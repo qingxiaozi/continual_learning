@@ -1,5 +1,5 @@
 ## 一、项目结构
-
+```
 continual_learning/
 ├── main.py
 ├── config/
@@ -29,7 +29,7 @@ continual_learning/
     ├── __init__.py
     ├── baseline_comparison.py
     └── ablation_study.py
-
+```
 ## Environment
 ### 车辆环境（VehicleEnvironment）：
 负责模拟车辆和基站的初始化和动态更新。

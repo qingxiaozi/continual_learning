@@ -38,6 +38,8 @@ class Config:
     MAX_CACHE_SIZE = 1000
     MIN_CACHE_SIZE = 100
     MAX_UPLOAD_BATCHES = 5  # 单阶段最大上传批次
+    MAX_LOCAL_BATCHES = 100  # 单个智能车最大缓存批次
+    MAX_CONFIDENCE_HISTORY = 7  #单个智能车最大缓存置信度个数
 
     # 数据集参数
     DATASET_NAMES = ['digit10', 'office31', 'domainnet']
