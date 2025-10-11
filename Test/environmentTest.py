@@ -30,5 +30,18 @@ class TestVehicleEnvironment:
         for vehicle in env.vehicles:
             assert vehicle.bs_connection is not None
 
+    def test_vehicle_movement(self):
+        '''
+        测试车辆移动
+        '''
+        env = VehicleEnvironment()
+        initial_positions = [v.position.copy() for v in env.vehicles]
+        env.update_vehicle_positions()
+        for i, vehicle in enumerate(env.vehicles):
+            # 检查位置是否更新
+            assert not np.array_equal(vehicle.position, initial_positions[i])
+            # 检查基站连接是否更新
+            assert vehicle.bs_connection is not None
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
