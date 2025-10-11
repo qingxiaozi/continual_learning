@@ -109,12 +109,13 @@ class VehicleEnvironment:
 
         # 性能统计
         self.session_stats = {
+            'total_communications':0,
+            'successful_uploads':0,
             'connection_changes':0
         }
 
         # 初始化环境
         self._initialize_environment()
-
 
     def _initialize_environment(self):
         '''
@@ -128,7 +129,6 @@ class VehicleEnvironment:
         self._establish_initial_connections()
         # 记录初始状态
         self._log_initial_environment()
-
 
     def _initialize_base_stations(self):
         coverage_radius = config.BASE_STATION_COVERAGE
@@ -153,7 +153,6 @@ class VehicleEnvironment:
             self.base_stations.append(base_station)
             print(f"基站 {i} 创建于位置 {bs_position}")
 
-
     def _initialize_vehicles(self):
         print(f"初始化 {config.NUM_VEHICLES}辆智能车辆")
         for i in range(config.NUM_VEHICLES):
@@ -165,7 +164,6 @@ class VehicleEnvironment:
             )
             self.vehicles.append(vehicle)
             print(f"车辆 {i} 创建于位置 {position}")
-
 
     def _generate_vehicle_position(self, vehicle_id):
         '''
@@ -188,7 +186,6 @@ class VehicleEnvironment:
         y_position = lane_centers[actual_lane] + np.random.uniform(-0.5, 0.5)
 
         return np.array([base_x, y_position])
-
 
     def _establish_initial_connections(self):
         '''
@@ -217,7 +214,6 @@ class VehicleEnvironment:
 
         print(f"初始连接建立完成: {connection_success_count}/{len(self.vehicles)} 车辆成功连接")
 
-
     def _find_nearest_base_station(self, position, check_coverage=True):
         '''
         找到距离指定位置最近的可用基站
@@ -245,7 +241,6 @@ class VehicleEnvironment:
 
         return nearest_bs
 
-
     def _log_initial_environment(self):
         '''
         记录环境的初始状态信息
@@ -265,7 +260,6 @@ class VehicleEnvironment:
         print(f"已连接车辆: {connected_vehicles}")
         print(f"基站平均利用率: {np.mean(bs_utilization):.2f}")
         print("=====================\n")
-
 
     def update_vehicle_positions(self, time_delta = 1.0):
         '''
@@ -293,7 +287,6 @@ class VehicleEnvironment:
         self.session_stats['connection_changes'] += connection_changes
         if connection_changes > 0:
             print(f"位置更新完成：{connection_changes} 个连接发生了变化")
-
 
     def _update_single_vehicle_position(self, vehicle, time_delta):
         '''
@@ -325,7 +318,6 @@ class VehicleEnvironment:
         smooth_y = current_y + (target_y - current_y) * 0.3  # 平滑因子
         vehicle.position = np.array([new_x, smooth_y])
 
-
     def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
         '''
         更新车辆与基站的连接
@@ -351,7 +343,6 @@ class VehicleEnvironment:
             vehicle.set_bs_connection(None)
             vehicle.communication_quality = 0.0
 
-
     def _get_vehicle_lane(self, vehicle):
         '''
         获取车辆当前所在车道编号
@@ -362,14 +353,12 @@ class VehicleEnvironment:
         distances = [abs(vehicle.position[1] - center) for center in lane_centers]
         return np.argmin(distances)
 
-
     def _get_lane_center(self, lane_index):
         '''
         获取指定车道的中心y坐标
         '''
         lane_width = self.road_width / self.num_lanes
         return -(self.road_width/2) + lane_width/2 + lane_index * lane_width
-
 
     def _get_base_station_by_id(self, bs_id):
         '''
@@ -379,7 +368,6 @@ class VehicleEnvironment:
             if bs['id'] == bs_id:
                 return bs
         return None
-
 
     def _should_update_connection(self, vehicle, old_position):
         '''
@@ -399,10 +387,28 @@ class VehicleEnvironment:
 
         return False
 
+    def reset(self):
+        '''
+        重置环境到初始状态
+        '''
+        print("重置车辆环境...")
+        # 重置状态变量
+        self.current_session = 0
+        self.environment_time = 0.0
+        self.session_stats = {
+            'total_communications':0,
+            'successful_uploads':0,
+            'connection_changes':0
+        }
+
+        #清空实体
+        self.vehicles = []
+        self.base_stations = []
+        #重新初始化
+        self._initialize_environment()
+        print("环境重置完成")
 
 # # 使用示例
-# import matplotlib.pyplot as plt
-# import numpy as np
 # from matplotlib.patches import Rectangle
 
 # def plot_vehicle_trajectories_separate(env, duration=60, time_step=1):
@@ -606,7 +612,7 @@ class VehicleEnvironment:
 #     plt.tight_layout()
 #     plt.show()
 
-# # if __name__ == "__main__":
+# if __name__ == "__main__":
 #     # 初始化环境
 #     env = VehicleEnvironment()
 #     # 绘制三个分开的图
