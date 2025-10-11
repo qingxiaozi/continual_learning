@@ -120,16 +120,13 @@ class VehicleEnvironment:
         '''
         初始化车辆和基站环境
         '''
-        # 步骤1: 初始化基站网络
+        # 初始化基站网络
         self._initialize_base_stations()
-
-        # 步骤2: 初始化车辆集群
+        # 初始化车辆集群
         self._initialize_vehicles()
-
-        # 步骤3: 建立初始连接
+        # 建立初始连接
         self._establish_initial_connections()
-
-        # 步骤4: 记录初始状态
+        # 记录初始状态
         self._log_initial_environment()
 
 
@@ -167,22 +164,20 @@ class VehicleEnvironment:
                 position = position,
             )
             self.vehicles.append(vehicle)
-
-            # if i < 5:  # 只打印前5辆的信息避免过多输出
             print(f"车辆 {i} 创建于位置 {position}")
 
 
     def _generate_vehicle_position(self, vehicle_id):
-        """
+        '''
         为车辆生成初始位置的策略
-        """
-        # 策略1: 沿道路长度均匀分布
+        '''
+        # x轴，沿道路长度均匀分布
         road_segments = 5
         segment_length = self.road_length / road_segments
         segment_idx = vehicle_id % road_segments
         base_x = segment_idx * segment_length + np.random.uniform(0, segment_length * 0.8)
 
-        # 策略2: 车道分配 - 模拟真实交通流
+        # y轴，车道分配，模拟真实交通流
         lane_width = self.road_width / self.num_lanes
         lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width for i in range(self.num_lanes)]
 
@@ -196,7 +191,8 @@ class VehicleEnvironment:
 
 
     def _establish_initial_connections(self):
-        '''建立车辆与基站的初始连接
+        '''
+        建立车辆与基站的初始连接
         '''
         connection_success_count = 0
         for vehicle in self.vehicles:
@@ -223,13 +219,14 @@ class VehicleEnvironment:
 
 
     def _find_nearest_base_station(self, position, check_coverage=True):
-        '''找到距离指定位置最近的可用基站
+        '''
+        找到距离指定位置最近的可用基站
         input:
-        position: 车辆位置坐标 [x, y]
-        check_coverage: 是否检查覆盖范围
+            position: 车辆位置坐标 [x, y]
+            check_coverage: 是否检查覆盖范围
 
         return:
-        dict: 最近的基站信息，如果没有可用基站则返回None
+            dict: 最近的基站信息，如果没有可用基站则返回None
         '''
         min_distance = float('inf')
         nearest_bs = None
@@ -237,10 +234,8 @@ class VehicleEnvironment:
         for bs in self.base_stations:
             # 计算欧几里得距离
             distance = np.linalg.norm(position - bs['position'])
-
-            # 检查是否在覆盖范围内（如果要求）
+            # 检查是否在覆盖范围内
             within_coverage = (not check_coverage) or (distance <= bs['coverage'])
-
             # 检查基站容量
             has_capacity = len(bs['connected_vehicles']) < bs['capacity']
 
@@ -255,7 +250,6 @@ class VehicleEnvironment:
         '''
         记录环境的初始状态信息
         '''
-
         # 统计连接情况
         connected_vehicles = sum(1 for v in self.vehicles if v.bs_connection is not None)
         bs_utilization = []
@@ -345,12 +339,10 @@ class VehicleEnvironment:
         # 连接到新基站
         if new_bs:
             vehicle.set_bs_connection(new_bs['id'])
-
             # 计算连接质量
             distance = np.linalg.norm(vehicle.position - new_bs['position'])
             quality = max(0.1, 1 - distance / new_bs['coverage'])  # 最低质量0.1
             vehicle.communication_quality = quality
-
             # 更新基站连接列表
             if vehicle.id not in new_bs['connected_vehicles']:
                 new_bs['connected_vehicles'].append(vehicle.id)
@@ -361,23 +353,28 @@ class VehicleEnvironment:
 
 
     def _get_vehicle_lane(self, vehicle):
-        """获取车辆当前所在车道编号"""
+        '''
+        获取车辆当前所在车道编号
+        '''
         lane_width = self.road_width / self.num_lanes
         lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width for i in range(self.num_lanes)]
-
         # 找到最近的车道中心
         distances = [abs(vehicle.position[1] - center) for center in lane_centers]
         return np.argmin(distances)
 
 
     def _get_lane_center(self, lane_index):
-        """获取指定车道的中心y坐标"""
+        '''
+        获取指定车道的中心y坐标
+        '''
         lane_width = self.road_width / self.num_lanes
         return -(self.road_width/2) + lane_width/2 + lane_index * lane_width
 
 
     def _get_base_station_by_id(self, bs_id):
-        """根据ID获取基站对象"""
+        '''
+        根据ID获取基站对象
+        '''
         for bs in self.base_stations:
             if bs['id'] == bs_id:
                 return bs
@@ -385,13 +382,13 @@ class VehicleEnvironment:
 
 
     def _should_update_connection(self, vehicle, old_position):
-        """判断是否需要更新车辆连接"""
+        '''
+        判断是否需要更新车辆连接
+        '''
         if vehicle.bs_connection is None:
             return True  # 当前无连接，需要尝试连接
-
         # 计算移动距离
         movement = np.linalg.norm(vehicle.position - old_position)
-
         # 如果移动显著，检查连接
         if movement > 50:  # 移动超过50米
             current_bs = self._get_base_station_by_id(vehicle.bs_connection)
