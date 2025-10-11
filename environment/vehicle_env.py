@@ -18,7 +18,6 @@ class Vehicle:
     def __init__(self, vehicle_id, position):
         self.id = vehicle_id  # 车辆唯一标识符
         self.position = position  # 车辆当前位置坐标，用于确定与哪个基站连接，计算通信质量，模拟车辆运动
-        self.cache_data = []
         self.local_model = None
         self.confidence_history = []  # 历史置信度记录
         self.bs_connection = None  # 当前连接的基站ID
@@ -99,13 +98,22 @@ class VehicleEnvironment:
         self.vehicles = []  # 车辆对象列表
         self.base_stations = []  # 基站对象列表，为基站信息字典
         self.current_session = 0  # 当前训练会话编号
-        self.road_length = 5000     # 道路长度（米）
-        self.road_width = 20        # 道路宽度（米），-10到10
+        self.environment_time = 0.0  # 环境运行时间(s)
+        self.road_length = 5000     # 道路长度(m）
+        self.road_width = 20        # 道路宽度(m），-10到10
         self.num_lanes = 4          # 车道数量
-        self._initialize_environment()  # 初始化环境
+
+        # 性能统计
+        self.session_stats = {
+            'connection_changes':0
+        }
+
+        # 初始化环境
+        self._initialize_environment()
 
     def _initialize_environment(self):
-        '''初始化车辆和基站环境
+        '''
+        初始化车辆和基站环境
         '''
         # 步骤1: 初始化基站网络
         self._initialize_base_stations()
@@ -113,11 +121,11 @@ class VehicleEnvironment:
         # 步骤2: 初始化车辆集群
         self._initialize_vehicles()
 
-        # # 步骤3: 建立初始连接
-        # self._establish_initial_connections()
+        # 步骤3: 建立初始连接
+        self._establish_initial_connections()
 
-        # # 步骤4: 记录初始状态
-        # self._log_initial_environment()
+        # 步骤4: 记录初始状态
+        self._log_initial_environment()
 
     def _initialize_base_stations(self):
         coverage_radius = config.BASE_STATION_COVERAGE
@@ -168,18 +176,133 @@ class VehicleEnvironment:
 
         # 策略2: 车道分配 - 模拟真实交通流
         lane_width = self.road_width / self.num_lanes
-        lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width
-                    for i in range(self.num_lanes)]
+        lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width for i in range(self.num_lanes)]
 
         # 车辆ID决定初始车道，增加随机性
         preferred_lane = vehicle_id % self.num_lanes
         lane_variation = np.random.randint(-1, 2)  # -1, 0, 1
         actual_lane = max(0, min(self.num_lanes-1, preferred_lane + lane_variation))
-
         y_position = lane_centers[actual_lane] + np.random.uniform(-0.5, 0.5)
 
         return np.array([base_x, y_position])
 
+    def _establish_initial_connections(self):
+        '''建立车辆与基站的初始连接
+        '''
+        connection_success_count = 0
+        for vehicle in self.vehicles:
+            nearest_bs = self._find_nearest_base_station(vehicle.position)
+            if nearest_bs:
+                # 检查基站容量
+                if len(nearest_bs['connected_vehicles']) < nearest_bs['capacity']:
+                    vehicle.set_bs_connection(nearest_bs['id'])
+                    nearest_bs['connected_vehicles'].append(vehicle.id)
+                    connection_success_count += 1
+                else:
+                    print(f"警告: 基站 {nearest_bs['id']} 容量已满，车辆 {vehicle.id} 无法连接")
+                    vehicle.set_bs_connection(None)
+            else:
+                print(f"警告: 车辆 {vehicle.id} 不在任何基站覆盖范围内")
+                vehicle.set_bs_connection(None)
+
+        print(f"初始连接建立完成: {connection_success_count}/{len(self.vehicles)} 车辆成功连接")
+
+    def _find_nearest_base_station(self, position, check_coverage=True):
+        '''找到距离指定位置最近的可用基站
+        input:
+        position: 车辆位置坐标 [x, y]
+        check_coverage: 是否检查覆盖范围
+
+        return:
+        dict: 最近的基站信息，如果没有可用基站则返回None
+        '''
+        min_distance = float('inf')
+        nearest_bs = None
+
+        for bs in self.base_stations:
+            # 计算欧几里得距离
+            distance = np.linalg.norm(position - bs['position'])
+
+            # 检查是否在覆盖范围内（如果要求）
+            within_coverage = (not check_coverage) or (distance <= bs['coverage'])
+
+            # 检查基站容量
+            has_capacity = len(bs['connected_vehicles']) < bs['capacity']
+
+            if within_coverage and has_capacity and distance < min_distance:
+                min_distance = distance
+                nearest_bs = bs
+
+        return nearest_bs
+
+    def _log_initial_environment(self):
+        '''
+        记录环境的初始状态信息
+        '''
+
+        # 统计连接情况
+        connected_vehicles = sum(1 for v in self.vehicles if v.bs_connection is not None)
+        bs_utilization = []
+
+        for bs in self.base_stations:
+            utilization = len(bs['connected_vehicles']) / bs['capacity']
+            bs_utilization.append(utilization)
+            bs['utilization'] = utilization
+
+        print("\n=== 环境初始化完成 ===")
+        print(f"基站数量: {len(self.base_stations)}")
+        print(f"车辆数量: {len(self.vehicles)}")
+        print(f"已连接车辆: {connected_vehicles}")
+        print(f"基站平均利用率: {np.mean(bs_utilization):.2f}")
+        print("=====================\n")
+
+    # def update_vehicle_positions(self):
+    #     '''
+    #     更新车辆位置
+    #     input:
+    #         time_delta：时间步长(s)
+    #     '''
+    #     connection_changes = 0
+    #     for vehicle in self.vehicles:
+    #         # 保持旧位置和连接状态
+    #         old_position = vehicle.position.copy()
+    #         old_bs_connection = vehicle.bs_connection
+    #         # 更新车辆位置
+    #         self._update_single_vehicle_position(vehicle, time_delta)
+
+    #         # 检查是否需要更新基站连接
+    #         if self._should_update_connection(vehicle, old_position):
+    #             new_bs = self._find_nearest_base_station(vehicle.position)
+    #             self._update_vehicle_connection(vehicle, old_bs_connection, new_bs)
+
+    #             if old_bs_connection != (new_bs['id'] if new_bs else None):
+    #                 connection_changes += 1
+
+    #     # 更新环境时间
+    #     self.environment_time += time_delta
+    #     self.session_stats['connection_changes'] += connection_changes
+
+    #     if connection_changes > 0:
+    #         print(f"位置更新完成：{connection_changes} 个连接发生了变化")
+
+    # def _update_single_vehicle_position(self, vehicle, time_delta):
+    #     '''
+    #     更新单个车辆的位置
+    #     假设车辆速度在8-20 m/s(29-72 km/h)之间
+    #     '''
+    #     base_speed = np.random.uniform(8, 20)
+    #     # 车道偏好：车辆倾向于保持当前车道
+    #     current_lane = self._get_vehicle_lane(vehicle)
+    #     lane_keeping_factor = 0.8  # 80%概率保持车道
+
+
+
+    # def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
+    #     '''
+    #     更新车辆与基站的连接
+    #     '''
+
+        #
 
 if __name__ == "__main__":
     tmp = VehicleEnvironment()
