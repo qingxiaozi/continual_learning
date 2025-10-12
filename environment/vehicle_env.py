@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
 import random
@@ -10,14 +11,15 @@ from collections import defaultdict
 
 
 class Vehicle:
-    '''
+    """
     智能车辆类，代表车路协同系统中的分布式感知节点
 
     1. 维护车辆自身的状态信息（位置、连接、数据等）
     2. 执行本地模型推理和置信度计算
     3. 管理本地数据缓存
     4. 与基站和边缘服务器进行通信协调
-    '''
+    """
+
     def __init__(self, vehicle_id, position):
         # 基本信息
         self.id = vehicle_id  # 车辆唯一标识符
@@ -31,15 +33,14 @@ class Vehicle:
         self.data_quality_scores = []  # 数据质量评分
         # 模型状态
         self.local_model = None
-        self.model_version = 0 # 当前模型版本
+        self.model_version = 0  # 当前模型版本
         # 性能监控
         self.confidence_history = []  # 历史置信度记录
         # 资源约束
         self.computation_capacity = 1.0  # 计算能力因子
-        self.storage_capacity = 1000     # 存储容量（数据批次数）
+        self.storage_capacity = 1000  # 存储容量（数据批次数）
         # 状态标志
         self.is_online = True
-
 
     def set_bs_connection(self, bs_id):
         old_bs = self.bs_connection
@@ -49,21 +50,21 @@ class Vehicle:
             print(f"Vehicle {self.id}: BS connection changed from {old_bs} to {bs_id}")
 
     def add_data_batch(self, data_batch):
-        '''添加数据批次
+        """添加数据批次
         data_batch：数据批次，DataLoader对象
-        '''
+        """
         self.data_batches.append(data_batch)
-            # 缓存管理逻辑（可选）：
+        # 缓存管理逻辑（可选）：
         if len(self.data_batches) > config.MAX_LOCAL_BATCHES:
             # 移除最旧的数据批次（FIFO策略）
             self.data_batches.pop(0)
 
     def get_inference_confidence(self, model, data_loader):
-        '''计算模型在本地数据上的推理置信度
+        """计算模型在本地数据上的推理置信度
         1. 对于每个样本，模型输出一个向量logits，通过softmax函数转换为概率分布
         2. 取概率分布中最大的概率值作为该样本的置信度
         3. 对于一个批次的数据，计算所有样本置信度的平均值作为该批次的平均置信度
-        '''
+        """
         if not data_loader:
             return 0.0
 
@@ -83,12 +84,14 @@ class Vehicle:
                 outputs = model(inputs)
 
                 # 处理不同类型的模型输出
-                if hasattr(outputs, 'logits'):
+                if hasattr(outputs, "logits"):
                     # 某些模型（如 transformers）输出包含logits属性
                     outputs = outputs.logits
                 # 计算置信度
                 probabilities = torch.softmax(outputs, dim=1)  # 转换为概率分布
-                batch_confidence = torch.max(probabilities, dim=1)[0]  # 获取每个样本的最大概率
+                batch_confidence = torch.max(probabilities, dim=1)[
+                    0
+                ]  # 获取每个样本的最大概率
                 mean_confidence = batch_confidence.mean().item()  # 批次平均置信度
 
                 total_confidence += mean_confidence
@@ -107,37 +110,38 @@ class Vehicle:
 
 
 class VehicleEnvironment:
-    '''
+    """
     车辆环境类
 
     1. 初始化环境。创建车辆和基站，并将车辆连接到最近的基站
     2. 更新车辆位置。模拟车辆移动，更新车辆与基站的连接
     3. 获取环境状态。为DRL智能体提供状态信息，包括每辆车的置信度、测试损失和数据质量评分
-    '''
+    """
+
     def __init__(self):
         # 实体集合
         self.vehicles = []  # 车辆对象列表
         self.base_stations = []  # 基站对象列表，为基站信息字典
         self.current_session = 0  # 当前训练会话编号
         self.environment_time = 0.0  # 环境运行时间(s)
-        self.road_length = 5000     # 道路长度(m）
-        self.road_width = 20        # 道路宽度(m），-10到10
-        self.num_lanes = 4          # 车道数量
+        self.road_length = 5000  # 道路长度(m）
+        self.road_width = 20  # 道路宽度(m），-10到10
+        self.num_lanes = 4  # 车道数量
 
         # 性能统计
         self.session_stats = {
-            'total_communications':0,
-            'successful_uploads':0,
-            'connection_changes':0
+            "total_communications": 0,
+            "successful_uploads": 0,
+            "connection_changes": 0,
         }
 
         # 初始化环境
         self._initialize_environment()
 
     def _initialize_environment(self):
-        '''
+        """
         初始化车辆和基站环境
-        '''
+        """
         # 初始化基站网络
         self._initialize_base_stations()
         # 初始化车辆集群
@@ -154,18 +158,22 @@ class VehicleEnvironment:
         print(f"初始化 {num_bs} 个基站，覆盖半径: {coverage_radius}米")
 
         for i in range(num_bs):
-            #基站位置：沿着道路均匀分布
-            bs_x = i * (self.road_length / (num_bs - 1)) if num_bs > 1 else self.road_length /2
+            # 基站位置：沿着道路均匀分布
+            bs_x = (
+                i * (self.road_length / (num_bs - 1))
+                if num_bs > 1
+                else self.road_length / 2
+            )
             bs_position = np.array([bs_x, -10])  # 假设基站位于道路边缘
-            #基站属性配置
+            # 基站属性配置
             base_station = {
-                'id': i,
-                'position': bs_position,
-                'coverage': coverage_radius,
-                'capacity': 50,  # 最大连接车辆数
-                'connected_vehicles': [],  # 当前连接的车辆ID列表
-                'utilization': 0.0,  # 利用率
-                'signal_strength': 1.0  # 信号强度因子
+                "id": i,
+                "position": bs_position,
+                "coverage": coverage_radius,
+                "capacity": 50,  # 最大连接车辆数
+                "connected_vehicles": [],  # 当前连接的车辆ID列表
+                "utilization": 0.0,  # 利用率
+                "signal_strength": 1.0,  # 信号强度因子
             }
             self.base_stations.append(base_station)
             print(f"基站 {i} 创建于位置 {bs_position}")
@@ -176,63 +184,72 @@ class VehicleEnvironment:
             position = self._generate_vehicle_position(i)
             # 创建车辆实例
             vehicle = Vehicle(
-                vehicle_id = i,
-                position = position,
+                vehicle_id=i,
+                position=position,
             )
             self.vehicles.append(vehicle)
             print(f"车辆 {i} 创建于位置 {position}")
 
     def _generate_vehicle_position(self, vehicle_id):
-        '''
+        """
         为车辆生成初始位置的策略
-        '''
+        """
         # x轴，沿道路长度均匀分布
         road_segments = 5
         segment_length = self.road_length / road_segments
         segment_idx = vehicle_id % road_segments
-        base_x = segment_idx * segment_length + np.random.uniform(0, segment_length * 0.8)
+        base_x = segment_idx * segment_length + np.random.uniform(
+            0, segment_length * 0.8
+        )
 
         # y轴，车道分配，模拟真实交通流
         lane_width = self.road_width / self.num_lanes
-        lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width for i in range(self.num_lanes)]
+        lane_centers = [
+            -(self.road_width / 2) + lane_width / 2 + i * lane_width
+            for i in range(self.num_lanes)
+        ]
 
         # 车辆ID决定初始车道，增加随机性
         preferred_lane = vehicle_id % self.num_lanes
         lane_variation = np.random.randint(-1, 2)  # -1, 0, 1
-        actual_lane = max(0, min(self.num_lanes-1, preferred_lane + lane_variation))
+        actual_lane = max(0, min(self.num_lanes - 1, preferred_lane + lane_variation))
         y_position = lane_centers[actual_lane] + np.random.uniform(-0.5, 0.5)
 
         return np.array([base_x, y_position])
 
     def _establish_initial_connections(self):
-        '''
+        """
         建立车辆与基站的初始连接
-        '''
+        """
         connection_success_count = 0
         for vehicle in self.vehicles:
             nearest_bs = self._find_nearest_base_station(vehicle.position)
             if nearest_bs:
                 # 检查基站容量
-                if len(nearest_bs['connected_vehicles']) < nearest_bs['capacity']:
-                    vehicle.set_bs_connection(nearest_bs['id'])
-                    nearest_bs['connected_vehicles'].append(vehicle.id)
+                if len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
+                    vehicle.set_bs_connection(nearest_bs["id"])
+                    nearest_bs["connected_vehicles"].append(vehicle.id)
                     connection_success_count += 1
 
                     # 计算连接质量
-                    distance = np.linalg.norm(vehicle.position - nearest_bs['position'])
-                    quality = max(0, 1 - distance / nearest_bs['coverage'])
+                    distance = np.linalg.norm(vehicle.position - nearest_bs["position"])
+                    quality = max(0, 1 - distance / nearest_bs["coverage"])
                     vehicle.communication_quality = quality
                 else:
-                    print(f"警告: 基站 {nearest_bs['id']} 容量已满，车辆 {vehicle.id} 无法连接")
+                    print(
+                        f"警告: 基站 {nearest_bs['id']} 容量已满，车辆 {vehicle.id} 无法连接"
+                    )
                     vehicle.set_bs_connection(None)
             else:
                 print(f"警告: 车辆 {vehicle.id} 不在任何基站覆盖范围内")
                 vehicle.set_bs_connection(None)
 
-        print(f"初始连接建立完成: {connection_success_count}/{len(self.vehicles)} 车辆成功连接")
+        print(
+            f"初始连接建立完成: {connection_success_count}/{len(self.vehicles)} 车辆成功连接"
+        )
 
     def _find_nearest_base_station(self, position, check_coverage=True):
-        '''
+        """
         找到距离指定位置最近的可用基站
         input:
             position: 车辆位置坐标 [x, y]
@@ -240,17 +257,17 @@ class VehicleEnvironment:
 
         return:
             dict: 最近的基站信息，如果没有可用基站则返回None
-        '''
-        min_distance = float('inf')
+        """
+        min_distance = float("inf")
         nearest_bs = None
 
         for bs in self.base_stations:
             # 计算欧几里得距离
-            distance = np.linalg.norm(position - bs['position'])
+            distance = np.linalg.norm(position - bs["position"])
             # 检查是否在覆盖范围内
-            within_coverage = (not check_coverage) or (distance <= bs['coverage'])
+            within_coverage = (not check_coverage) or (distance <= bs["coverage"])
             # 检查基站容量
-            has_capacity = len(bs['connected_vehicles']) < bs['capacity']
+            has_capacity = len(bs["connected_vehicles"]) < bs["capacity"]
 
             if within_coverage and has_capacity and distance < min_distance:
                 min_distance = distance
@@ -259,17 +276,19 @@ class VehicleEnvironment:
         return nearest_bs
 
     def _log_initial_environment(self):
-        '''
+        """
         记录环境的初始状态信息
-        '''
+        """
         # 统计连接情况
-        connected_vehicles = sum(1 for v in self.vehicles if v.bs_connection is not None)
+        connected_vehicles = sum(
+            1 for v in self.vehicles if v.bs_connection is not None
+        )
         bs_utilization = []
 
         for bs in self.base_stations:
-            utilization = len(bs['connected_vehicles']) / bs['capacity']
+            utilization = len(bs["connected_vehicles"]) / bs["capacity"]
             bs_utilization.append(utilization)
-            bs['utilization'] = utilization
+            bs["utilization"] = utilization
 
         print("\n=== 环境初始化完成 ===")
         print(f"基站数量: {len(self.base_stations)}")
@@ -278,12 +297,12 @@ class VehicleEnvironment:
         print(f"基站平均利用率: {np.mean(bs_utilization):.2f}")
         print("=====================\n")
 
-    def update_vehicle_positions(self, time_delta = 1.0):
-        '''
+    def update_vehicle_positions(self, time_delta=1.0):
+        """
         更新车辆位置
         input:
             time_delta：时间步长(s)
-        '''
+        """
         connection_changes = 0
         for vehicle in self.vehicles:
             # 保持旧位置和连接状态
@@ -296,20 +315,20 @@ class VehicleEnvironment:
             if self._should_update_connection(vehicle, old_position):
                 new_bs = self._find_nearest_base_station(vehicle.position)
                 self._update_vehicle_connection(vehicle, old_bs_connection, new_bs)
-                if old_bs_connection != (new_bs['id'] if new_bs else None):
+                if old_bs_connection != (new_bs["id"] if new_bs else None):
                     connection_changes += 1
 
         # 更新环境时间
         self.environment_time += time_delta
-        self.session_stats['connection_changes'] += connection_changes
+        self.session_stats["connection_changes"] += connection_changes
         if connection_changes > 0:
             print(f"位置更新完成：{connection_changes} 个连接发生了变化")
 
     def _update_single_vehicle_position(self, vehicle, time_delta):
-        '''
+        """
         更新单个车辆的位置
         假设车辆速度在8-20 m/s(29-72 km/h)之间
-        '''
+        """
         base_speed = np.random.uniform(8, 20)
         # 车道偏好：车辆倾向于保持当前车道
         current_lane = self._get_vehicle_lane(vehicle)
@@ -322,7 +341,9 @@ class VehicleEnvironment:
             target_y = self._get_lane_center(new_lane)
         else:
             # 保持车道，但轻微横向波动
-            target_y = self._get_lane_center(current_lane) + np.random.uniform(-0.2, 0.2)
+            target_y = self._get_lane_center(current_lane) + np.random.uniform(
+                -0.2, 0.2
+            )
         # 更新位置
         new_x = vehicle.position[0] + base_speed * time_delta
         # 边界处理：环形道路
@@ -336,60 +357,63 @@ class VehicleEnvironment:
         vehicle.position = np.array([new_x, smooth_y])
 
     def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
-        '''
+        """
         更新车辆与基站的连接
-        '''
+        """
         # 从旧基站断开连接
         if old_bs_id is not None:
             old_bs = self._get_base_station_by_id(old_bs_id)
-            if old_bs and vehicle.id in old_bs['connected_vehicles']:
-                old_bs['connected_vehicles'].remove(vehicle.id)
+            if old_bs and vehicle.id in old_bs["connected_vehicles"]:
+                old_bs["connected_vehicles"].remove(vehicle.id)
 
         # 连接到新基站
         if new_bs:
-            vehicle.set_bs_connection(new_bs['id'])
+            vehicle.set_bs_connection(new_bs["id"])
             # 计算连接质量
-            distance = np.linalg.norm(vehicle.position - new_bs['position'])
-            quality = max(0.1, 1 - distance / new_bs['coverage'])  # 最低质量0.1
+            distance = np.linalg.norm(vehicle.position - new_bs["position"])
+            quality = max(0.1, 1 - distance / new_bs["coverage"])  # 最低质量0.1
             vehicle.communication_quality = quality
             # 更新基站连接列表
-            if vehicle.id not in new_bs['connected_vehicles']:
-                new_bs['connected_vehicles'].append(vehicle.id)
+            if vehicle.id not in new_bs["connected_vehicles"]:
+                new_bs["connected_vehicles"].append(vehicle.id)
         else:
             # 无可用基站
             vehicle.set_bs_connection(None)
             vehicle.communication_quality = 0.0
 
     def _get_vehicle_lane(self, vehicle):
-        '''
+        """
         获取车辆当前所在车道编号
-        '''
+        """
         lane_width = self.road_width / self.num_lanes
-        lane_centers = [-(self.road_width/2) + lane_width/2 + i*lane_width for i in range(self.num_lanes)]
+        lane_centers = [
+            -(self.road_width / 2) + lane_width / 2 + i * lane_width
+            for i in range(self.num_lanes)
+        ]
         # 找到最近的车道中心
         distances = [abs(vehicle.position[1] - center) for center in lane_centers]
         return np.argmin(distances)
 
     def _get_lane_center(self, lane_index):
-        '''
+        """
         获取指定车道的中心y坐标
-        '''
+        """
         lane_width = self.road_width / self.num_lanes
-        return -(self.road_width/2) + lane_width/2 + lane_index * lane_width
+        return -(self.road_width / 2) + lane_width / 2 + lane_index * lane_width
 
     def _get_base_station_by_id(self, bs_id):
-        '''
+        """
         根据ID获取基站对象
-        '''
+        """
         for bs in self.base_stations:
-            if bs['id'] == bs_id:
+            if bs["id"] == bs_id:
                 return bs
         return None
 
     def _should_update_connection(self, vehicle, old_position):
-        '''
+        """
         判断是否需要更新车辆连接
-        '''
+        """
         if vehicle.bs_connection is None:
             return True  # 当前无连接，需要尝试连接
         # 计算移动距离
@@ -398,32 +422,35 @@ class VehicleEnvironment:
         if movement > 50:  # 移动超过50米
             current_bs = self._get_base_station_by_id(vehicle.bs_connection)
             if current_bs:
-                current_distance = np.linalg.norm(vehicle.position - current_bs['position'])
+                current_distance = np.linalg.norm(
+                    vehicle.position - current_bs["position"]
+                )
                 # 如果距离超过覆盖范围的80%，考虑切换
-                return current_distance > current_bs['coverage'] * 0.8
+                return current_distance > current_bs["coverage"] * 0.8
 
         return False
 
     def reset(self):
-        '''
+        """
         重置环境到初始状态
-        '''
+        """
         print("重置车辆环境...")
         # 重置状态变量
         self.current_session = 0
         self.environment_time = 0.0
         self.session_stats = {
-            'total_communications':0,
-            'successful_uploads':0,
-            'connection_changes':0
+            "total_communications": 0,
+            "successful_uploads": 0,
+            "connection_changes": 0,
         }
 
-        #清空实体
+        # 清空实体
         self.vehicles = []
         self.base_stations = []
-        #重新初始化
+        # 重新初始化
         self._initialize_environment()
         print("环境重置完成")
+
 
 # # 使用示例
 # from matplotlib.patches import Rectangle

@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import Config
 from config.paths import Paths
 
+
 def test_config_basic():
     """测试配置类的基本功能"""
     print("=== 配置参数基础测试 ===")
@@ -76,7 +77,9 @@ def test_device_compatibility():
     if config.DEVICE.type == "cuda":
         print("✓ 使用GPU加速")
         print(f"GPU设备: {torch.cuda.get_device_name()}")
-        print(f"GPU内存: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        print(
+            f"GPU内存: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB"
+        )
     else:
         print("ℹ 使用CPU，建议在支持CUDA的环境中使用GPU")
 
@@ -130,7 +133,7 @@ def run_complete_test():
     test_device_compatibility()
     test_paths_basic()
 
-    print("\n" + "="*50)
+    print("\n" + "=" * 50)
     print("测试总结:")
     if validation_passed:
         print("✓ 所有测试通过！配置脚本可以正常使用。")
