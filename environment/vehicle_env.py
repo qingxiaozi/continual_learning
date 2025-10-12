@@ -19,17 +19,34 @@ class Vehicle:
     4. 与基站和边缘服务器进行通信协调
     '''
     def __init__(self, vehicle_id, position):
+        # 基本信息
         self.id = vehicle_id  # 车辆唯一标识符
         self.position = position  # 车辆当前位置坐标，用于确定与哪个基站连接，计算通信质量，模拟车辆运动
-        self.local_model = None
-        self.confidence_history = []  # 历史置信度记录
+        # 通信状态
         self.bs_connection = None  # 当前连接的基站ID
         self.communication_quality = 1.0  # 通信质量因子 [0, 1]
-        self.data_batches = []  #车辆采集的实时数据批次，未标注
+        # 数据管理
+        self.data_batches = []  # 车辆采集的实时数据批次，未标注
         self.cache_data = []  # 1
+        self.data_quality_scores = []  # 数据质量评分
+        # 模型状态
+        self.local_model = None
+        self.model_version = 0 # 当前模型版本
+        # 性能监控
+        self.confidence_history = []  # 历史置信度记录
+        # 资源约束
+        self.computation_capacity = 1.0  # 计算能力因子
+        self.storage_capacity = 1000     # 存储容量（数据批次数）
+        # 状态标志
+        self.is_online = True
+
 
     def set_bs_connection(self, bs_id):
+        old_bs = self.bs_connection
         self.bs_connection = bs_id
+        # 记录基站切换事件
+        if old_bs != bs_id:
+            print(f"Vehicle {self.id}: BS connection changed from {old_bs} to {bs_id}")
 
     def add_data_batch(self, data_batch):
         '''添加数据批次
