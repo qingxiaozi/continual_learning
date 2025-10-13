@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
 from environment.vehicle_env import VehicleEnvironment
@@ -15,7 +16,8 @@ class CommunicationSystem:
     - 模型重训练时延 (t_retrain)
     - 模型广播时延 (t_broadcast)
     """
-    def __init__(self, vehicle_env = None):
+
+    def __init__(self, vehicle_env=None):
         # 环境引用
         self.vehicle_env = vehicle_env
 
@@ -42,7 +44,9 @@ class CommunicationSystem:
 
         # 训练参数
         self.training_epochs = config.NUM_EPOCH  # E，训练轮次
-        self.cache_samples_per_vehicle = config.MAX_LOCAL_BATCHES * config.SAMPLES_OF_BATCH  # |D_v|，每车缓存样本数
+        self.cache_samples_per_vehicle = (
+            config.MAX_LOCAL_BATCHES * config.SAMPLES_OF_BATCH
+        )  # |D_v|，每车缓存样本数
 
         # 模型参数
         self.model_parameter_size = 50e6  # P_m，模型参数量的大小（bit），1
@@ -66,11 +70,13 @@ class CommunicationSystem:
         # 计算距离
         print(f"vehicle的位置为{vehicle.position}")
         print(f"基站的位置为{base_station['position']}")
-        distance = np.linalg.norm(vehicle.position - base_station['position'])
+        distance = np.linalg.norm(vehicle.position - base_station["position"])
         # 避免除零
         distance = max(distance, 1.0)
         # 计算路径损耗部分: G_0 * (d_v^s)^{-α}
-        path_loss_component = self.reference_gain * (distance ** (-self.path_loss_exponent))
+        path_loss_component = self.reference_gain * (
+            distance ** (-self.path_loss_exponent)
+        )
         # 生成阴影衰落 ξ (对数正态分布)
         shadowing_key = f"{vehicle.id}_{session_id}"
         if shadowing_key in self._shadowing_cache:
@@ -86,14 +92,11 @@ class CommunicationSystem:
         return path_loss_component * shadowing_linear
 
 
-
 if __name__ == "__main__":
     env = VehicleEnvironment()
     comm_system = CommunicationSystem(env)
     vehicle = env.vehicles[0]
     base_station = env.base_stations[0]
-    channel_gain = comm_system.calculate_channel_gain(vehicle, base_station, session_id = 1)
-
-
-
-
+    channel_gain = comm_system.calculate_channel_gain(
+        vehicle, base_station, session_id=1
+    )

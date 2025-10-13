@@ -66,12 +66,16 @@ class TestCommunicationSystem:
             # 检查是否有车辆和基站
             assert len(env.vehicles) > 0, "没有创建车辆"
             assert len(env.base_stations) > 0, "没有创建基站"
-            print(f"✓ 创建了 {len(env.vehicles)} 辆车和 {len(env.base_stations)} 个基站")
+            print(
+                f"✓ 创建了 {len(env.vehicles)} 辆车和 {len(env.base_stations)} 个基站"
+            )
 
             # 测试信道增益计算
             vehicle = env.vehicles[0]
             base_station = env.base_stations[0]
-            channel_gain = comm_system.calculate_channel_gain(vehicle, base_station, session_id = 1)
+            channel_gain = comm_system.calculate_channel_gain(
+                vehicle, base_station, session_id=1
+            )
             print(f"✓ 信道增益计算: {channel_gain:.6f}")
 
             # 验证信道增益合理性
@@ -81,9 +85,9 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise  # 重新抛出异常，让测试失败
-
 
 
 if __name__ == "__main__":
