@@ -52,8 +52,8 @@ def test_config_validation():
         (config.DRL_BATCH_SIZE > 0, "批次大小应大于0"),
         (config.DRL_BUFFER_SIZE > config.DRL_BATCH_SIZE, "缓冲区应大于批次大小"),
         (config.BASE_STATION_COVERAGE > 0, "基站覆盖范围应大于0"),
-        (config.UPLINK_BANDWIDTH > 0, "上行带宽应大于0"),
-        (config.DOWNLINK_BANDWIDTH > 0, "下行带宽应大于0"),
+        (config.BASE_BANDWIDTH > 0, "基础带宽应大于0"),
+        (config.NOISE_POWER > 0, "噪声应大于0"),
     ]
 
     all_passed = True
@@ -64,7 +64,7 @@ def test_config_validation():
             print(f"✗ {message}")
             all_passed = False
 
-    return all_passed
+    assert all_passed, f"配置验证失败: {', '.join(error_messages)}"
 
 
 def test_device_compatibility():

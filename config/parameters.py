@@ -11,12 +11,14 @@ class Config:
 
     # 通信参数
     BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围
-    UPLINK_BANDWIDTH = 100e6  # Hz，上行带宽，限制数据上传的速度
-    DOWNLINK_BANDWIDTH = 200e6  # Hz，下行带宽，限制模型下发的速度
-    TRANSMIT_POWER = 23  # dBm，发射功率，影响通信距离和质量
-    NOISE_POWER = -174  # dBm/Hz，噪声功率，决定通信质量的下限
+    BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
+    BS_TRANSMIT_POWER = 10  # W，基站发射功率，影响通信距离和质量
+    VEHICLE_TRANSMIT_POWER = 0.1  # 车辆发射功率（W）
+    NOISE_POWER = 1e-10  # W，噪声功率，决定通信质量的下限
     PATH_LOSS_EXPONENT = 2.7  # 路径损耗指数
     SHADOWING_STD = 8  # 阴影衰落标准差
+    INTERFERENCE_POWER = 1e-11  # 干扰功率
+    REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
 
     # 模型参数
     MODEL_INPUT_SIZE = 224  # 模型输入尺寸的大小
@@ -41,6 +43,7 @@ class Config:
     MAX_UPLOAD_BATCHES = 5  # 单阶段最大上传批次
     MAX_LOCAL_BATCHES = 100  # 单个智能车最大缓存批次
     MAX_CONFIDENCE_HISTORY = 7  # 单个智能车最大缓存置信度个数
+    SAMPLES_OF_BATCH = 64  # 每个batch中的样本数
 
     # 数据集参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
