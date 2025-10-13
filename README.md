@@ -9,7 +9,7 @@ continual_learning/
 ├── environment/
 │   ├── __init__.py
 │   ├── vehicle_env.py
-│   ├── communication.py
+│   ├── communication_env.py
 │   └── data_simulator.py
 ├── models/
 │   ├── __init__.py
