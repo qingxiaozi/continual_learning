@@ -91,12 +91,63 @@ class CommunicationSystem:
 
         return path_loss_component * shadowing_linear
 
+    def calculate_uplink_rate(self, vehicle, base_station, bandwidth_ratio, session_id):
+        """
+        计算上行链路通信速率 R_{uplink}^s
+        公式: R_{uplink}^s = β_v^s * B_base * log₂(1 + (P_v * g_v^s) / (δ² + I_v))
+        输入：
+            bandwidth_ratio：车辆v的带宽分配比例
+        """
+        if vehicle is None or base_station is None:
+            return 0.0
+
+        channel_gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+        signal_power = self.vehicle_transmit_power * channel_gain
+        noise_plus_interference = self.noise_power + self.I_v
+        snr = signal_power / max(noise_plus_interference, 1e-20)  # 防止(δ² + I_v)为0
+
+        allocated_bandwidth = bandwidth_ratio * self.base_bandwidth
+        uplink_rate = allocated_bandwidth * np.log2(1 + snr)
+
+        return max(uplink_rate, 0)
+
+    def calculate_downlink_rate(self, session_id):
+        """
+        计算下行链路广播速率 R_{downlink}^s
+        公式: R_{downlink}^s = B_base * log₂(1 + (P_b * min_{v∈V} g_v^s) / (δ² + I_v))
+        """
+        if self.vehicle_env is None:
+            return 0.0
+
+        min_channel_gain = float('inf')
+
+        for vehicle in self.vehicle_env.vehicles:
+            if vehicle.bs_connection is not None:
+                base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+                if base_station:
+                    channel_gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+                    min_channel_gain = min(min_channel_gain, channel_gain)
+
+        if min_channel_gain == float('inf'):
+            min_channel_gain = 1e-6
+
+        signal_power = self.base_station_power * min_channel_gain
+        noise_plus_interference = self.noise_power + self.I_v
+        snr = signal_power / max(noise_plus_interference, 1e-20)
+
+        downlink_rate = self.base_bandwidth * np.log2(1 + snr)
+        return max(downlink_rate, 0)
 
 if __name__ == "__main__":
     env = VehicleEnvironment()
     comm_system = CommunicationSystem(env)
     vehicle = env.vehicles[0]
     base_station = env.base_stations[0]
-    channel_gain = comm_system.calculate_channel_gain(
-        vehicle, base_station, session_id=1
+    a = comm_system.calculate_uplink_rate(
+        vehicle, base_station, 0.2, session_id = 1
     )
+    b = comm_system.calculate_downlink_rate(
+        session_id = 1
+    )
+    print(f"a:{a}，b:{b}")
+

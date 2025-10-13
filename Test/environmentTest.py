@@ -82,6 +82,14 @@ class TestCommunicationSystem:
             assert channel_gain > 0, f"信道增益应该大于0，实际得到: {channel_gain}"
             assert channel_gain < 1, f"信道增益通常小于1，实际得到: {channel_gain}"
 
+            # 测试上行速率计算
+            uplink_rate = comm_system.calculate_uplink_rate(vehicle, base_station, bandwidth_ratio=0.1, session_id=1)
+            print(f"✓ 上行速率计算: {uplink_rate:.2f} bit/s")
+
+            # 测试下行速率计算
+            downlink_rate = comm_system.calculate_downlink_rate(session_id=1)
+            print(f"✓ 下行速率计算: {downlink_rate:.2f} bit/s")
+
         except Exception as e:
             print(f"❌ 测试失败: {e}")
             import traceback
