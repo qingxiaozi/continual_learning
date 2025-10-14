@@ -48,9 +48,9 @@ class TestVehicleEnvironment:
 
 
 class TestCommunicationSystem:
-    def test_communication_system(self):
-        """测试通信系统功能"""
-        print("开始测试通信系统...")
+    def test_communication_system_initialization(self):
+        """测试通信系统初始化"""
+        print("开始测试通信系统初始化...")
 
         try:
             # 创建车辆环境
@@ -63,16 +63,31 @@ class TestCommunicationSystem:
             print("✓ CommunicationSystem 创建成功")
             assert comm_system is not None, "通信系统创建失败"
 
-            # 检查是否有车辆和基站
-            assert len(env.vehicles) > 0, "没有创建车辆"
-            assert len(env.base_stations) > 0, "没有创建基站"
-            print(
-                f"✓ 创建了 {len(env.vehicles)} 辆车和 {len(env.base_stations)} 个基站"
-            )
+            # 检查基本参数
+            assert comm_system.base_bandwidth > 0, "基础带宽应该大于0"
+            assert comm_system.noise_power > 0, "噪声功率应该大于0"
+            assert comm_system.edge_server_computation > 0, "边缘服务器计算能力应该大于0"
 
-            # 测试信道增益计算
+            print("✓ 通信系统参数初始化正确")
+
+        except Exception as e:
+            print(f"❌ 通信系统初始化测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_channel_gain_calculation(self):
+        """测试信道增益计算"""
+        print("开始测试信道增益计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
             vehicle = env.vehicles[0]
             base_station = env.base_stations[0]
+
+            # 测试信道增益计算
             channel_gain = comm_system.calculate_channel_gain(
                 vehicle, base_station, session_id=1
             )
@@ -82,20 +97,138 @@ class TestCommunicationSystem:
             assert channel_gain > 0, f"信道增益应该大于0，实际得到: {channel_gain}"
             assert channel_gain < 1, f"信道增益通常小于1，实际得到: {channel_gain}"
 
-            # 测试上行速率计算
-            uplink_rate = comm_system.calculate_uplink_rate(vehicle, base_station, bandwidth_ratio=0.1, session_id=1)
-            print(f"✓ 上行速率计算: {uplink_rate:.2f} bit/s")
+            # 测试多次计算的确定性（相同的输入应该得到相同的结果）
+            channel_gain2 = comm_system.calculate_channel_gain(
+                vehicle, base_station, session_id=1
+            )
+            assert channel_gain == channel_gain2, "相同输入的信道增益计算应该一致"
+
+            # 测试不同会话ID得到不同的阴影衰落
+            channel_gain3 = comm_system.calculate_channel_gain(
+                vehicle, base_station, session_id=2
+            )
+            # 由于阴影衰落随机，可能相同也可能不同，但不应该报错
+
+            print("✓ 信道增益计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 信道增益计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_uplink_rate_calculation(self):
+        """测试上行链路速率计算"""
+        print("开始测试上行链路速率计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            vehicle = env.vehicles[0]
+            base_station = env.base_stations[0]
+
+            # 测试不同带宽分配的上行速率
+            bandwidth_ratios = [0.1, 0.5, 1.0]
+            rates = []
+
+            for ratio in bandwidth_ratios:
+                uplink_rate = comm_system.calculate_uplink_rate(
+                    vehicle, base_station, bandwidth_ratio=ratio, session_id=1
+                )
+                rates.append(uplink_rate)
+                print(f"✓ 带宽分配 {ratio:.1f} 的上行速率: {uplink_rate:.2f} bit/s")
+
+                # 验证速率非负
+                assert uplink_rate >= 0, f"上行速率应该非负，实际得到: {uplink_rate}"
+
+            # 验证带宽分配越大速率越高（在相同信道条件下）
+            for i in range(1, len(rates)):
+                assert rates[i] >= rates[i-1], "带宽分配增加时上行速率应该增加或保持不变"
+
+            # 测试零带宽分配
+            zero_rate = comm_system.calculate_uplink_rate(
+                vehicle, base_station, bandwidth_ratio=0.0, session_id=1
+            )
+            assert zero_rate == 0, "零带宽分配时上行速率应该为0"
+
+            print("✓ 上行链路速率计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 上行链路速率计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_downlink_rate_calculation(self):
+        """测试下行链路速率计算"""
+        print("开始测试下行链路速率计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
 
             # 测试下行速率计算
             downlink_rate = comm_system.calculate_downlink_rate(session_id=1)
             print(f"✓ 下行速率计算: {downlink_rate:.2f} bit/s")
 
-        except Exception as e:
-            print(f"❌ 测试失败: {e}")
-            import traceback
+            # 验证下行速率合理性
+            assert downlink_rate >= 0, f"下行速率应该非负，实际得到: {downlink_rate}"
+            assert downlink_rate > 0, f"下行速率应该大于0，实际得到: {downlink_rate}"
 
+            # 测试不同会话的下行速率
+            downlink_rate2 = comm_system.calculate_downlink_rate(session_id=2)
+            # 由于信道条件可能变化，速率可能不同
+
+            print("✓ 下行链路速率计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 下行链路速率计算测试失败: {e}")
+            import traceback
             traceback.print_exc()
-            raise  # 重新抛出异常，让测试失败
+            raise
+
+    def test_transmission_delay_calculation(self):
+        """测试数据传输时延计算"""
+        print("开始测试数据传输时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 创建上传决策和带宽分配
+            upload_decisions = []
+            bandwidth_allocations = {}
+
+            # 为前3辆车创建上传决策
+            for i in range(min(3, len(env.vehicles))):
+                upload_decisions.append((env.vehicles[i].id, 2))  # 每辆车上传2个批次
+                bandwidth_allocations[env.vehicles[i].id] = 0.1  # 每辆车分配10%带宽
+
+            # 计算传输时延
+            transmission_delay = comm_system.calculate_transmission_delay(
+                upload_decisions, bandwidth_allocations, session_id=1
+            )
+            print(f"✓ 数据传输时延: {transmission_delay:.4f} 秒")
+
+            # 验证时延非负
+            assert transmission_delay >= 0, f"传输时延应该非负，实际得到: {transmission_delay}"
+
+            # 测试无上传数据的情况
+            zero_upload_decisions = [(env.vehicles[0].id, 0)]
+            zero_delay = comm_system.calculate_transmission_delay(
+                zero_upload_decisions, bandwidth_allocations, session_id=1
+            )
+            assert zero_delay == 0, "无上传数据时传输时延应该为0"
+
+            print("✓ 数据传输时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 数据传输时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
 
 
 if __name__ == "__main__":
