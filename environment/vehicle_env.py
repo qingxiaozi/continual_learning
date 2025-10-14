@@ -411,6 +411,15 @@ class VehicleEnvironment:
                 return bs
         return None
 
+        def _get_vehicle_by_id(self, vehicle_id):
+        """
+        根据ID获取车辆
+        """
+        for vehicle in self.vehicles:
+            if vehicle.id == vehicle_id:
+                return vehicle
+        return None
+
     def _should_update_connection(self, vehicle, old_position):
         """
         判断是否需要更新车辆连接
