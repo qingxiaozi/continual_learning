@@ -229,6 +229,81 @@ class TestCommunicationSystem:
             traceback.print_exc()
             raise
 
+    def test_labeling_delay_calculation(self):
+        """测试数据标注时延计算"""
+        print("开始测试数据标注时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 创建上传决策
+            upload_decisions = []
+            total_samples = 0
+
+            # 为前3辆车创建上传决策
+            for i in range(min(3, len(env.vehicles))):
+                batches = 2
+                upload_decisions.append((env.vehicles[i].id, batches))
+                total_samples += batches * comm_system.samples_of_per_batch
+
+            # 计算标注时延
+            labeling_delay = comm_system.calculate_labeling_delay(upload_decisions)
+            print(f"✓ 数据标注时延: {labeling_delay:.6f} 秒")
+
+            # 验证时延计算正确性
+            expected_delay = (total_samples * comm_system.golden_model_computation) / comm_system.edge_server_computation
+            assert abs(labeling_delay - expected_delay) < 1e-10, "标注时延计算不正确"
+
+            # 验证时延非负
+            assert labeling_delay >= 0, f"标注时延应该非负，实际得到: {labeling_delay}"
+
+            # 测试无上传数据的情况
+            zero_upload_decisions = []
+            zero_delay = comm_system.calculate_labeling_delay(zero_upload_decisions)
+            assert zero_delay == 0, "无上传数据时标注时延应该为0"
+
+            print("✓ 数据标注时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 数据标注时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_retraining_delay_calculation(self):
+        """测试模型重训练时延计算"""
+        print("开始测试模型重训练时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            num_vehicles = len(env.vehicles)
+
+            # 计算重训练时延
+            retraining_delay = comm_system.calculate_retraining_delay(num_vehicles)
+            print(f"✓ 模型重训练时延: {retraining_delay:.4f} 秒")
+
+            # 验证时延计算正确性
+            total_samples = comm_system.cache_samples_per_vehicle * num_vehicles
+            computation_per_epoch = total_samples * comm_system.global_model_computation
+            total_computation = comm_system.training_epochs * computation_per_epoch
+            expected_delay = total_computation / comm_system.edge_server_computation
+
+            assert abs(retraining_delay - expected_delay) < 1e-10, "重训练时延计算不正确"
+
+            # 验证时延非负
+            assert retraining_delay >= 0, f"重训练时延应该非负，实际得到: {retraining_delay}"
+
+            print("✓ 模型重训练时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 模型重训练时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
 
 
 if __name__ == "__main__":

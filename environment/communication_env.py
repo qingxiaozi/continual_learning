@@ -193,6 +193,50 @@ class CommunicationSystem:
 
         return max_delay
 
+    def calculate_labeling_delay(self, upload_decisions):
+        """
+        计算数据标注时延 t_label
+        公式：t_label = (c_golden * Σ_{v=1}^{|V|} (m_v^s * |b_v^s|)) / C
+        参数:
+            upload_decisions: 上传决策列表，每个元素为 (vehicle_id, upload_batches)
+
+        返回:
+            float: 数据标注时延 (秒)
+        """
+        total_samples = 0
+
+        for vehicle_id, upload_batches in upload_decisions:
+            total_samples += upload_batches * self.samples_of_per_batch
+            # 计算总计算需求
+        total_computation = total_samples * self.golden_model_computation
+            # 计算标注时延
+        labeling_delay = total_computation / self.edge_server_computation
+
+        return labeling_delay
+
+    def calculate_retraining_delay(self, num_vehicles):
+        """
+        计算模型重训练时延 t_retrain
+        公式: t_retrain = (E * |D_v| * |V| * c_global) / C
+        参数:
+            num_vehicles: 车辆数量 |V|
+        返回:
+            float: 模型重训练时延 (秒)
+        """
+        # 计算总训练样本数
+        total_samples = self.cache_samples_per_vehicle * num_vehicles
+        # 计算单轮训练的计算需求
+        computation_per_epoch = total_samples * self.global_model_computation
+        # 计算总计算需求
+        total_computation = self.training_epochs * computation_per_epoch
+        # 计算重训练时延
+        retraining_delay = total_computation / self.edge_server_computation
+
+        return retraining_delay
+
+
+
+
 
 
 
