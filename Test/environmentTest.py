@@ -304,6 +304,190 @@ class TestCommunicationSystem:
             traceback.print_exc()
             raise
 
+    def test_broadcast_delay_calculation(self):
+        """测试模型广播时延计算"""
+        print("开始测试模型广播时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 计算广播时延
+            broadcast_delay = comm_system.calculate_broadcast_delay(session_id=1)
+            print(f"✓ 模型广播时延: {broadcast_delay:.4f} 秒")
+
+            # 验证时延计算正确性
+            downlink_rate = comm_system.calculate_downlink_rate(session_id=1)
+            expected_delay = comm_system.model_parameter_size_bits / downlink_rate
+
+            assert abs(broadcast_delay - expected_delay) < 1e-10, "广播时延计算不正确"
+
+            # 验证时延非负
+            assert broadcast_delay >= 0, f"广播时延应该非负，实际得到: {broadcast_delay}"
+
+            print("✓ 模型广播时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 模型广播时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_total_training_delay_calculation(self):
+        """测试总训练时延计算"""
+        print("开始测试总训练时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 创建上传决策和带宽分配
+            upload_decisions = []
+            bandwidth_allocations = {}
+
+            # 为前3辆车创建上传决策
+            for i in range(min(3, len(env.vehicles))):
+                upload_decisions.append((env.vehicles[i].id, 2))  # 每辆车上传2个批次
+                bandwidth_allocations[env.vehicles[i].id] = 0.1  # 每辆车分配10%带宽
+
+            num_vehicles = len(env.vehicles)
+            session_id = 1
+
+            # 计算总时延
+            delay_breakdown = comm_system.calculate_total_training_delay(
+                upload_decisions, bandwidth_allocations, session_id, num_vehicles
+            )
+
+            # 输出详细结果
+            print("=== 总训练时延分析 ===")
+            print(f"✓ 数据传输时延: {delay_breakdown['transmission_delay']:.4f} 秒")
+            print(f"✓ 数据标注时延: {delay_breakdown['labeling_delay']:.6f} 秒")
+            print(f"✓ 模型重训练时延: {delay_breakdown['retraining_delay']:.4f} 秒")
+            print(f"✓ 模型广播时延: {delay_breakdown['broadcast_delay']:.4f} 秒")
+            print(f"✓ 总时延: {delay_breakdown['total_delay']:.4f} 秒")
+            print(f"✓ 总上传数据: {delay_breakdown['upload_data_size'] / 1e6:.2f} Mbit")
+            print(f"✓ 有效上行速率: {delay_breakdown['effective_uplink_rate'] / 1e6:.2f} Mbps")
+            print(f"✓ 下行广播速率: {delay_breakdown['effective_downlink_rate'] / 1e6:.2f} Mbps")
+
+            # 验证总时延是各部分时延之和
+            expected_total = (
+                delay_breakdown['transmission_delay'] +
+                delay_breakdown['labeling_delay'] +
+                delay_breakdown['retraining_delay'] +
+                delay_breakdown['broadcast_delay']
+            )
+            assert abs(delay_breakdown['total_delay'] - expected_total) < 1e-10, "总时延计算不正确"
+
+            # 验证所有时延都非负
+            for key, value in delay_breakdown.items():
+                if key.endswith('_delay'):
+                    assert value >= 0, f"{key} 应该非负，实际得到: {value}"
+
+            print("✓ 总训练时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 总训练时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_broadcast_delay_calculation(self):
+        """测试模型广播时延计算"""
+        print("开始测试模型广播时延计算...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 计算广播时延
+            broadcast_delay = comm_system.calculate_broadcast_delay(session_id=1)
+            print(f"✓ 模型广播时延: {broadcast_delay:.4f} 秒")
+
+            # 验证时延计算正确性
+            downlink_rate = comm_system.calculate_downlink_rate(session_id=1)
+            expected_delay = comm_system.model_parameter_size / downlink_rate
+
+            assert abs(broadcast_delay - expected_delay) < 1e-10, "广播时延计算不正确"
+
+            # 验证时延非负
+            assert broadcast_delay >= 0, f"广播时延应该非负，实际得到: {broadcast_delay}"
+
+            print("✓ 模型广播时延计算测试通过")
+
+        except Exception as e:
+            print(f"❌ 模型广播时延计算测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_communication_statistics(self):
+        """测试通信统计信息"""
+        print("开始测试通信统计信息...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 获取通信统计
+            stats = comm_system.get_communication_statistics(session_id=1)
+
+            print("=== 通信统计信息 ===")
+            print(f"✓ 会话ID: {stats['session_id']}")
+            print(f"✓ 车辆数量: {stats['num_vehicles']}")
+            print(f"✓ 基站数量: {stats['num_base_stations']}")
+            print(f"✓ 已连接车辆: {stats['connected_vehicles']}")
+            print(f"✓ 平均信道增益: {stats['average_channel_gain']:.6f}")
+            print(f"✓ 最小信道增益: {stats['min_channel_gain']:.6f}")
+            print(f"✓ 最大信道增益: {stats['max_channel_gain']:.6f}")
+            print(f"✓ 下行速率: {stats['effective_downlink_rate']:.2f} bit/s")
+
+            # 验证统计信息合理性
+            assert stats['num_vehicles'] == len(env.vehicles)
+            assert stats['num_base_stations'] == len(env.base_stations)
+            assert stats['connected_vehicles'] <= stats['num_vehicles']
+            assert stats['min_channel_gain'] <= stats['average_channel_gain'] <= stats['max_channel_gain']
+            assert stats['effective_downlink_rate'] >= 0
+
+            print("✓ 通信统计信息测试通过")
+
+        except Exception as e:
+            print(f"❌ 通信统计信息测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def test_edge_cases(self):
+        """测试边界情况"""
+        print("开始测试边界情况...")
+
+        try:
+            env = VehicleEnvironment()
+            comm_system = CommunicationSystem(env)
+
+            # 测试无车辆的情况（理论上不应该发生，但测试代码的健壮性）
+            # 这里我们创建一个临时的空环境来测试
+
+            # 测试零数据上传
+            zero_upload = []
+            zero_bandwidth = {}
+            zero_delay = comm_system.calculate_total_training_delay(
+                zero_upload, zero_bandwidth, session_id=1, num_vehicles=len(env.vehicles)
+            )
+
+            # 总时延应该等于重训练时延加广播时延（因为传输和标注时延为0）
+            expected_zero_delay = (
+                zero_delay['retraining_delay'] +
+                zero_delay['broadcast_delay']
+            )
+            assert abs(zero_delay['total_delay'] - expected_zero_delay) < 1e-10
+
+            print("✓ 边界情况测试通过")
+
+        except Exception as e:
+            print(f"❌ 边界情况测试失败: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
 
 if __name__ == "__main__":

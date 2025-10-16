@@ -462,214 +462,214 @@ class VehicleEnvironment:
         print("环境重置完成")
 
 
-# # 使用示例
-# from matplotlib.patches import Rectangle
+# 使用示例
+from matplotlib.patches import Rectangle
 
-# def plot_vehicle_trajectories_separate(env, duration=60, time_step=1):
-#     """
-#     分别绘制三个图：轨迹图、位置-时间图和热力图
+def plot_vehicle_trajectories_separate(env, duration=60, time_step=1):
+    """
+    分别绘制三个图：轨迹图、位置-时间图和热力图
 
-#     参数:
-#     env: VehicleEnvironment 实例
-#     duration: 模拟时间长度(秒)
-#     time_step: 时间步长(秒)
-#     """
+    参数:
+    env: VehicleEnvironment 实例
+    duration: 模拟时间长度(秒)
+    time_step: 时间步长(秒)
+    """
 
-#     # 存储轨迹数据
-#     trajectories = {vehicle.id: {'x': [], 'y': [], 'times': []} for vehicle in env.vehicles}
+    # 存储轨迹数据
+    trajectories = {vehicle.id: {'x': [], 'y': [], 'times': []} for vehicle in env.vehicles}
 
-#     # 模拟60秒并记录位置
-#     current_time = 0
-#     while current_time <= duration:
-#         # 更新车辆位置
-#         env.update_vehicle_positions(time_step)
-#         current_time += time_step
+    # 模拟60秒并记录位置
+    current_time = 0
+    while current_time <= duration:
+        # 更新车辆位置
+        env.update_vehicle_positions(time_step)
+        current_time += time_step
 
-#         # 记录每辆车的位置
-#         for vehicle in env.vehicles:
-#             trajectories[vehicle.id]['x'].append(vehicle.position[0])
-#             trajectories[vehicle.id]['y'].append(vehicle.position[1])
-#             trajectories[vehicle.id]['times'].append(current_time)
+        # 记录每辆车的位置
+        for vehicle in env.vehicles:
+            trajectories[vehicle.id]['x'].append(vehicle.position[0])
+            trajectories[vehicle.id]['y'].append(vehicle.position[1])
+            trajectories[vehicle.id]['times'].append(current_time)
 
-#     # 图1: 车辆轨迹图（调整宽高比）
-#     plt.figure(figsize=(26, 6))  # 增加宽度，减小高度
-#     ax1 = plt.gca()
+    # 图1: 车辆轨迹图（调整宽高比）
+    plt.figure(figsize=(26, 6))  # 增加宽度，减小高度
+    ax1 = plt.gca()
 
-#     colors = plt.cm.tab10(np.linspace(0, 1, len(env.vehicles)))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(env.vehicles)))
 
-#     for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
-#         ax1.plot(trajectory['x'], trajectory['y'],
-#                 color=colors[i], linewidth=2, alpha=0.7,
-#                 label=f'Vehicle {vehicle_id}')
+    for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
+        ax1.plot(trajectory['x'], trajectory['y'],
+                color=colors[i], linewidth=2, alpha=0.7,
+                label=f'Vehicle {vehicle_id}')
 
-#         # 标记起点和终点
-#         ax1.scatter(trajectory['x'][0], trajectory['y'][0],
-#                    color=colors[i], marker='o', s=50, zorder=5)
-#         ax1.scatter(trajectory['x'][-1], trajectory['y'][-1],
-#                    color=colors[i], marker='s', s=50, zorder=5)
+        # 标记起点和终点
+        ax1.scatter(trajectory['x'][0], trajectory['y'][0],
+                   color=colors[i], marker='o', s=50, zorder=5)
+        ax1.scatter(trajectory['x'][-1], trajectory['y'][-1],
+                   color=colors[i], marker='s', s=50, zorder=5)
 
-#     # 添加基站位置
-#     if hasattr(env, 'base_stations') and env.base_stations:
-#         for i, bs in enumerate(env.base_stations):
-#             # 假设基站有position属性，如果没有请根据实际情况调整
-#             if hasattr(bs, 'position'):
-#                 bs_x, bs_y = bs.position
-#             else:
-#                 # 如果基站是字典形式
-#                 bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
+    # 添加基站位置
+    if hasattr(env, 'base_stations') and env.base_stations:
+        for i, bs in enumerate(env.base_stations):
+            # 假设基站有position属性，如果没有请根据实际情况调整
+            if hasattr(bs, 'position'):
+                bs_x, bs_y = bs.position
+            else:
+                # 如果基站是字典形式
+                bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
 
-#             ax1.scatter(bs_x, bs_y, color='red', marker='^', s=150,
-#                        label=f'Base Station {i+1}' if i == 0 else "", zorder=10)
-#             ax1.text(bs_x, bs_y + 1, f'BS{i+1}',
-#                     ha='center', va='bottom', fontweight='bold')
+            ax1.scatter(bs_x, bs_y, color='red', marker='^', s=150,
+                       label=f'Base Station {i+1}' if i == 0 else "", zorder=10)
+            ax1.text(bs_x, bs_y + 1, f'BS{i+1}',
+                    ha='center', va='bottom', fontweight='bold')
 
-#     # 设置子图1属性
-#     ax1.set_xlabel('X Position (m)')
-#     ax1.set_ylabel('Y Position (m)')
-#     ax1.set_title('Vehicle Trajectories Over Time with Base Stations')
-#     ax1.grid(True, alpha=0.3)
-#     ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    # 设置子图1属性
+    ax1.set_xlabel('X Position (m)')
+    ax1.set_ylabel('Y Position (m)')
+    ax1.set_title('Vehicle Trajectories Over Time with Base Stations')
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
-#     # 绘制道路边界
-#     ax1.add_patch(Rectangle((0, -env.road_width/2), env.road_length,
-#                           env.road_width, fill=False, edgecolor='black',
-#                           linestyle='--', alpha=0.5))
+    # 绘制道路边界
+    ax1.add_patch(Rectangle((0, -env.road_width/2), env.road_length,
+                          env.road_width, fill=False, edgecolor='black',
+                          linestyle='--', alpha=0.5))
 
-#     # 绘制车道线
-#     lane_width = env.road_width / env.num_lanes
-#     for i in range(1, env.num_lanes):
-#         y_pos = -env.road_width/2 + i * lane_width
-#         ax1.axhline(y=y_pos, color='gray', linestyle=':', alpha=0.5)
+    # 绘制车道线
+    lane_width = env.road_width / env.num_lanes
+    for i in range(1, env.num_lanes):
+        y_pos = -env.road_width/2 + i * lane_width
+        ax1.axhline(y=y_pos, color='gray', linestyle=':', alpha=0.5)
 
-#     plt.tight_layout()
-#     plt.show()
+    plt.tight_layout()
+    plt.show()
 
-#     # 图2: X坐标随时间变化
-#     plt.figure(figsize=(12, 6))
-#     ax2 = plt.gca()
+    # 图2: X坐标随时间变化
+    plt.figure(figsize=(12, 6))
+    ax2 = plt.gca()
 
-#     for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
-#         ax2.plot(trajectory['times'], trajectory['x'],
-#                 color=colors[i], linewidth=2, alpha=0.7,
-#                 label=f'Vehicle {vehicle_id}')
+    for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
+        ax2.plot(trajectory['times'], trajectory['x'],
+                color=colors[i], linewidth=2, alpha=0.7,
+                label=f'Vehicle {vehicle_id}')
 
-#     ax2.set_xlabel('Time (s)')
-#     ax2.set_ylabel('X Position (m)')
-#     ax2.set_title('Longitudinal Position Over Time')
-#     ax2.grid(True, alpha=0.3)
-#     ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('X Position (m)')
+    ax2.set_title('Longitudinal Position Over Time')
+    ax2.grid(True, alpha=0.3)
+    ax2.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
-#     plt.tight_layout()
-#     plt.show()
+    plt.tight_layout()
+    plt.show()
 
-#     # 图3: 位置热力图
-#     plt.figure(figsize=(12, 6))
-#     ax3 = plt.gca()
+    # 图3: 位置热力图
+    # plt.figure(figsize=(12, 6))
+    # ax3 = plt.gca()
 
-#     # 收集所有位置点
-#     all_x = []
-#     all_y = []
-#     for trajectory in trajectories.values():
-#         all_x.extend(trajectory['x'])
-#         all_y.extend(trajectory['y'])
+    # 收集所有位置点
+    all_x = []
+    all_y = []
+    for trajectory in trajectories.values():
+        all_x.extend(trajectory['x'])
+        all_y.extend(trajectory['y'])
 
-#     # 创建热力图
-#     heatmap, xedges, yedges = np.histogram2d(all_x, all_y,
-#                                            bins=[50, 20],
-#                                            range=[[0, env.road_length],
-#                                                   [-env.road_width/2, env.road_width/2]])
+    # 创建热力图
+    heatmap, xedges, yedges = np.histogram2d(all_x, all_y,
+                                           bins=[50, 20],
+                                           range=[[0, env.road_length],
+                                                  [-env.road_width/2, env.road_width/2]])
 
-#     # 显示热力图
-#     im = ax3.imshow(heatmap.T, extent=[0, env.road_length, -env.road_width/2, env.road_width/2],
-#                   origin='lower', cmap='hot', aspect='auto')
+    # 显示热力图
+    im = ax3.imshow(heatmap.T, extent=[0, env.road_length, -env.road_width/2, env.road_width/2],
+                  origin='lower', cmap='hot', aspect='auto')
 
-#     # 添加基站位置到热力图
-#     if hasattr(env, 'base_stations') and env.base_stations:
-#         for i, bs in enumerate(env.base_stations):
-#             if hasattr(bs, 'position'):
-#                 bs_x, bs_y = bs.position
-#             else:
-#                 bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
+    # 添加基站位置到热力图
+    if hasattr(env, 'base_stations') and env.base_stations:
+        for i, bs in enumerate(env.base_stations):
+            if hasattr(bs, 'position'):
+                bs_x, bs_y = bs.position
+            else:
+                bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
 
-#             ax3.scatter(bs_x, bs_y, color='cyan', marker='^', s=150,
-#                        label=f'Base Station {i+1}' if i == 0 else "", zorder=10)
-#             ax3.text(bs_x, bs_y + 1, f'BS{i+1}',
-#                     ha='center', va='bottom', fontweight='bold', color='white')
+            ax3.scatter(bs_x, bs_y, color='cyan', marker='^', s=150,
+                       label=f'Base Station {i+1}' if i == 0 else "", zorder=10)
+            ax3.text(bs_x, bs_y + 1, f'BS{i+1}',
+                    ha='center', va='bottom', fontweight='bold', color='white')
 
-#     # 绘制道路边界
-#     ax3.add_patch(Rectangle((0, -env.road_width/2), env.road_length,
-#                           env.road_width, fill=False, edgecolor='blue',
-#                           linewidth=2))
+    # 绘制道路边界
+    ax3.add_patch(Rectangle((0, -env.road_width/2), env.road_length,
+                          env.road_width, fill=False, edgecolor='blue',
+                          linewidth=2))
 
-#     ax3.set_xlabel('X Position (m)')
-#     ax3.set_ylabel('Y Position (m)')
-#     ax3.set_title('Vehicle Position Heatmap with Base Stations')
-#     plt.colorbar(im, ax=ax3, label='Position Frequency')
-#     ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax3.set_xlabel('X Position (m)')
+    ax3.set_ylabel('Y Position (m)')
+    ax3.set_title('Vehicle Position Heatmap with Base Stations')
+    plt.colorbar(im, ax=ax3, label='Position Frequency')
+    ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
-#     plt.tight_layout()
-#     plt.show()
+    plt.tight_layout()
+    plt.show()
 
-#     return trajectories
+    return trajectories
 
-# def create_enhanced_trajectory_plot(env, trajectories):
-#     """
-#     创建一个增强版的轨迹图，包含更多细节
-#     """
-#     plt.figure(figsize=(18, 6))  # 更宽的图形
+def create_enhanced_trajectory_plot(env, trajectories):
+    """
+    创建一个增强版的轨迹图，包含更多细节
+    """
+    plt.figure(figsize=(18, 6))  # 更宽的图形
 
-#     colors = plt.cm.tab10(np.linspace(0, 1, len(env.vehicles)))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(env.vehicles)))
 
-#     # 绘制轨迹
-#     for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
-#         plt.plot(trajectory['x'], trajectory['y'],
-#                 color=colors[i], linewidth=2, alpha=0.7,
-#                 label=f'Vehicle {vehicle_id}')
+    # 绘制轨迹
+    for i, (vehicle_id, trajectory) in enumerate(trajectories.items()):
+        plt.plot(trajectory['x'], trajectory['y'],
+                color=colors[i], linewidth=2, alpha=0.7,
+                label=f'Vehicle {vehicle_id}')
 
-#         # 标记起点和终点
-#         plt.scatter(trajectory['x'][0], trajectory['y'][0],
-#                    color=colors[i], marker='o', s=80, zorder=5)
-#         plt.scatter(trajectory['x'][-1], trajectory['y'][-1],
-#                    color=colors[i], marker='s', s=80, zorder=5)
+        # 标记起点和终点
+        plt.scatter(trajectory['x'][0], trajectory['y'][0],
+                   color=colors[i], marker='o', s=80, zorder=5)
+        plt.scatter(trajectory['x'][-1], trajectory['y'][-1],
+                   color=colors[i], marker='s', s=80, zorder=5)
 
-#     # 添加基站位置
-#     if hasattr(env, 'base_stations') and env.base_stations:
-#         for i, bs in enumerate(env.base_stations):
-#             if hasattr(bs, 'position'):
-#                 bs_x, bs_y = bs.position
-#             else:
-#                 bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
+    # 添加基站位置
+    if hasattr(env, 'base_stations') and env.base_stations:
+        for i, bs in enumerate(env.base_stations):
+            if hasattr(bs, 'position'):
+                bs_x, bs_y = bs.position
+            else:
+                bs_x, bs_y = bs.get('position', (i * env.road_length / len(env.base_stations), 0))
 
-#             plt.scatter(bs_x, bs_y, color='red', marker='^', s=200,
-#                        label=f'Base Station {i+1}', zorder=10)
-#             plt.text(bs_x, bs_y + 1.5, f'BS{i+1}',
-#                     ha='center', va='bottom', fontweight='bold', fontsize=12)
+            plt.scatter(bs_x, bs_y, color='red', marker='^', s=200,
+                       label=f'Base Station {i+1}', zorder=10)
+            plt.text(bs_x, bs_y + 1.5, f'BS{i+1}',
+                    ha='center', va='bottom', fontweight='bold', fontsize=12)
 
-#     # 绘制道路边界
-#     plt.gca().add_patch(Rectangle((0, -env.road_width/2), env.road_length,
-#                           env.road_width, fill=False, edgecolor='black',
-#                           linewidth=2, alpha=0.7))
+    # 绘制道路边界
+    plt.gca().add_patch(Rectangle((0, -env.road_width/2), env.road_length,
+                          env.road_width, fill=False, edgecolor='black',
+                          linewidth=2, alpha=0.7))
 
-#     # 绘制车道线
-#     lane_width = env.road_width / env.num_lanes
-#     for i in range(1, env.num_lanes):
-#         y_pos = -env.road_width/2 + i * lane_width
-#         plt.axhline(y=y_pos, color='gray', linestyle='--', alpha=0.5)
+    # 绘制车道线
+    lane_width = env.road_width / env.num_lanes
+    for i in range(1, env.num_lanes):
+        y_pos = -env.road_width/2 + i * lane_width
+        plt.axhline(y=y_pos, color='gray', linestyle='--', alpha=0.5)
 
-#     # 添加图例和标签
-#     plt.xlabel('X Position (m)', fontsize=12)
-#     plt.ylabel('Y Position (m)', fontsize=12)
-#     plt.title('Enhanced Vehicle Trajectories with Base Stations', fontsize=14)
-#     plt.grid(True, alpha=0.3)
-#     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
+    # 添加图例和标签
+    plt.xlabel('X Position (m)', fontsize=12)
+    plt.ylabel('Y Position (m)', fontsize=12)
+    plt.title('Enhanced Vehicle Trajectories with Base Stations', fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize=10)
 
-#     plt.tight_layout()
-#     plt.show()
+    plt.tight_layout()
+    plt.show()
 
-# if __name__ == "__main__":
-#     # 初始化环境
-#     env = VehicleEnvironment()
-#     # 绘制三个分开的图
-#     trajectories = plot_vehicle_trajectories_separate(env, duration=60, time_step=0.5)
-#     # # 可选：创建增强版轨迹图
-#     # create_enhanced_trajectory_plot(env, trajectories)
+if __name__ == "__main__":
+    # 初始化环境
+    env = VehicleEnvironment()
+    # 绘制三个分开的图
+    trajectories = plot_vehicle_trajectories_separate(env, duration=60, time_step=0.5)
+    # # 可选：创建增强版轨迹图
+    # create_enhanced_trajectory_plot(env, trajectories)
