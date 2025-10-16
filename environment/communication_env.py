@@ -35,7 +35,9 @@ class CommunicationSystem:
 
         # 数据参数
         self.sample_size = 1024  # b0，单个样本的大小（bits），1
-        self.samples_of_per_batch = config.SAMPLES_OF_BATCH  # |b_v^s|，每个批次包含的样本数
+        self.samples_of_per_batch = (
+            config.SAMPLES_OF_BATCH
+        )  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
         self.golden_model_computation = 1e6  # 黄金模型处理一个样本的计算周期数，1
@@ -119,16 +121,20 @@ class CommunicationSystem:
         if self.vehicle_env is None:
             return 0.0
 
-        min_channel_gain = float('inf')
+        min_channel_gain = float("inf")
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.bs_connection is not None:
-                base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+                base_station = self.vehicle_env._get_base_station_by_id(
+                    vehicle.bs_connection
+                )
                 if base_station:
-                    channel_gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+                    channel_gain = self.calculate_channel_gain(
+                        vehicle, base_station, session_id
+                    )
                     min_channel_gain = min(min_channel_gain, channel_gain)
 
-        if min_channel_gain == float('inf'):
+        if min_channel_gain == float("inf"):
             min_channel_gain = 1e-6
 
         signal_power = self.base_station_power * min_channel_gain
@@ -138,7 +144,9 @@ class CommunicationSystem:
 
         return max(downlink_rate, 0)
 
-    def calculate_transmission_delay(self, upload_decisions, bandwidth_allocations, session_id):
+    def calculate_transmission_delay(
+        self, upload_decisions, bandwidth_allocations, session_id
+    ):
         """
         计算数据传输时延 t_trans
 
@@ -161,19 +169,27 @@ class CommunicationSystem:
             if not vehicle or vehicle.bs_connection is None:
                 continue
             # 获取基站
-            base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+            base_station = self.vehicle_env._get_base_station_by_id(
+                vehicle.bs_connection
+            )
             if not base_station:
                 continue
             # 获取带宽分配比例
-            bandwidth_ratio = bandwidth_allocations.get(vehicle_id, 0.0)  # 从bandwidth_allocations字典中获取键为vehicle_id的值，如果这个键不存在，则返回默认0.0
+            bandwidth_ratio = bandwidth_allocations.get(
+                vehicle_id, 0.0
+            )  # 从bandwidth_allocations字典中获取键为vehicle_id的值，如果这个键不存在，则返回默认0.0
             if bandwidth_ratio <= 0:
                 continue
             # 计算上行速率
-            uplink_rate = self.calculate_uplink_rate(vehicle, base_station, bandwidth_ratio, session_id)
+            uplink_rate = self.calculate_uplink_rate(
+                vehicle, base_station, bandwidth_ratio, session_id
+            )
             if uplink_rate <= 0:
                 continue
             # 计算单个车辆上传数据量：m_v^s * |b_v^s| * b0
-            data_size_bits = upload_batches * self.samples_of_per_batch * self.sample_size
+            data_size_bits = (
+                upload_batches * self.samples_of_per_batch * self.sample_size
+            )
             # 计算传输时延
             transmission_delay = data_size_bits / uplink_rate
             # 取最大值
@@ -197,7 +213,7 @@ class CommunicationSystem:
             total_samples += upload_batches * self.samples_of_per_batch
             # 计算总计算需求
         total_computation = total_samples * self.golden_model_computation
-            # 计算标注时延
+        # 计算标注时延
         labeling_delay = total_computation / self.edge_server_computation
 
         return labeling_delay
@@ -234,13 +250,15 @@ class CommunicationSystem:
         # 计算下行广播速率
         downlink_rate = self.calculate_downlink_rate(session_id)
         if downlink_rate <= 0:
-            return float('inf')
+            return float("inf")
         # 计算广播时延
         broadcast_delay = self.model_parameter_size / downlink_rate
 
         return broadcast_delay
 
-    def calculate_total_training_delay(self, upload_decisions, bandwidth_allocations, session_id, num_vehicles):
+    def calculate_total_training_delay(
+        self, upload_decisions, bandwidth_allocations, session_id, num_vehicles
+    ):
         """
         计算训练阶段总时延 T_s
 
@@ -256,7 +274,9 @@ class CommunicationSystem:
             dict: 包含各项时延和总时延的字典
         """
         # 计算各项时延
-        t_trans = self.calculate_transmission_delay(upload_decisions, bandwidth_allocations, session_id)
+        t_trans = self.calculate_transmission_delay(
+            upload_decisions, bandwidth_allocations, session_id
+        )
         t_label = self.calculate_labeling_delay(upload_decisions)
         t_retrain = self.calculate_retraining_delay(num_vehicles)
         t_broadcast = self.calculate_broadcast_delay(session_id)
@@ -265,14 +285,16 @@ class CommunicationSystem:
         total_delay = t_trans + t_label + t_retrain + t_broadcast
         # 返回详细结果
         delay_breakdown = {
-            'transmission_delay': t_trans,
-            'labeling_delay': t_label,
-            'retraining_delay': t_retrain,
-            'broadcast_delay': t_broadcast,
-            'total_delay': total_delay,
-            'upload_data_size': self._calculate_total_upload_data(upload_decisions),
-            'effective_uplink_rate': self._calculate_effective_uplink_rate(upload_decisions, bandwidth_allocations, session_id),
-            'effective_downlink_rate': self.calculate_downlink_rate(session_id)
+            "transmission_delay": t_trans,
+            "labeling_delay": t_label,
+            "retraining_delay": t_retrain,
+            "broadcast_delay": t_broadcast,
+            "total_delay": total_delay,
+            "upload_data_size": self._calculate_total_upload_data(upload_decisions),
+            "effective_uplink_rate": self._calculate_effective_uplink_rate(
+                upload_decisions, bandwidth_allocations, session_id
+            ),
+            "effective_downlink_rate": self.calculate_downlink_rate(session_id),
         }
 
         return delay_breakdown
@@ -280,15 +302,17 @@ class CommunicationSystem:
     def get_communication_statistics(self, session_id):
         """获取通信统计信息"""
         stats = {
-            'session_id': session_id,
-            'num_vehicles': len(self.vehicle_env.vehicles),
-            'num_base_stations': len(self.vehicle_env.base_stations),
-            'connected_vehicles': sum(1 for v in self.vehicle_env.vehicles if v.bs_connection is not None),
-            'average_channel_gain': self._calculate_average_channel_gain(session_id),
-            'min_channel_gain': self._calculate_min_channel_gain(session_id),
-            'max_channel_gain': self._calculate_max_channel_gain(session_id),
+            "session_id": session_id,
+            "num_vehicles": len(self.vehicle_env.vehicles),
+            "num_base_stations": len(self.vehicle_env.base_stations),
+            "connected_vehicles": sum(
+                1 for v in self.vehicle_env.vehicles if v.bs_connection is not None
+            ),
+            "average_channel_gain": self._calculate_average_channel_gain(session_id),
+            "min_channel_gain": self._calculate_min_channel_gain(session_id),
+            "max_channel_gain": self._calculate_max_channel_gain(session_id),
             # 'effective_uplink_rate': self._calculate_effective_uplink_rate(upload_decisions, bandwidth_allocations, session_id),
-            'effective_downlink_rate': self.calculate_downlink_rate(session_id),
+            "effective_downlink_rate": self.calculate_downlink_rate(session_id),
         }
         return stats
 
@@ -300,23 +324,28 @@ class CommunicationSystem:
         """
         total_data_bits = 0
         for vehicle_id, upload_batches in upload_decisions:
-            total_data_bits += upload_batches * self.samples_of_per_batch * self.sample_size
+            total_data_bits += (
+                upload_batches * self.samples_of_per_batch * self.sample_size
+            )
 
         return total_data_bits
 
-    def _calculate_effective_uplink_rate(self, upload_decisions, bandwidth_allocations, session_id):
+    def _calculate_effective_uplink_rate(
+        self, upload_decisions, bandwidth_allocations, session_id
+    ):
         """
         计算有效上行速率
         有效上传速率 = 计算总上传数据量 / 最大传输时间
         """
         total_data = self._calculate_total_upload_data(upload_decisions)
-        t_trans = self.calculate_transmission_delay(upload_decisions, bandwidth_allocations, session_id)
+        t_trans = self.calculate_transmission_delay(
+            upload_decisions, bandwidth_allocations, session_id
+        )
 
         if t_trans > 0:
             return total_data / t_trans
         else:
             return 0.0
-
 
     def _calculate_average_channel_gain(self, session_id):
         """计算平均信道增益"""
@@ -325,9 +354,13 @@ class CommunicationSystem:
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.bs_connection is not None:
-                base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+                base_station = self.vehicle_env._get_base_station_by_id(
+                    vehicle.bs_connection
+                )
                 if base_station:
-                    gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+                    gain = self.calculate_channel_gain(
+                        vehicle, base_station, session_id
+                    )
                     total_gain += gain
                     count += 1
 
@@ -335,16 +368,20 @@ class CommunicationSystem:
 
     def _calculate_min_channel_gain(self, session_id):
         """计算最小信道增益"""
-        min_gain = float('inf')
+        min_gain = float("inf")
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.bs_connection is not None:
-                base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+                base_station = self.vehicle_env._get_base_station_by_id(
+                    vehicle.bs_connection
+                )
                 if base_station:
-                    gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+                    gain = self.calculate_channel_gain(
+                        vehicle, base_station, session_id
+                    )
                     min_gain = min(min_gain, gain)
 
-        return min_gain if min_gain != float('inf') else 0.0
+        return min_gain if min_gain != float("inf") else 0.0
 
     def _calculate_max_channel_gain(self, session_id):
         """计算最大信道增益"""
@@ -352,12 +389,17 @@ class CommunicationSystem:
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.bs_connection is not None:
-                base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+                base_station = self.vehicle_env._get_base_station_by_id(
+                    vehicle.bs_connection
+                )
                 if base_station:
-                    gain = self.calculate_channel_gain(vehicle, base_station, session_id)
+                    gain = self.calculate_channel_gain(
+                        vehicle, base_station, session_id
+                    )
                     max_gain = max(max_gain, gain)
 
         return max_gain
+
 
 if __name__ == "__main__":
     # 创建环境和通信系统
@@ -374,7 +416,9 @@ if __name__ == "__main__":
     # 创建带宽分配（示例：均匀分配）
     total_bandwidth = 1.0
     bandwidth_per_vehicle = total_bandwidth / num_vehicles
-    bandwidth_allocations = {vehicle.id: bandwidth_per_vehicle for vehicle in vehicle_env.vehicles}
+    bandwidth_allocations = {
+        vehicle.id: bandwidth_per_vehicle for vehicle in vehicle_env.vehicles
+    }
 
     # 计算总时延
     delay_breakdown = comm_system.calculate_total_training_delay(
@@ -391,4 +435,3 @@ if __name__ == "__main__":
     print(f"总上传数据: {delay_breakdown['upload_data_size'] / 1e6:.2f} Mbit")
     print(f"有效上行速率: {delay_breakdown['effective_uplink_rate'] / 1e6:.2f} Mbps")
     print(f"下行广播速率: {delay_breakdown['effective_downlink_rate'] / 1e6:.2f} Mbps")
-

@@ -66,13 +66,16 @@ class TestCommunicationSystem:
             # 检查基本参数
             assert comm_system.base_bandwidth > 0, "基础带宽应该大于0"
             assert comm_system.noise_power > 0, "噪声功率应该大于0"
-            assert comm_system.edge_server_computation > 0, "边缘服务器计算能力应该大于0"
+            assert (
+                comm_system.edge_server_computation > 0
+            ), "边缘服务器计算能力应该大于0"
 
             print("✓ 通信系统参数初始化正确")
 
         except Exception as e:
             print(f"❌ 通信系统初始化测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -114,6 +117,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 信道增益计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -144,7 +148,9 @@ class TestCommunicationSystem:
 
             # 验证带宽分配越大速率越高（在相同信道条件下）
             for i in range(1, len(rates)):
-                assert rates[i] >= rates[i-1], "带宽分配增加时上行速率应该增加或保持不变"
+                assert (
+                    rates[i] >= rates[i - 1]
+                ), "带宽分配增加时上行速率应该增加或保持不变"
 
             # 测试零带宽分配
             zero_rate = comm_system.calculate_uplink_rate(
@@ -157,6 +163,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 上行链路速率计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -185,6 +192,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 下行链路速率计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -212,7 +220,9 @@ class TestCommunicationSystem:
             print(f"✓ 数据传输时延: {transmission_delay:.4f} 秒")
 
             # 验证时延非负
-            assert transmission_delay >= 0, f"传输时延应该非负，实际得到: {transmission_delay}"
+            assert (
+                transmission_delay >= 0
+            ), f"传输时延应该非负，实际得到: {transmission_delay}"
 
             # 测试无上传数据的情况
             zero_upload_decisions = [(env.vehicles[0].id, 0)]
@@ -226,6 +236,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 数据传输时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -252,7 +263,9 @@ class TestCommunicationSystem:
             print(f"✓ 数据标注时延: {labeling_delay:.6f} 秒")
 
             # 验证时延计算正确性
-            expected_delay = (total_samples * comm_system.golden_model_computation) / comm_system.edge_server_computation
+            expected_delay = (
+                total_samples * comm_system.golden_model_computation
+            ) / comm_system.edge_server_computation
             assert abs(labeling_delay - expected_delay) < 1e-10, "标注时延计算不正确"
 
             # 验证时延非负
@@ -268,6 +281,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 数据标注时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -291,16 +305,21 @@ class TestCommunicationSystem:
             total_computation = comm_system.training_epochs * computation_per_epoch
             expected_delay = total_computation / comm_system.edge_server_computation
 
-            assert abs(retraining_delay - expected_delay) < 1e-10, "重训练时延计算不正确"
+            assert (
+                abs(retraining_delay - expected_delay) < 1e-10
+            ), "重训练时延计算不正确"
 
             # 验证时延非负
-            assert retraining_delay >= 0, f"重训练时延应该非负，实际得到: {retraining_delay}"
+            assert (
+                retraining_delay >= 0
+            ), f"重训练时延应该非负，实际得到: {retraining_delay}"
 
             print("✓ 模型重训练时延计算测试通过")
 
         except Exception as e:
             print(f"❌ 模型重训练时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -323,13 +342,16 @@ class TestCommunicationSystem:
             assert abs(broadcast_delay - expected_delay) < 1e-10, "广播时延计算不正确"
 
             # 验证时延非负
-            assert broadcast_delay >= 0, f"广播时延应该非负，实际得到: {broadcast_delay}"
+            assert (
+                broadcast_delay >= 0
+            ), f"广播时延应该非负，实际得到: {broadcast_delay}"
 
             print("✓ 模型广播时延计算测试通过")
 
         except Exception as e:
             print(f"❌ 模型广播时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -366,21 +388,27 @@ class TestCommunicationSystem:
             print(f"✓ 模型广播时延: {delay_breakdown['broadcast_delay']:.4f} 秒")
             print(f"✓ 总时延: {delay_breakdown['total_delay']:.4f} 秒")
             print(f"✓ 总上传数据: {delay_breakdown['upload_data_size'] / 1e6:.2f} Mbit")
-            print(f"✓ 有效上行速率: {delay_breakdown['effective_uplink_rate'] / 1e6:.2f} Mbps")
-            print(f"✓ 下行广播速率: {delay_breakdown['effective_downlink_rate'] / 1e6:.2f} Mbps")
+            print(
+                f"✓ 有效上行速率: {delay_breakdown['effective_uplink_rate'] / 1e6:.2f} Mbps"
+            )
+            print(
+                f"✓ 下行广播速率: {delay_breakdown['effective_downlink_rate'] / 1e6:.2f} Mbps"
+            )
 
             # 验证总时延是各部分时延之和
             expected_total = (
-                delay_breakdown['transmission_delay'] +
-                delay_breakdown['labeling_delay'] +
-                delay_breakdown['retraining_delay'] +
-                delay_breakdown['broadcast_delay']
+                delay_breakdown["transmission_delay"]
+                + delay_breakdown["labeling_delay"]
+                + delay_breakdown["retraining_delay"]
+                + delay_breakdown["broadcast_delay"]
             )
-            assert abs(delay_breakdown['total_delay'] - expected_total) < 1e-10, "总时延计算不正确"
+            assert (
+                abs(delay_breakdown["total_delay"] - expected_total) < 1e-10
+            ), "总时延计算不正确"
 
             # 验证所有时延都非负
             for key, value in delay_breakdown.items():
-                if key.endswith('_delay'):
+                if key.endswith("_delay"):
                     assert value >= 0, f"{key} 应该非负，实际得到: {value}"
 
             print("✓ 总训练时延计算测试通过")
@@ -388,6 +416,7 @@ class TestCommunicationSystem:
         except Exception as e:
             print(f"❌ 总训练时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -410,13 +439,16 @@ class TestCommunicationSystem:
             assert abs(broadcast_delay - expected_delay) < 1e-10, "广播时延计算不正确"
 
             # 验证时延非负
-            assert broadcast_delay >= 0, f"广播时延应该非负，实际得到: {broadcast_delay}"
+            assert (
+                broadcast_delay >= 0
+            ), f"广播时延应该非负，实际得到: {broadcast_delay}"
 
             print("✓ 模型广播时延计算测试通过")
 
         except Exception as e:
             print(f"❌ 模型广播时延计算测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -442,17 +474,22 @@ class TestCommunicationSystem:
             print(f"✓ 下行速率: {stats['effective_downlink_rate']:.2f} bit/s")
 
             # 验证统计信息合理性
-            assert stats['num_vehicles'] == len(env.vehicles)
-            assert stats['num_base_stations'] == len(env.base_stations)
-            assert stats['connected_vehicles'] <= stats['num_vehicles']
-            assert stats['min_channel_gain'] <= stats['average_channel_gain'] <= stats['max_channel_gain']
-            assert stats['effective_downlink_rate'] >= 0
+            assert stats["num_vehicles"] == len(env.vehicles)
+            assert stats["num_base_stations"] == len(env.base_stations)
+            assert stats["connected_vehicles"] <= stats["num_vehicles"]
+            assert (
+                stats["min_channel_gain"]
+                <= stats["average_channel_gain"]
+                <= stats["max_channel_gain"]
+            )
+            assert stats["effective_downlink_rate"] >= 0
 
             print("✓ 通信统计信息测试通过")
 
         except Exception as e:
             print(f"❌ 通信统计信息测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -471,21 +508,24 @@ class TestCommunicationSystem:
             zero_upload = []
             zero_bandwidth = {}
             zero_delay = comm_system.calculate_total_training_delay(
-                zero_upload, zero_bandwidth, session_id=1, num_vehicles=len(env.vehicles)
+                zero_upload,
+                zero_bandwidth,
+                session_id=1,
+                num_vehicles=len(env.vehicles),
             )
 
             # 总时延应该等于重训练时延加广播时延（因为传输和标注时延为0）
             expected_zero_delay = (
-                zero_delay['retraining_delay'] +
-                zero_delay['broadcast_delay']
+                zero_delay["retraining_delay"] + zero_delay["broadcast_delay"]
             )
-            assert abs(zero_delay['total_delay'] - expected_zero_delay) < 1e-10
+            assert abs(zero_delay["total_delay"] - expected_zero_delay) < 1e-10
 
             print("✓ 边界情况测试通过")
 
         except Exception as e:
             print(f"❌ 边界情况测试失败: {e}")
             import traceback
+
             traceback.print_exc()
             raise
 
