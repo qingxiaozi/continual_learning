@@ -45,9 +45,26 @@ class Config:
     MAX_CONFIDENCE_HISTORY = 7  # 单个智能车最大缓存置信度个数
     SAMPLES_OF_BATCH = 64  # 每个batch中的样本数
 
-    # 数据集参数
+    # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
-    CURRENT_DATASET = "digit10"
+    CURRENT_DATASET = "office31"
+    # 域增量学习参数
+    DOMAIN_SEQUENCES = {
+        'office31': ['amazon', 'webcam', 'dslr'],
+        'digit10': ['mnist', 'emnist', 'usps', 'svhn'],
+        'domainnet': ['clipart', 'infograph', 'painting', 'quickdraw', 'real', 'sketch']
+    }
+    # 狄利克雷分布参数（控制数据异构程度）
+    DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
+    # 数据集特定参数
+    OFFICE31_CLASSES = 31
+    DIGIT10_CLASSES = 10
+    DOMAINNET_CLASSES = 345
+    # 域切换参数
+    DOMAIN_CHANGE_INTERVAL = 20  # 每20个session切换一个域
+    # 数据加载参数
+    BATCH_SIZE = 32
+    IMAGE_SIZE = 224  # 统一调整到相同尺寸
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
