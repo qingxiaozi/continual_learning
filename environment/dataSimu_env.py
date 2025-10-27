@@ -40,28 +40,28 @@ class DomainIncrementalDataSimulator:
                 "domains": ["amazon", "webcam", "dslr"],
                 "data_loader": self._load_office31_data,
             },
-            "digit10": {
-                "num_classes": config.DIGIT10_CLASSES,
-                "domains": ["mnist", "emnist", "usps", "svhn"],
-                "data_loader": self._load_digit10_data,
-            },
-            "domainnet": {
-                "num_classes": config.DOMAINNET_CLASSES,
-                "domains": [
-                    "clipart",
-                    "infograph",
-                    "painting",
-                    "quickdraw",
-                    "real",
-                    "sketch",
-                ],
-                "data_loader": self._load_domainnet_data,
-            },
+            # "digit10": {
+            #     "num_classes": config.DIGIT10_CLASSES,
+            #     "domains": ["mnist", "emnist", "usps", "svhn"],
+            #     "data_loader": self._load_digit10_data,
+            # },
+            # "domainnet": {
+            #     "num_classes": config.DOMAINNET_CLASSES,
+            #     "domains": [
+            #         "clipart",
+            #         "infograph",
+            #         "painting",
+            #         "quickdraw",
+            #         "real",
+            #         "sketch",
+            #     ],
+            #      "data_loader": self._load_domainnet_data,
+            # },
         }
 
         # 数据缓存
         self.data_cache = {}  # 缓存不同域的数据，key为域名或索引，值是数据
-        self.vehicle_data_assignment = (
+        self.vehicle_data_assignments = (
             {}
         )  # 每辆车的数据，key为数据集_域名（office31_amazon），值为一个字典，其中键为vehicle_id,值为该车辆在该域中分配到的索引列表
 
@@ -84,7 +84,7 @@ class DomainIncrementalDataSimulator:
         使用狄利克雷分布初始化车辆数据分配
         """
         num_vehicles = len(self.vehicle_env.vehicles)
-        num_classes = self.dataset_info[self.current_dataset["num_classes"]]
+        num_classes = self.dataset_info[self.current_dataset]["num_classes"]
         # 为每个类别生成狄利克雷分布，存储每个类别在不同车辆上的分配比例
         self.class_distributions = {}
 
@@ -173,10 +173,10 @@ class DomainIncrementalDataSimulator:
         vehicle_idx = vehicle_id
         # 如果还没有为该域分配数据，则进行分配
         domain_key = f"{self.current_dataset}_{self.get_current_domain()}"
-        if domain_key not in self.vehicle_data_assignment:
+        if domain_key not in self.vehicle_data_assignments:
             self._assign_domain_data_to_vehicles(full_dataset)
 
-        return self.vehicle_data_assignment(full_dataset)
+        return self.vehicle_data_assignments[domain_key].get(vehicle_idx, [])
 
     def _assign_domain_data_to_vehicles(self, full_dataset):
         """
@@ -263,9 +263,19 @@ class DomainIncrementalDataSimulator:
             # return self._create_simulated_dataset(config.OFFICE31_CLASSES, 1000)
         return Office31Dataset(dataset_path, transform = self.transform)
 
-    # def _create_simulated_dataset(self, num_classes, size):
-    #     """创建模拟数据集（当真实数据不可用时）"""
-    #     return SimulatedDataset(size, num_classes=num_classes, transform=self.transform)
+    # def _load_digit10_data(self, domain):
+    #     """加载Digit10数据集"""
+    #     if domain == 'mnist':
+    #         return MNISTDataset(transform=self.transform)
+    #     elif domain == 'emnist':
+    #         return EMNISTDataset(transform=self.transform)
+    #     elif domain == 'usps':
+    #         return USPSDataset(transform=self.transform)
+    #     elif domain == 'svhn':
+    #         return SVHNDataset(transform=self.transform)
+    #     else:
+    #         print(f"警告: Digit10 域 {domain} 不支持")
+    #         return self._create_simulated_dataset(config.DIGIT10_CLASSES, 1000)
 
     def get_data_distribution_info(self):
         """获取当前数据分布信息"""
@@ -351,7 +361,9 @@ class Office31Dataset(BaseDataset):
         return image, label
 
     def get_class_name(self, label_idx):
-        """根据标签索引获取类别名称"""
+        """
+        根据标签索引获取类别名称
+        """
         return self.idx_to_class.get(label_idx, "Unknown")
 
 
