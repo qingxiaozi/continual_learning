@@ -56,6 +56,8 @@ class Config:
     }
     # 狄利克雷分布参数（控制数据异构程度）
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
+    # 数据路径
+    DATA_BASE_PATH = '../data'
     # 数据集特定参数
     OFFICE31_CLASSES = 31
     DIGIT10_CLASSES = 10
