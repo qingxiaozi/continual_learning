@@ -427,20 +427,25 @@ def display_sample(dataset, index=None):
 
 
 if __name__ == "__main__":
-    data_path = "../data/office-31/webcam"
-    # 检查路径是否存在
-    if not os.path.exists(data_path):
-        print(f"警告: 数据路径 {data_path} 不存在!")
-    # 创建数据集实例
-    try:
-        dataset = Office31Dataset(data_path, transform=None)
-        print(f"成功加载数据集，包含 {len(dataset)} 个样本")
-        # 显示数据集统计信息
-        display_dataset_statistics(dataset)
-        # 显示几个样本
-        for i in range(3):
-            print(f"\n--- 显示样本 #{i} ---")
-            display_sample(dataset, index=i)
-
-    except Exception as e:
-        print(f"加载数据集时出错: {e}")
+    env = VehicleEnvironment()
+    dataSimu = DomainIncrementalDataSimulator(env)
+    print(dataSimu.vehicle_env)
+    print(dataSimu.current_dataset)
+    dataSimu.update_session(1)
+    print(f"当前域为{dataSimu.get_current_domain()}")
+    num_vehicles = len(dataSimu.vehicle_env.vehicles)
+    num_classes = dataSimu.dataset_info[config.CURRENT_DATASET]['num_classes']
+    for class_idx, distribution in dataSimu.class_distributions.items():
+        print(f"类别{class_idx}")
+        print(len(distribution))
+        print(abs(np.sum(distribution)))
+    test_vehicles = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    # dataSimu._assign_domain_data_to_vehicles()
+    for vehicle_id in test_vehicles:
+        print(f"车辆{vehicle_id}")
+        data_batches = dataSimu.generate_vehicle_data(vehicle_id, num_batches=2)
+        for batch in data_batches:
+            sample_batch = next(iter(batch))
+            if isinstance(sample_batch, (list, tuple)):
+                inputs, targets = sample_batch
+                print(f"targets:{targets}")
