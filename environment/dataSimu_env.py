@@ -261,7 +261,7 @@ class DomainIncrementalDataSimulator:
         if not os.path.exists(dataset_path):
             print(f"警告：Office-31 {domain}路径不存在：{dataset_path}")
             # return self._create_simulated_dataset(config.OFFICE31_CLASSES, 1000)
-        return Office31Dataset(dataset_path, transform = self.transform)
+        return Office31Dataset(dataset_path, transform=self.transform)
 
     # def _load_digit10_data(self, domain):
     #     """加载Digit10数据集"""
@@ -309,7 +309,7 @@ class DomainIncrementalDataSimulator:
 
 # 基础数据集类
 class BaseDataset(Dataset):
-    def __init__(self, transform = None):
+    def __init__(self, transform=None):
         self.transform = transform
         self.data = []
         self.labels = []
@@ -326,7 +326,7 @@ class BaseDataset(Dataset):
 
 
 class Office31Dataset(BaseDataset):
-    def __init__(self, data_path, transform = None):
+    def __init__(self, data_path, transform=None):
         super().__init__(transform)
         self.data_path = data_path
         self._load_data()
@@ -335,7 +335,11 @@ class Office31Dataset(BaseDataset):
         """
         加载office-31数据
         """
-        classes = [d for d in os.listdir(self.data_path) if os.path.isdir(os.path.join(self.data_path, d))]
+        classes = [
+            d
+            for d in os.listdir(self.data_path)
+            if os.path.isdir(os.path.join(self.data_path, d))
+        ]
         classes.sort()
         # 为每个类别分配一个唯一的数字索引{'back_pack':0, 'bike':1, ...}
         self.class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
@@ -345,7 +349,7 @@ class Office31Dataset(BaseDataset):
             class_path = os.path.join(self.data_path, class_name)
             class_idx = self.class_to_idx[class_name]
             for img_file in os.listdir(class_path):
-                if img_file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                if img_file.lower().endswith((".jpg", ".jpeg", ".png")):
                     img_path = os.path.join(class_path, img_file)
                     self.data.append(img_path)
                     self.labels.append(class_idx)
@@ -354,7 +358,7 @@ class Office31Dataset(BaseDataset):
         image_path = self.data[idx]
         label = self.labels[idx]
         # 加载图像
-        image = Image.open(image_path).convert('RGB')
+        image = Image.open(image_path).convert("RGB")
         if self.transform:
             image = self.transform(image)
 
@@ -387,6 +391,7 @@ def display_dataset_statistics(dataset):
 
     print("=====================\n")
 
+
 def display_sample(dataset, index=None):
     """
     显示数据集中的一个样本
@@ -413,7 +418,7 @@ def display_sample(dataset, index=None):
     plt.figure(figsize=(8, 6))
     plt.imshow(image)
     plt.title(f"sample #{index}\nclass_name: {class_name} (label: {label})")
-    plt.axis('off')
+    plt.axis("off")
     plt.tight_layout()
     plt.show()
 
@@ -434,12 +439,33 @@ if __name__ == "__main__":
     dataSimu.update_session(1)
     print(f"当前域为{dataSimu.get_current_domain()}")
     num_vehicles = len(dataSimu.vehicle_env.vehicles)
-    num_classes = dataSimu.dataset_info[config.CURRENT_DATASET]['num_classes']
+    num_classes = dataSimu.dataset_info[config.CURRENT_DATASET]["num_classes"]
     for class_idx, distribution in dataSimu.class_distributions.items():
         print(f"类别{class_idx}")
         print(len(distribution))
         print(abs(np.sum(distribution)))
-    test_vehicles = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]
+    test_vehicles = [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+    ]
     # dataSimu._assign_domain_data_to_vehicles()
     for vehicle_id in test_vehicles:
         print(f"车辆{vehicle_id}")

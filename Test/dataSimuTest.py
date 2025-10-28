@@ -3,11 +3,17 @@ import numpy as np
 import torch
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from environment.vehicle_env import VehicleEnvironment
-from environment.dataSimu_env import DomainIncrementalDataSimulator, Office31Dataset, BaseDataset
+from environment.dataSimu_env import (
+    DomainIncrementalDataSimulator,
+    Office31Dataset,
+    BaseDataset,
+)
 from config.parameters import config
+
 
 class TestDataSimulator:
     """数据模拟器测试类"""
@@ -22,8 +28,8 @@ class TestDataSimulator:
         """测试数据模拟器初始化"""
         assert self.data_simulator.vehicle_env == self.vehicle_env
         assert self.data_simulator.current_dataset == config.CURRENT_DATASET
-        assert hasattr(self.data_simulator, 'class_distributions')
-        assert hasattr(self.data_simulator, 'vehicle_data_assignments')
+        assert hasattr(self.data_simulator, "class_distributions")
+        assert hasattr(self.data_simulator, "vehicle_data_assignments")
 
         print("✓ 数据模拟器初始化测试通过")
 
@@ -65,7 +71,9 @@ class TestDataSimulator:
     def test_dirichlet_distribution(self):
         """测试狄利克雷分布数据分配"""
         num_vehicles = len(self.vehicle_env.vehicles)
-        num_classes = self.data_simulator.dataset_info[config.CURRENT_DATASET]['num_classes']
+        num_classes = self.data_simulator.dataset_info[config.CURRENT_DATASET][
+            "num_classes"
+        ]
 
         # 检查类别分布
         assert len(self.data_simulator.class_distributions) == num_classes
@@ -98,7 +106,7 @@ class TestDataSimulator:
             assert len(data_batches) == 2
 
             for batch in data_batches:
-                assert hasattr(batch, '__iter__')  # 应该是可迭代的DataLoader
+                assert hasattr(batch, "__iter__")  # 应该是可迭代的DataLoader
 
                 # 尝试获取一个批次的数据
                 try:
@@ -127,7 +135,11 @@ class TestDataSimulator:
 
             if data_batches and len(data_batches) > 0:
                 data_loader = data_batches[0]
-                sample_count = len(data_loader.dataset) if hasattr(data_loader.dataset, '__len__') else 0
+                sample_count = (
+                    len(data_loader.dataset)
+                    if hasattr(data_loader.dataset, "__len__")
+                    else 0
+                )
                 vehicle_sample_counts.append(sample_count)
 
         # 检查数据异构性（标准差应该大于0）
@@ -148,13 +160,19 @@ class TestDataSimulator:
         dist_info = self.data_simulator.get_data_distribution_info()
 
         # 检查信息完整性
-        required_keys = ['dataset', 'domain', 'session', 'domain_index', 'total_domains']
+        required_keys = [
+            "dataset",
+            "domain",
+            "session",
+            "domain_index",
+            "total_domains",
+        ]
         for key in required_keys:
             assert key in dist_info
 
         # 检查数据类型
-        assert isinstance(dist_info['dataset'], str)
-        assert isinstance(dist_info['domain'], str)
-        assert isinstance(dist_info['session'], int)
+        assert isinstance(dist_info["dataset"], str)
+        assert isinstance(dist_info["domain"], str)
+        assert isinstance(dist_info["session"], int)
 
         print("✓ 数据分布信息测试通过")

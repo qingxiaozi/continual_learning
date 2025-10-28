@@ -50,14 +50,21 @@ class Config:
     CURRENT_DATASET = "office31"
     # 域增量学习参数
     DOMAIN_SEQUENCES = {
-        'office31': ['amazon', 'webcam', 'dslr'],
-        'digit10': ['mnist', 'emnist', 'usps', 'svhn'],
-        'domainnet': ['clipart', 'infograph', 'painting', 'quickdraw', 'real', 'sketch']
+        "office31": ["amazon", "webcam", "dslr"],
+        "digit10": ["mnist", "emnist", "usps", "svhn"],
+        "domainnet": [
+            "clipart",
+            "infograph",
+            "painting",
+            "quickdraw",
+            "real",
+            "sketch",
+        ],
     }
     # 狄利克雷分布参数（控制数据异构程度）
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
     # 数据路径
-    DATA_BASE_PATH = '/home/heruiqing_233-/workspace/continual_learning/data'
+    DATA_BASE_PATH = "/home/heruiqing_233-/workspace/continual_learning/data"
     # 数据集特定参数
     OFFICE31_CLASSES = 31
     DIGIT10_CLASSES = 10
