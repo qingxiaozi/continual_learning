@@ -126,13 +126,13 @@ class DomainIncrementalDataSimulator:
             self.seen_domains.append(current_domain)
             print(f"新域 {current_domain} 已加入已见域")
 
-        # 预加载当前域的测试集
-        self._preload_domain_test_set(current_domain)
-
         # 只有在域实际发生变化时才打印切换信息
         if old_domain != current_domain:
             old_domain_display = old_domain if old_session > 0 else "初始域"
             print(f"Session {session_id}: 域切换 {old_domain_display} -> {current_domain}")
+
+        # 预加载当前域的数据集
+        self._preload_domain_test_set(current_domain)
 
     def _preload_domain_test_set(self, domain):
         """预加载域的测试集并保存到已见域测试集"""
@@ -160,7 +160,7 @@ class DomainIncrementalDataSimulator:
             self.seen_domains_test_sets[domain_key] = self.test_data_cache[domain_key]
             print(f"已加载 {domain} 域的测试集，样本数: {len(self.test_data_cache[domain_key])}")
 
-    def generate_vehicle_data(self, vehicle_id, num_batches = 5):
+    def generate_vehicle_data(self, vehicle_id):
         """
         为指定车辆生成数据批次
         输入：
@@ -171,39 +171,31 @@ class DomainIncrementalDataSimulator:
         """
         current_domain = self.get_current_domain()
         domain_key = f"{self.current_dataset}_{current_domain}"
-
-        # 加载或获取缓存的训练数据
-        if domain_key not in self.train_data_cache:
-            full_dataset = self._load_domain_data(current_domain)
-            train_size = int(config.TRAIN_TEST_SPLIT * len(full_dataset))
-            test_size = len(full_dataset) - train_size
-            train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
-
-            self.train_data_cache[domain_key] = train_dataset
-            self.test_data_cache[domain_key] = test_dataset
-
+        # 由于在切换域后，训练集和测试集已经分别放至train_data_cache和test_data_cache，因此此处可直接取用
         train_dataset = self.train_data_cache[domain_key]
-        # 获取该车辆的训练数据子集
+        # 获取该车辆的训练数据子集索引
         vehicle_indices = self._get_vehicle_data_indices(vehicle_id, train_dataset)
 
         if not vehicle_indices:
             print(f"警告: 车辆 {vehicle_id} 在当前域 {current_domain} 中没有分配到训练数据")
             return []
 
-        # 创建车辆特定的训练数据集
+        # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
         vehicle_dataset = Subset(train_dataset, vehicle_indices)
-
         # 创建数据批次
-        batches = []
-        for _ in range(num_batches):
-            dataloader = DataLoader(
-                vehicle_dataset,
-                batch_size=config.BATCH_SIZE,
-                shuffle=True,
-                drop_last=True
-            )
-            batches.append(dataloader)
+        dataloader = DataLoader(
+            vehicle_dataset,
+            batch_size = config.BATCH_SIZE,
+            shuffle = True,
+            drop_last = True
+        )
 
+        # 收集所有批次
+        batches = []
+        for batch in dataloader:
+            batches.append(batch)
+
+        print(f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次，每批 {config.BATCH_SIZE} 个样本")
         return batches
 
     def _get_vehicle_data_indices(self, vehicle_id, train_dataset):
@@ -211,7 +203,7 @@ class DomainIncrementalDataSimulator:
         获取指定车辆在当前域中的数据索引
         输入：
             vehicle_id：车辆id
-            full_dataset：某个域的所有数据，即域数据集
+            train_dataset：某个域的训练集
         输出：
 
         """
@@ -227,7 +219,7 @@ class DomainIncrementalDataSimulator:
 
     def _assign_domain_data_to_vehicles(self, train_dataset):
         """
-        使用狄利克雷分布将域数据分配给各个车辆
+        使用狄利克雷分布将域训练数据分配给各个车辆
         """
         num_vehicles = len(self.vehicle_env.vehicles)
         domain_key = f"{self.current_dataset}_{self.get_current_domain()}"
@@ -628,7 +620,7 @@ if __name__ == "__main__":
     print(f"狄利克雷参数 α: {config.DIRICHLET_ALPHA}")
     # 3. 演示域增量切换
     print("\n2. 域增量切换演示...")
-    sessions_to_demo = [0, 1, 2, 3]  # 演示的会话点
+    sessions_to_demo = [0, 1, 2, 3, 4]  # 演示的会话点
 
     for session in sessions_to_demo:
         print(f"\n--- Session {session} ---")
@@ -645,10 +637,10 @@ if __name__ == "__main__":
         print("\n车辆数据分配示例:")
         for vehicle_id in range(min(3, len(vehicle_env.vehicles))):
             # 生成车辆数据
-            vehicle_data = data_simulator.generate_vehicle_data(vehicle_id, num_batches=2)
+            vehicle_data = data_simulator.generate_vehicle_data(vehicle_id)
 
             if vehicle_data:
-                total_samples = sum(len(loader.dataset) for loader in vehicle_data)
+                total_samples = len(vehicle_data) * config.BATCH_SIZE
                 print(f"  车辆 {vehicle_id}: {total_samples} 个训练样本, {len(vehicle_data)} 个批次")
             else:
                 print(f"  车辆 {vehicle_id}: 无训练数据")
