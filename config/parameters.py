@@ -70,10 +70,16 @@ class Config:
     DIGIT10_CLASSES = 10
     DOMAINNET_CLASSES = 345
     # 域切换参数
-    DOMAIN_CHANGE_INTERVAL = 20  # 每20个session切换一个域
+    DOMAIN_CHANGE_INTERVAL = 1  # 每1个session切换一个域
     # 数据加载参数
     BATCH_SIZE = 32
     IMAGE_SIZE = 224  # 统一调整到相同尺寸
+    # 测试策略参数
+    TEST_STRATEGY = 'cumulative'  # 'current' 或 'cumulative'
+    TRAIN_TEST_SPLIT = 0.8  # 训练集比例
+
+    # 评估参数
+    EVALUATION_FREQUENCY = 5  # 每5个session评估一次
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
