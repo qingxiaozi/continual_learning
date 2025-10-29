@@ -116,16 +116,10 @@ class DomainIncrementalDataSimulator:
         更新训练会话
         """
         old_session = self.current_session
+        old_domain = self.get_current_domain()  # 在更新前获取旧域
+
         self.current_session = session_id
-
-        # 检查是否需要切换域
-        old_domain_idx = self.current_domain_idx
-        self.current_domain_idx = (session_id // config.DOMAIN_CHANGE_INTERVAL) % len(
-            self.current_domains
-        )
-
-        # 获取当前域
-        current_domain = self.get_current_domain()
+        current_domain = self.get_current_domain()  # 在更新后获取新域
 
         # 确保当前域被记录到已见域中
         if current_domain not in self.seen_domains:
@@ -136,9 +130,9 @@ class DomainIncrementalDataSimulator:
         self._preload_domain_test_set(current_domain)
 
         # 只有在域实际发生变化时才打印切换信息
-        if old_domain_idx != self.current_domain_idx:
-            old_domain = self.current_domains[old_domain_idx] if old_session > 0 else "初始域"
-            print(f"Session {session_id}: 域切换 {old_domain} -> {current_domain}")
+        if old_domain != current_domain:
+            old_domain_display = old_domain if old_session > 0 else "初始域"
+            print(f"Session {session_id}: 域切换 {old_domain_display} -> {current_domain}")
 
     def _preload_domain_test_set(self, domain):
         """预加载域的测试集并保存到已见域测试集"""
