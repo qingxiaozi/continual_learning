@@ -25,11 +25,11 @@ class DomainIncrementalDataSimulator:
     5. 计算测试损失（待定）
     """
 
-    def __init__(self, vehicle_env):
-        self.vehicle_env = vehicle_env
+    def __init__(self, num_vehicles):
+        self.num_vehicles = num_vehicles
         self.current_dataset = config.CURRENT_DATASET
         self.current_domain_idx = 0
-        self.current_session = 0  # = self.vehicle_env.current_session
+        self.current_session = 0
 
         # 域序列
         self.domain_sequences = config.DOMAIN_SEQUENCES
@@ -88,7 +88,7 @@ class DomainIncrementalDataSimulator:
         """
         使用狄利克雷分布初始化车辆数据分配
         """
-        num_vehicles = len(self.vehicle_env.vehicles)
+        num_vehicles = self.num_vehicles
         num_classes = self.dataset_info[self.current_dataset]["num_classes"]
         # 为每个类别生成狄利克雷分布，存储每个类别在不同车辆上的分配比例
         self.class_distributions = {}
@@ -207,7 +207,7 @@ class DomainIncrementalDataSimulator:
         输出：
 
         """
-        num_vehicles = len(self.vehicle_env.vehicles)
+        num_vehicles = self.num_vehicles
         vehicle_idx = vehicle_id
 
         # 如果还没有为该域分配数据，则进行分配
@@ -221,7 +221,7 @@ class DomainIncrementalDataSimulator:
         """
         使用狄利克雷分布将域训练数据分配给各个车辆
         """
-        num_vehicles = len(self.vehicle_env.vehicles)
+        num_vehicles = self.num_vehicles
         domain_key = f"{self.current_dataset}_{self.get_current_domain()}"
 
         # 按类别组织训练数据索引
@@ -611,10 +611,12 @@ if __name__ == "__main__":
     # 1. 初始化车辆环境
     print("1. 初始化车辆环境...")
     vehicle_env = VehicleEnvironment()
-    data_simulator = DomainIncrementalDataSimulator(vehicle_env)
+    num_vehicles = len(vehicle_env.vehicles)
+    print(f"车辆数量：{num_vehicles}")
+    data_simulator = DomainIncrementalDataSimulator(num_vehicles)
 
     # 2. 显示初始信息
-    print(f"车辆数量: {len(vehicle_env.vehicles)}")
+    print(f"车辆数量: {data_simulator.num_vehicles}")
     print(f"当前数据集: {data_simulator.current_dataset}")
     print(f"可用域: {data_simulator.current_domains}")
     print(f"狄利克雷参数 α: {config.DIRICHLET_ALPHA}")
@@ -635,7 +637,7 @@ if __name__ == "__main__":
         print(f"测试数据总量: {dist_info['total_test_samples']}")
         # 为前3辆车分配数据并显示信息
         print("\n车辆数据分配示例:")
-        for vehicle_id in range(min(3, len(vehicle_env.vehicles))):
+        for vehicle_id in range(min(3, num_vehicles)):
             # 生成车辆数据
             vehicle_data = data_simulator.generate_vehicle_data(vehicle_id)
 
