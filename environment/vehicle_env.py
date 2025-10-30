@@ -5,6 +5,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
+from environment.dataSimu_env import DomainIncrementalDataSimulator
 import random
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -136,8 +137,10 @@ class VehicleEnvironment:
             "connection_changes": 0,
         }
 
-        # 初始化环境
+        # 初始化物理环境
         self._initialize_environment()
+        # 初始化数据环境
+        self.data_simulator = DomainIncrementalDataSimulator()
 
     def _initialize_environment(self):
         """
@@ -291,7 +294,7 @@ class VehicleEnvironment:
             bs_utilization.append(utilization)
             bs["utilization"] = utilization
 
-        print("\n=== 环境初始化完成 ===")
+        print("\n=== 物理环境初始化完成 ===")
         print(f"基站数量: {len(self.base_stations)}")
         print(f"车辆数量: {len(self.vehicles)}")
         print(f"已连接车辆: {connected_vehicles}")
@@ -461,7 +464,40 @@ class VehicleEnvironment:
         self._initialize_environment()
         print("环境重置完成")
 
+    def update_session(self, session_id):
+        "更新训练会话"
+        self.current_session = session_id
+        # 更新车辆位置，此处的time_delta需要计算，待定
+        self.update_vehicle_positions(time_delta = 1)
+        # 更新数据模拟器
+        self.data_simulator.update_session(session_id)
+        # 为车辆生成新数据
+        self._refresh_vehicle_data()
+        print("*****************************")
+        print(f"*    Session {session_id} 更新完成     *")
+        print("*****************************")
 
+    def _refresh_vehicle_data(self):
+        """为所有车辆刷新数据"""
+        for vehicle in self.vehicles:
+            # 生成新的数据批次
+            new_data = self.data_simulator.generate_vehicle_data(vehicle.id)
+
+            # 更新车辆数据
+            vehicle.data_batches = new_data
+
+            # 更新数据统计
+            if new_data:
+                total_samples = 0
+                for loader in new_data:
+                    if hasattr(loader, 'dataset'):
+                        total_samples += len(loader.dataset)
+
+                vehicle.data_statistics = {
+                    'total_samples': total_samples,
+                    'num_batches': len(new_data),
+                    'current_domain': self.data_simulator.get_current_domain()
+                }
 # 使用示例
 from matplotlib.patches import Rectangle
 
@@ -606,8 +642,8 @@ def plot_vehicle_trajectories_separate(env, duration=60, time_step=1):
     plt.show()
 
     # 图3: 位置热力图
-    # plt.figure(figsize=(12, 6))
-    # ax3 = plt.gca()
+    plt.figure(figsize=(12, 6))
+    ax3 = plt.gca()
 
     # 收集所有位置点
     all_x = []
@@ -785,7 +821,9 @@ def create_enhanced_trajectory_plot(env, trajectories):
 if __name__ == "__main__":
     # 初始化环境
     env = VehicleEnvironment()
+    env.update_session(0)
+    env.update_session(1)
     # 绘制三个分开的图
-    trajectories = plot_vehicle_trajectories_separate(env, duration=60, time_step=0.5)
+    # trajectories = plot_vehicle_trajectories_separate(env, duration=60, time_step=0.5)
     # # 可选：创建增强版轨迹图
     # create_enhanced_trajectory_plot(env, trajectories)

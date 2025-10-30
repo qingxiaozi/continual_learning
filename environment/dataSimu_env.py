@@ -9,7 +9,6 @@ from collections import defaultdict
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
-from environment.vehicle_env import VehicleEnvironment
 import matplotlib.pyplot as plt
 
 
@@ -25,8 +24,8 @@ class DomainIncrementalDataSimulator:
     5. 计算测试损失（待定）
     """
 
-    def __init__(self, num_vehicles):
-        self.num_vehicles = num_vehicles
+    def __init__(self):
+        self.num_vehicles = config.NUM_VEHICLES
         self.current_dataset = config.CURRENT_DATASET
         self.current_domain_idx = 0
         self.current_session = 0
@@ -98,9 +97,10 @@ class DomainIncrementalDataSimulator:
             alpha = np.full(num_vehicles, config.DIRICHLET_ALPHA)
             distribution = np.random.dirichlet(alpha)
             self.class_distributions[class_idx] = distribution
-        print(
-            f"使用狄利克雷分布(α={config.DIRICHLET_ALPHA})初始化{num_vehicles}辆车的数据分配"
-        )
+        print("\n=== 数据环境初始化完成 ===")
+        print(f"狄利克雷分布系数 α = {config.DIRICHLET_ALPHA}")
+        print(f"初始化{num_vehicles}辆车的数据分配")
+        print("=====================\n")
 
     def get_current_domain(self):
         """
@@ -610,10 +610,7 @@ def display_sample(dataset, index=None):
 if __name__ == "__main__":
     # 1. 初始化车辆环境
     print("1. 初始化车辆环境...")
-    vehicle_env = VehicleEnvironment()
-    num_vehicles = len(vehicle_env.vehicles)
-    print(f"车辆数量：{num_vehicles}")
-    data_simulator = DomainIncrementalDataSimulator(num_vehicles)
+    data_simulator = DomainIncrementalDataSimulator()
 
     # 2. 显示初始信息
     print(f"车辆数量: {data_simulator.num_vehicles}")
@@ -637,7 +634,7 @@ if __name__ == "__main__":
         print(f"测试数据总量: {dist_info['total_test_samples']}")
         # 为前3辆车分配数据并显示信息
         print("\n车辆数据分配示例:")
-        for vehicle_id in range(min(3, num_vehicles)):
+        for vehicle_id in range(data_simulator.num_vehicles):
             # 生成车辆数据
             vehicle_data = data_simulator.generate_vehicle_data(vehicle_id)
 
