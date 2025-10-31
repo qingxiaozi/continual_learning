@@ -468,7 +468,7 @@ class VehicleEnvironment:
         "更新训练会话"
         self.current_session = session_id
         # 更新车辆位置，此处的time_delta需要计算，待定
-        self.update_vehicle_positions(time_delta = 1)
+        self.update_vehicle_positions(time_delta=1)
         # 更新数据模拟器
         self.data_simulator.update_session(session_id)
         # 为车辆生成新数据
@@ -490,14 +490,16 @@ class VehicleEnvironment:
             if new_data:
                 total_samples = 0
                 for loader in new_data:
-                    if hasattr(loader, 'dataset'):
+                    if hasattr(loader, "dataset"):
                         total_samples += len(loader.dataset)
 
                 vehicle.data_statistics = {
-                    'total_samples': total_samples,
-                    'num_batches': len(new_data),
-                    'current_domain': self.data_simulator.get_current_domain()
+                    "total_samples": total_samples,
+                    "num_batches": len(new_data),
+                    "current_domain": self.data_simulator.get_current_domain(),
                 }
+
+
 # 使用示例
 from matplotlib.patches import Rectangle
 

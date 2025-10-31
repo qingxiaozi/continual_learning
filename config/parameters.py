@@ -75,7 +75,7 @@ class Config:
     BATCH_SIZE = 32
     IMAGE_SIZE = 224  # 统一调整到相同尺寸
     # 测试策略参数
-    TEST_STRATEGY = 'cumulative'  # 'current' 或 'cumulative'
+    TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
     TRAIN_TEST_SPLIT = 0.8  # 训练集比例
 
     # 评估参数

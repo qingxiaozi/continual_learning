@@ -10,7 +10,9 @@ class ResNet18(nn.Module):
         super(ResNet18, self).__init__()
 
         # 初始卷积层
-        self.conv1 = nn.Conv2d(channel, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(
+            channel, 64, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -33,7 +35,9 @@ class ResNet18(nn.Module):
         downsample = None
         if stride != 1 or in_channels != out_channels:
             downsample = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    in_channels, out_channels, kernel_size=1, stride=stride, bias=False
+                ),
                 nn.BatchNorm2d(out_channels),
             )
 
@@ -48,7 +52,7 @@ class ResNet18(nn.Module):
         """权重初始化"""
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -73,16 +77,24 @@ class ResNet18(nn.Module):
 
 class BasicBlock(nn.Module):
     """ResNet基础块"""
+
     expansion = 1
 
     def __init__(self, in_channels, out_channels, stride=1, downsample=None):
         super(BasicBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride,
-                              padding=1, bias=False)
+        self.conv1 = nn.Conv2d(
+            in_channels,
+            out_channels,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            bias=False,
+        )
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1,
-                              padding=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.downsample = downsample
         self.stride = stride
@@ -109,7 +121,7 @@ class BasicBlock(nn.Module):
 # 使用示例
 if __name__ == "__main__":
     # 创建模型
-    model = ResNet18(num_classes = 31, channel = 3)
+    model = ResNet18(num_classes=31, channel=3)
 
     # 测试前向传播
     x = torch.randn(2, 3, 224, 224)  # batch_size=2, 3通道, 224x224图像

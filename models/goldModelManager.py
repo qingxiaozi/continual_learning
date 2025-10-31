@@ -4,10 +4,12 @@ import torchvision.models as models
 from torch.utils.data import DataLoader
 import os
 import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
 from config.paths import paths
 from environment.dataSimu_env import DomainIncrementalDataSimulator
+
 
 class GoldenModelManager:
     """
@@ -34,7 +36,9 @@ class GoldenModelManager:
         self.batch_size = 32
 
         # 模型路径
-        self.model_path = os.path.join(paths.RESULTS_DIR, f'golden_model_{dataset_name}.pth')
+        self.model_path = os.path.join(
+            paths.RESULTS_DIR, f"golden_model_{dataset_name}.pth"
+        )
 
         # 如果模型已存在，直接加载；否则进行微调
         if os.path.exists(self.model_path):
@@ -45,11 +49,11 @@ class GoldenModelManager:
 
     def _get_num_classes(self, dataset_name):
         """根据数据集名称获取类别数量"""
-        if dataset_name == 'office31':
+        if dataset_name == "office31":
             return config.OFFICE31_CLASSES
-        elif dataset_name == 'digit10':
+        elif dataset_name == "digit10":
             return config.DIGIT10_CLASSES
-        elif dataset_name == 'domainnet':
+        elif dataset_name == "domainnet":
             return config.DOMAINNET_CLASSES
         else:
             return 10  # 默认值
@@ -57,7 +61,7 @@ class GoldenModelManager:
     def _initialize_model(self):
         """初始化ResNet18模型"""
         # 加载预训练的ResNet18
-        model = models.resnet18(pretrained = True)
+        model = models.resnet18(pretrained=True)
 
         # 冻结前面的层（可选，根据数据量决定）
         # self._freeze_layers(model)
@@ -83,7 +87,7 @@ class GoldenModelManager:
         for param in model.fc.parameters():
             param.requires_grad = True
 
-    def fine_tune(self, train_dataset, val_dataset = None):
+    def fine_tune(self, train_dataset, val_dataset=None):
         """
         微调黄金模型
         参数：
@@ -97,25 +101,19 @@ class GoldenModelManager:
 
         # 创建数据加载器
         train_loader = DataLoader(
-            train_dataset,
-            batch_size = self.batch_size,
-            shuffle = True,
-            num_workers = 4
+            train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4
         )
         val_loader = None
         if val_dataset:
             val_loader = DataLoader(
-                val_dataset,
-                batch_size = self.batch_size,
-                shuffle = False,
-                num_workers = 4
+                val_dataset, batch_size=self.batch_size, shuffle=False, num_workers=4
             )
 
         # 定义损失函数和优化器
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(
             filter(lambda p: p.requires_grad, self.model.parameters()),
-            lr = self.learning_rate
+            lr=self.learning_rate,
         )
 
         # 学习率调度器
@@ -144,7 +142,7 @@ class GoldenModelManager:
                 train_correct += predicted.eq(targets).sum().item()
 
             # 计算训练准确率
-            train_accuracy = 100. * train_correct / train_total
+            train_accuracy = 100.0 * train_correct / train_total
             avg_train_loss = train_loss / len(train_loader)
 
             # 验证阶段
@@ -156,23 +154,28 @@ class GoldenModelManager:
 
                 with torch.no_grad():
                     for inputs, targets in val_loader:
-                        inputs, targets = inputs.to(self.device), targets.to(self.device)
+                        inputs, targets = inputs.to(self.device), targets.to(
+                            self.device
+                        )
                         outputs = self.model(inputs)
                         _, predicted = outputs.max(1)
                         val_total += targets.size(0)
                         val_correct += predicted.eq(targets).sum().item()
 
-                val_accuracy = 100. * val_correct / val_total
+                val_accuracy = 100.0 * val_correct / val_total
 
             # 更新学习率
             scheduler.step()
             # 打印进度
-            print(f'Epoch [{epoch+1}/{self.fine_tune_epochs}] '
-                  f'Train Loss: {avg_train_loss:.4f}, '
-                  f'Train Acc: {train_accuracy:.2f}%', end='')
+            print(
+                f"Epoch [{epoch+1}/{self.fine_tune_epochs}] "
+                f"Train Loss: {avg_train_loss:.4f}, "
+                f"Train Acc: {train_accuracy:.2f}%",
+                end="",
+            )
 
             if val_loader:
-                print(f', Val Acc: {val_accuracy:.2f}%')
+                print(f", Val Acc: {val_accuracy:.2f}%")
 
                 # 保存最佳模型
                 if val_accuracy > best_val_accuracy:
@@ -197,7 +200,9 @@ class GoldenModelManager:
         self.model.eval()
 
         with torch.no_grad():
-            if isinstance(inputs, list) or (isinstance(inputs, torch.Tensor) and inputs.dim() == 3):
+            if isinstance(inputs, list) or (
+                isinstance(inputs, torch.Tensor) and inputs.dim() == 3
+            ):
                 inputs = inputs.unsqueeze(0)
 
             inputs = inputs.to(self.device)
@@ -210,31 +215,38 @@ class GoldenModelManager:
     def save_model(self):
         """保存模型"""
         os.makedirs(os.path.dirname(self.model_path), exist_ok=True)
-        torch.save({
-            'model_state_dict': self.model.state_dict(),
-            'dataset_name': self.dataset_name,
-            'num_classes': self.num_classes
-        }, self.model_path)
+        torch.save(
+            {
+                "model_state_dict": self.model.state_dict(),
+                "dataset_name": self.dataset_name,
+                "num_classes": self.num_classes,
+            },
+            self.model_path,
+        )
 
     def load_model(self):
         """加载模型"""
         checkpoint = torch.load(self.model_path, map_location=self.device)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"黄金模型加载成功，数据集: {checkpoint['dataset_name']}, "
-              f"类别数: {checkpoint['num_classes']}")
+        self.model.load_state_dict(checkpoint["model_state_dict"])
+        print(
+            f"黄金模型加载成功，数据集: {checkpoint['dataset_name']}, "
+            f"类别数: {checkpoint['num_classes']}"
+        )
 
     def get_model_info(self):
         """获取模型信息"""
         total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
 
         return {
-            'model_name': 'ResNet18',
-            'dataset': self.dataset_name,
-            'num_classes': self.num_classes,
-            'total_parameters': total_params,
-            'trainable_parameters': trainable_params,
-            'model_path': self.model_path
+            "model_name": "ResNet18",
+            "dataset": self.dataset_name,
+            "num_classes": self.num_classes,
+            "total_parameters": total_params,
+            "trainable_parameters": trainable_params,
+            "model_path": self.model_path,
         }
 
     def label_data(self, dataloader):
@@ -288,7 +300,7 @@ class GoldenModelManager:
                 total += targets.size(0)
                 correct += predicted.eq(targets).sum().item()
 
-        accuracy = 100. * correct / total
+        accuracy = 100.0 * correct / total
         return accuracy
 
 
@@ -301,6 +313,7 @@ if __name__ == "__main__":
 
     # 合并所有域的数据
     from torch.utils.data import ConcatDataset
+
     full_train_dataset = ConcatDataset(train_datasets)
     # 分割训练集和验证集
     train_size = int(0.8 * len(full_train_dataset))
