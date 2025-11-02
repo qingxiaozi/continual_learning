@@ -31,6 +31,9 @@ class DomainIncrementalDataSimulator:
         self.current_domain_idx = 0
         self.current_session = 0
 
+        # # 初始化黄金模型
+        # self.golden_model = GoldenModelManager(self.current_dataset)
+
         # 域序列
         self.domain_sequences = config.DOMAIN_SEQUENCES
         self.current_domains = self.domain_sequences[self.current_dataset]
@@ -474,6 +477,89 @@ class DomainIncrementalDataSimulator:
 
         return info
 
+    # def prepare_golden_model(self, train_all_domains=True):
+    #     """
+    #     准备黄金模型
+
+    #     参数:
+    #         train_all_domains: 是否使用所有域的数据训练黄金模型
+    #     """
+    #     print(f"准备黄金模型，数据集: {self.current_dataset}")
+
+    #     # 检查黄金模型是否已经训练
+    #     if os.path.exists(self.golden_model.model_path):
+    #         print("黄金模型已存在，跳过训练")
+    #         return
+
+    #     # 收集训练数据
+    #     if train_all_domains:
+    #         # 使用所有域的数据训练
+    #         train_datasets = []
+    #         for domain in self.domain_sequences[self.current_dataset]:
+    #             domain_data = self._load_domain_data(domain)
+    #             train_datasets.append(domain_data)
+
+    #         # 合并所有域的数据
+    #         from torch.utils.data import ConcatDataset
+    #         full_train_dataset = ConcatDataset(train_datasets)
+
+    #         # 分割训练集和验证集
+    #         train_size = int(0.8 * len(full_train_dataset))
+    #         val_size = len(full_train_dataset) - train_size
+    #         train_dataset, val_dataset = torch.utils.data.random_split(
+    #             full_train_dataset, [train_size, val_size]
+    #         )
+
+    #     else:
+    #         # 只使用当前域的数据训练
+    #         full_dataset = self._load_domain_data(self.get_current_domain())
+
+    #         # 分割训练集和验证集
+    #         train_size = int(0.8 * len(full_dataset))
+    #         val_size = len(full_dataset) - train_size
+    #         train_dataset, val_dataset = torch.utils.data.random_split(
+    #             full_dataset, [train_size, val_size]
+    #         )
+
+    #     # 微调黄金模型
+    #     self.golden_model.fine_tune(train_dataset, val_dataset)
+
+    #     # 评估黄金模型在所有域上的性能
+    #     self._evaluate_golden_model_on_all_domains()
+
+    # def _evaluate_golden_model_on_all_domains(self):
+    #     """评估黄金模型在所有域上的性能"""
+    #     print("\n=== 黄金模型域性能评估 ===")
+
+    #     for domain in self.domain_sequences[self.current_dataset]:
+    #         domain_data = self._load_domain_data(domain)
+    #         data_loader = DataLoader(domain_data, batch_size=32, shuffle=False)
+
+    #         accuracy = self.golden_model.evaluate(data_loader)
+    #         print(f"域 {domain}: {accuracy:.2f}%")
+
+    #     print("==========================\n")
+
+    # def label_uploaded_data(self, uploaded_data):
+    #     """
+    #     为上传的数据生成标签
+
+    #     参数:
+    #         uploaded_data: 上传的数据批次列表
+
+    #     返回:
+    #         list: 标注后的数据批次列表
+    #     """
+    #     labeled_data = []
+
+    #     for data_batch in uploaded_data:
+    #         # 使用黄金模型生成标签
+    #         batch_labeled_data = self.golden_model.label_data(data_batch)
+    #         labeled_data.extend(batch_labeled_data)
+
+    #     print(f"数据标注完成: {len(labeled_data)} 个批次已标注")
+    #     return labeled_data
+
 
 # 基础数据集类
 class BaseDataset(Dataset):
@@ -578,45 +664,6 @@ def display_dataset_statistics(dataset):
         print(f"  {class_name}: {count} 个样本")
 
     print("=====================\n")
-
-
-def display_sample(dataset, index=None):
-    """
-    显示数据集中的一个样本
-
-    参数:
-        dataset: Office31Dataset实例
-        index: 要显示的样本索引，如果为None则随机选择
-    """
-    if len(dataset) == 0:
-        print("数据集为空!")
-        return
-
-    # 如果未指定索引，随机选择一个
-    if index is None:
-        index = np.random.randint(0, len(dataset))
-
-    # 获取样本
-    image, label = dataset[index]
-
-    # 获取类别名称
-    class_name = dataset.get_class_name(label)
-
-    # 显示图像和标签信息
-    plt.figure(figsize=(8, 6))
-    plt.imshow(image)
-    plt.title(f"sample #{index}\nclass_name: {class_name} (label: {label})")
-    plt.axis("off")
-    plt.tight_layout()
-    plt.show()
-
-    # 打印详细信息
-    print(f"样本索引: {index}")
-    print(f"图像路径: {dataset.data[index]}")
-    print(f"类别名称: {class_name}")
-    print(f"标签索引: {label}")
-    print(f"数据集大小: {len(dataset)} 个样本")
-    print(f"类别数量: {len(dataset.class_to_idx)}")
 
 
 if __name__ == "__main__":

@@ -60,12 +60,13 @@ class Vehicle:
             # 移除最旧的数据批次（FIFO策略）
             self.data_batches.pop(0)
 
-    def get_inference_confidence(self, model, data_loader):
+    def get_inference_confidence(self, model):
         """计算模型在本地数据上的推理置信度
         1. 对于每个样本，模型输出一个向量logits，通过softmax函数转换为概率分布
         2. 取概率分布中最大的概率值作为该样本的置信度
         3. 对于一个批次的数据，计算所有样本置信度的平均值作为该批次的平均置信度
         """
+        data_loader = self.data_batches
         if not data_loader:
             return 0.0
 
@@ -476,6 +477,14 @@ class VehicleEnvironment:
         print("*****************************")
         print(f"*    Session {session_id} 更新完成     *")
         print("*****************************")
+        # # 每辆车执行推理
+        # for vec in self.vehicles:
+        #     print(sys)
+        #     from models.g2_model import globalModel
+        #     model = globalModel()
+        #     acc = vec.get_inference_confidence(model)
+        #     print(acc)
+        #     exit()
 
     def _refresh_vehicle_data(self):
         """为所有车辆刷新数据"""
