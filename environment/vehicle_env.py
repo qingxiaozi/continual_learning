@@ -22,50 +22,24 @@ class Vehicle:
     """
 
     def __init__(self, vehicle_id, position):
-        # 基本信息
         self.id = vehicle_id  # 车辆唯一标识符
-        self.position = position  # 车辆当前位置坐标，用于确定与哪个基站连接，计算通信质量，模拟车辆运动
-        # 通信状态
-        self.bs_connection = None  # 当前连接的基站ID
-        self.communication_quality = 1.0  # 通信质量因子 [0, 1]
-        # 数据管理
-        self.data_batches = []  # 车辆采集的实时数据批次，未标注
-        self.cache_data = []  # 1
-        self.data_quality_scores = []  # 数据质量评分
-        # 模型状态
+        self.position = position  # 车辆当前位置坐标
+        self.cache_data = []  # 车辆数据缓存
         self.local_model = None
-        self.model_version = 0  # 当前模型版本
-        # 性能监控
+        self.bs_connection = None  # 当前连接的基站ID
+        self.data_batches = []  # 车辆的实时数据批次，未标注
+        self.data_quality_scores = []  # 数据质量评分
         self.confidence_history = []  # 历史置信度记录
-        # 资源约束
-        self.computation_capacity = 1.0  # 计算能力因子
-        self.storage_capacity = 1000  # 存储容量（数据批次数）
-        # 状态标志
-        self.is_online = True
 
     def set_bs_connection(self, bs_id):
-        old_bs = self.bs_connection
         self.bs_connection = bs_id
-        # 记录基站切换事件
-        if old_bs != bs_id:
-            print(f"Vehicle {self.id}: BS connection changed from {old_bs} to {bs_id}")
 
     def add_data_batch(self, data_batch):
-        """添加数据批次
-        data_batch：数据批次，DataLoader对象
-        """
+        """添加数据批次"""
         self.data_batches.append(data_batch)
-        # 缓存管理逻辑（可选）：
-        if len(self.data_batches) > config.MAX_LOCAL_BATCHES:
-            # 移除最旧的数据批次（FIFO策略）
-            self.data_batches.pop(0)
 
     def get_inference_confidence(self, model):
-        """计算模型在本地数据上的推理置信度
-        1. 对于每个样本，模型输出一个向量logits，通过softmax函数转换为概率分布
-        2. 取概率分布中最大的概率值作为该样本的置信度
-        3. 对于一个批次的数据，计算所有样本置信度的平均值作为该批次的平均置信度
-        """
+        """计算模型在本地数据上的推理置信度"""
         data_loader = self.data_batches
         if not data_loader:
             return 0.0
@@ -76,18 +50,14 @@ class Vehicle:
         # 禁用梯度计算以提升效率
         with torch.no_grad():
             for batch in data_loader:
-                # 数据预处理：提取输入
                 if isinstance(batch, (list, tuple)):
                     inputs, _ = batch  # 忽略标签，只使用输入
                 else:
                     inputs = batch
 
-                # 前向传播获取模型输出
                 outputs = model(inputs)
-
-                # 处理不同类型的模型输出
                 if hasattr(outputs, "logits"):
-                    # 某些模型（如 transformers）输出包含logits属性
+                    # 某些模型输出包含logits属性
                     outputs = outputs.logits
                 # 计算置信度
                 probabilities = torch.softmax(outputs, dim=1)  # 转换为概率分布
@@ -98,15 +68,9 @@ class Vehicle:
 
                 total_confidence += mean_confidence
                 count += 1
-        # 计算整体平均置信度
+
         avg_confidence = total_confidence / count if count > 0 else 0.0
-
-        # 记录历史置信度
         self.confidence_history.append(avg_confidence)
-
-        # 历史记录管理（保持合理长度）
-        if len(self.confidence_history) > config.MAX_CONFIDENCE_HISTORY:
-            self.confidence_history.pop(0)
 
         return avg_confidence
 
@@ -124,24 +88,17 @@ class VehicleEnvironment:
     def __init__(self):
         # 实体集合
         self.vehicles = []  # 车辆对象列表
-        self.base_stations = []  # 基站对象列表，为基站信息字典
+        self.base_stations = []  # 基站对象列表，字典
         self.current_session = 0  # 当前训练会话编号
         self.environment_time = 0.0  # 环境运行时间(s)
         self.road_length = 5000  # 道路长度(m）
         self.road_width = 20  # 道路宽度(m），-10到10
         self.num_lanes = 4  # 车道数量
 
-        # 性能统计
-        self.session_stats = {
-            "total_communications": 0,
-            "successful_uploads": 0,
-            "connection_changes": 0,
-        }
-
         # 初始化物理环境
         self._initialize_environment()
-        # 初始化数据环境
-        self.data_simulator = DomainIncrementalDataSimulator()
+        # # 初始化数据环境
+        # self.data_simulator = DomainIncrementalDataSimulator()
 
     def _initialize_environment(self):
         """
@@ -160,7 +117,7 @@ class VehicleEnvironment:
         coverage_radius = config.BASE_STATION_COVERAGE
         optimal_bs_count = max(3, int(self.road_length / (coverage_radius * 0.8)) + 1)
         num_bs = min(optimal_bs_count, 5)  # 最多5个基站
-        print(f"初始化 {num_bs} 个基站，覆盖半径: {coverage_radius}米")
+        print(f"初始化 {num_bs} 个基站")
 
         for i in range(num_bs):
             # 基站位置：沿着道路均匀分布
@@ -178,7 +135,6 @@ class VehicleEnvironment:
                 "capacity": 50,  # 最大连接车辆数
                 "connected_vehicles": [],  # 当前连接的车辆ID列表
                 "utilization": 0.0,  # 利用率
-                "signal_strength": 1.0,  # 信号强度因子
             }
             self.base_stations.append(base_station)
             print(f"基站 {i} 创建于位置 {bs_position}")
@@ -235,11 +191,6 @@ class VehicleEnvironment:
                     vehicle.set_bs_connection(nearest_bs["id"])
                     nearest_bs["connected_vehicles"].append(vehicle.id)
                     connection_success_count += 1
-
-                    # 计算连接质量
-                    distance = np.linalg.norm(vehicle.position - nearest_bs["position"])
-                    quality = max(0, 1 - distance / nearest_bs["coverage"])
-                    vehicle.communication_quality = quality
                 else:
                     print(
                         f"警告: 基站 {nearest_bs['id']} 容量已满，车辆 {vehicle.id} 无法连接"
@@ -325,9 +276,6 @@ class VehicleEnvironment:
 
         # 更新环境时间
         self.environment_time += time_delta
-        self.session_stats["connection_changes"] += connection_changes
-        if connection_changes > 0:
-            print(f"位置更新完成：{connection_changes} 个连接发生了变化")
 
     def _update_single_vehicle_position(self, vehicle, time_delta):
         """
@@ -374,17 +322,12 @@ class VehicleEnvironment:
         # 连接到新基站
         if new_bs:
             vehicle.set_bs_connection(new_bs["id"])
-            # 计算连接质量
-            distance = np.linalg.norm(vehicle.position - new_bs["position"])
-            quality = max(0.1, 1 - distance / new_bs["coverage"])  # 最低质量0.1
-            vehicle.communication_quality = quality
             # 更新基站连接列表
             if vehicle.id not in new_bs["connected_vehicles"]:
                 new_bs["connected_vehicles"].append(vehicle.id)
         else:
             # 无可用基站
             vehicle.set_bs_connection(None)
-            vehicle.communication_quality = 0.0
 
     def _get_vehicle_lane(self, vehicle):
         """
@@ -445,68 +388,56 @@ class VehicleEnvironment:
         return False
 
     def reset(self):
-        """
-        重置环境到初始状态
-        """
+        """重置环境到初始状态"""
         print("重置车辆环境...")
         # 重置状态变量
         self.current_session = 0
-        self.environment_time = 0.0
-        self.session_stats = {
-            "total_communications": 0,
-            "successful_uploads": 0,
-            "connection_changes": 0,
-        }
-
-        # 清空实体
-        self.vehicles = []
-        self.base_stations = []
         # 重新初始化
         self._initialize_environment()
         print("环境重置完成")
 
-    def update_session(self, session_id):
-        "更新训练会话"
-        self.current_session = session_id
-        # 更新车辆位置，此处的time_delta需要计算，待定
-        self.update_vehicle_positions(time_delta=1)
-        # 更新数据模拟器
-        self.data_simulator.update_session(session_id)
-        # 为车辆生成新数据
-        self._refresh_vehicle_data()
-        print("*****************************")
-        print(f"*    Session {session_id} 更新完成     *")
-        print("*****************************")
-        # # 每辆车执行推理
-        # for vec in self.vehicles:
-        #     print(sys)
-        #     from models.g2_model import globalModel
-        #     model = globalModel()
-        #     acc = vec.get_inference_confidence(model)
-        #     print(acc)
-        #     exit()
+    # def update_session(self, session_id):
+    #     "更新训练会话"
+    #     self.current_session = session_id
+    #     # 更新车辆位置，此处的time_delta需要计算，待定
+    #     self.update_vehicle_positions(time_delta=1)
+    #     # 更新数据模拟器
+    #     self.data_simulator.update_session(session_id)
+    #     # 为车辆生成新数据
+    #     self._refresh_vehicle_data()
+    #     print("*****************************")
+    #     print(f"*    Session {session_id} 更新完成     *")
+    #     print("*****************************")
+    #     # # 每辆车执行推理
+    #     # for vec in self.vehicles:
+    #     #     print(sys)
+    #     #     from models.g2_model import globalModel
+    #     #     model = globalModel()
+    #     #     acc = vec.get_inference_confidence(model)
+    #     #     print(acc)
+    #     #     exit()
 
-    def _refresh_vehicle_data(self):
-        """为所有车辆刷新数据"""
-        for vehicle in self.vehicles:
-            # 生成新的数据批次
-            new_data = self.data_simulator.generate_vehicle_data(vehicle.id)
+    # def _refresh_vehicle_data(self):
+    #     """为所有车辆刷新数据"""
+    #     for vehicle in self.vehicles:
+    #         # 生成新的数据批次
+    #         new_data = self.data_simulator.generate_vehicle_data(vehicle.id)
 
-            # 更新车辆数据
-            vehicle.data_batches = new_data
+    #         # 更新车辆数据
+    #         vehicle.data_batches = new_data
 
-            # 更新数据统计
-            if new_data:
-                total_samples = 0
-                for loader in new_data:
-                    if hasattr(loader, "dataset"):
-                        total_samples += len(loader.dataset)
+    #         # 更新数据统计
+    #         if new_data:
+    #             total_samples = 0
+    #             for loader in new_data:
+    #                 if hasattr(loader, "dataset"):
+    #                     total_samples += len(loader.dataset)
 
-                vehicle.data_statistics = {
-                    "total_samples": total_samples,
-                    "num_batches": len(new_data),
-                    "current_domain": self.data_simulator.get_current_domain(),
-                }
+    #             vehicle.data_statistics = {
+    #                 "total_samples": total_samples,
+    #                 "num_batches": len(new_data),
+    #                 "current_domain": self.data_simulator.get_current_domain(),
+    #             }
 
 
 # 使用示例
@@ -832,8 +763,8 @@ def create_enhanced_trajectory_plot(env, trajectories):
 if __name__ == "__main__":
     # 初始化环境
     env = VehicleEnvironment()
-    env.update_session(0)
-    env.update_session(1)
+    # env.update_session(0)
+    # env.update_session(1)
     # 绘制三个分开的图
     # trajectories = plot_vehicle_trajectories_separate(env, duration=60, time_step=0.5)
     # # 可选：创建增强版轨迹图
