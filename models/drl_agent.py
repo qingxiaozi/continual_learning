@@ -8,7 +8,7 @@ import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
-
+from environment.vehicle_env import VehicleEnvironment
 
 class DRLNetwork(nn.Module):
     """DRL策略网络 - 输出连续动作"""
@@ -158,12 +158,19 @@ class DRLAgent:
 
 
 if __name__ == "__main__":
-    print(DRLNetwork)
+    env = VehicleEnvironment()
     state_dim = 3 * config.NUM_VEHICLES  # 置信度、测试损失、质量评分
     action_dim = 2 * config.NUM_VEHICLES  # 上传批次、带宽分配
-    drl = DRLNetwork(state_dim, action_dim)
-    x = torch.randn(1, state_dim)
-    print(drl(x))
-
     drlAgent = DRLAgent(state_dim, action_dim)
-    print(drlAgent)
+
+    # 训练智能体
+    print("开始训练...")
+    train_agent(drlAgent, env, episodes=100)
+    # 保存模型
+    agent.save_model("drl_agent.pth")
+    print("模型已保存")
+    # 加载模型进行测试
+    print("开始测试...")
+    agent2 = DRLAgent(env.state_dim, env.action_dim)
+    agent2.load_model("drl_agent.pth")
+    test_agent(agent2, env)

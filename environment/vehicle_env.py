@@ -38,13 +38,15 @@ class Vehicle:
         """添加数据批次"""
         self.data_batches.append(data_batch)
 
-    def get_inference_confidence(self, model):
+    def get_inference_confidence(self, global_model, data_loader):
         """计算模型在本地数据上的推理置信度"""
-        data_loader = self.data_batches
-        if not data_loader:
+        """
+        dataloader:为车辆新采集的数据
+        """
+        if not data_loader or len(data_loader) == 0:
             return 0.0
 
-        model.eval()
+        global_model.eval()
         total_confidence = 0.0
         count = 0
         # 禁用梯度计算以提升效率
@@ -55,7 +57,7 @@ class Vehicle:
                 else:
                     inputs = batch
 
-                outputs = model(inputs)
+                outputs = global_model(inputs)
                 if hasattr(outputs, "logits"):
                     # 某些模型输出包含logits属性
                     outputs = outputs.logits
@@ -74,6 +76,41 @@ class Vehicle:
 
         return avg_confidence
 
+    def calculate_test_loss(self, global_model, gold_model, data_loader):
+        """计算模型在数据上的测试损失"""
+        """
+        阶段s-1中新上传数据A_v^{s-1}在全局模型\omega_g^{s-1}上的测试损失L_{test,v}^s
+        dataloader:为经过计算后车辆上传的数据
+        """
+        if not data_loader or len(data_loader) == 0:
+            return 1.0
+
+        global_model.eval()
+        gold_model.eval()
+        criterion = torch.nn.CrossEntropyLoss()
+        device = next(global_model.parameters()).device
+
+        losses = []
+
+        with torch.no_grad():
+            for batch in data_loader:
+                # 提取输入数据
+                inputs = batch[0] if isinstance(batch, (list, tuple)) else batch
+                inputs = inputs.to(device)
+
+                if inputs.size(0) == 0:
+                    continue
+
+                # 生成伪标签
+                gold_outputs = gold_model.model(inputs)
+                targets = gold_outputs.argmax(dim=1)
+
+                # 计算损失
+                outputs = global_model(inputs)
+                loss = criterion(outputs, targets)
+                losses.append(loss.item())
+
+        return np.mean(losses) if losses else 1.0
 
 class VehicleEnvironment:
     """
@@ -408,14 +445,19 @@ class VehicleEnvironment:
     #     print("*****************************")
     #     print(f"*    Session {session_id} 更新完成     *")
     #     print("*****************************")
-    #     # # 每辆车执行推理
-    #     # for vec in self.vehicles:
-    #     #     print(sys)
-    #     #     from models.g2_model import globalModel
-    #     #     model = globalModel()
-    #     #     acc = vec.get_inference_confidence(model)
-    #     #     print(acc)
-    #     #     exit()
+
+    #     # 每辆车执行推理
+    #     for vec in self.vehicles:
+    #         print(sys)
+    #         from models.global_model import globalModel
+    #         model = globalModel("office31")
+    #         from models.gold_model import GoldModel
+    #         goldModel = GoldModel("office31")
+    #         acc = vec.get_inference_confidence(model, vec.data_batches)
+    #         print(acc)
+    #         loss = vec.calculate_test_loss(model, goldModel, vec.data_batches)
+    #         print(loss)
+    #         exit()
 
     # def _refresh_vehicle_data(self):
     #     """为所有车辆刷新数据"""

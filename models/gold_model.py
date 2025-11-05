@@ -27,6 +27,12 @@ class GoldModel:
         else:
             print(f"未找到预训练黄金模型，需要先进行微调,运行fine_tune(train_dataset, val_dataset)函数即可")
 
+    # 添加 eval方法
+    def eval(self):
+        """设置模型为评估模式"""
+        self.model.eval()
+        return self
+
     def _get_num_classes(self, dataset_name):
         """根据数据集名称获取类别数量"""
         if dataset_name == "office31":
@@ -242,4 +248,5 @@ if __name__ == "__main__":
     )
     print(data_simulator.current_dataset)
     golden_model = GoldModel(data_simulator.current_dataset)
-    golden_model.fine_tune(train_dataset, val_dataset)
+    print(golden_model.num_classes)
+    # golden_model.fine_tune(train_dataset, val_dataset)
