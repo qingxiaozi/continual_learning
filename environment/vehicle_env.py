@@ -24,7 +24,7 @@ class Vehicle:
     def __init__(self, vehicle_id, position):
         self.id = vehicle_id  # 车辆唯一标识符
         self.position = position  # 车辆当前位置坐标
-        self.cache_data = []  # 车辆数据缓存
+        self.cache_data = []  # 车辆数据缓存,相当于在边缘服务器上的数据
         self.local_model = None
         self.bs_connection = None  # 当前连接的基站ID
         self.data_batches = []  # 车辆的实时数据批次，未标注
@@ -345,6 +345,17 @@ class VehicleEnvironment:
         current_y = vehicle.position[1]
         smooth_y = current_y + (target_y - current_y) * 0.3  # 平滑因子
         vehicle.position = np.array([new_x, smooth_y])
+
+    # def get_environment_state(self):
+    #     """获取真实的环境状态用于DRL"""
+    #     state = []
+
+    #     for vehicle in self.vehicles:
+    #         try:
+    #             # 获取当前置信度，从全局模型推理中得到
+    #             if vehicle.data_batches:
+    #                 confidence = vehicle.get_inference_confidence(self.global_model, )
+
 
     def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
         """
