@@ -6,6 +6,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import config
 from environment.dataSimu_env import DomainIncrementalDataSimulator
+from learning.cache_manager import cacheManager
 import random
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -24,12 +25,15 @@ class Vehicle:
     def __init__(self, vehicle_id, position):
         self.id = vehicle_id  # 车辆唯一标识符
         self.position = position  # 车辆当前位置坐标
-        self.cache_data = []  # 车辆数据缓存,相当于在边缘服务器上的数据
-        self.local_model = None
         self.bs_connection = None  # 当前连接的基站ID
+
         self.data_batches = []  # 车辆的实时数据批次，未标注
+        self.uploaded_data = []  # 新上传的数据
+        self.cache_data = []  # 车辆数据缓存,相当于在边缘服务器上的数据
+
         self.data_quality_scores = []  # 数据质量评分
         self.confidence_history = []  # 历史置信度记录
+        self.test_loss_history = [] # 测试损失记录
 
     def set_bs_connection(self, bs_id):
         self.bs_connection = bs_id
@@ -38,12 +42,20 @@ class Vehicle:
         """添加数据批次"""
         self.data_batches.append(data_batch)
 
-    def get_inference_confidence(self, global_model, data_loader):
+    def set_uploaded_data(self, uploaded_batches):
+        """设置新上传的数据"""
+        self.uploaded_data = uploaded_batches
+
+    def clear_uploaded_data(self):
+        """清空已处理的上传数据"""
+        self.uploaded_data = []
+
+    def get_inference_confidence(self, global_model):
         """计算模型在本地数据上的推理置信度"""
         """
         dataloader:为车辆新采集的数据
         """
-        if not data_loader or len(data_loader) == 0:
+        if not self.data_batches or len(self.data_batches) == 0:
             return 0.0
 
         global_model.eval()
@@ -51,7 +63,7 @@ class Vehicle:
         count = 0
         # 禁用梯度计算以提升效率
         with torch.no_grad():
-            for batch in data_loader:
+            for batch in self.data_batches:
                 if isinstance(batch, (list, tuple)):
                     inputs, _ = batch  # 忽略标签，只使用输入
                 else:
@@ -76,13 +88,13 @@ class Vehicle:
 
         return avg_confidence
 
-    def calculate_test_loss(self, global_model, gold_model, data_loader):
-        """计算模型在数据上的测试损失"""
+    def calculate_test_loss(self, global_model, gold_model):
+        """计算模型在新上传数据上的测试损失"""
         """
         阶段s-1中新上传数据A_v^{s-1}在全局模型\omega_g^{s-1}上的测试损失L_{test,v}^s
         dataloader:为经过计算后车辆上传的数据
         """
-        if not data_loader or len(data_loader) == 0:
+        if not self.uploaded_data or len(self.uploaded_data) == 0:
             return 1.0
 
         global_model.eval()
@@ -93,7 +105,7 @@ class Vehicle:
         losses = []
 
         with torch.no_grad():
-            for batch in data_loader:
+            for batch in self.uploaded_data:
                 # 提取输入数据
                 inputs = batch[0] if isinstance(batch, (list, tuple)) else batch
                 inputs = inputs.to(device)
@@ -111,6 +123,18 @@ class Vehicle:
                 losses.append(loss.item())
 
         return np.mean(losses) if losses else 1.0
+
+    def update_quality_scores(self, cache_manager):
+        """从缓存管理器更新质量评分"""
+        cache = cache_manager.get_vehicle_cache(self.id)
+        if cache and 'quality_scores' in cache and cache['quality_scores']:
+            # 使用最新的质量评分
+            recent_scores = cache['quality_scores'][-min(5, len(cache['quality_scores'])):]
+            quality_score = np.mean(recent_scores)
+            self.quality_scores_history.append(quality_score)
+            return quality_score
+        return 0.5  # 默认质量评分
+
 
 class VehicleEnvironment:
     """
@@ -134,8 +158,8 @@ class VehicleEnvironment:
 
         # 初始化物理环境
         self._initialize_environment()
-        # # 初始化数据环境
-        # self.data_simulator = DomainIncrementalDataSimulator()
+        # 初始化数据环境
+        self.data_simulator = DomainIncrementalDataSimulator()
 
     def _initialize_environment(self):
         """
@@ -346,15 +370,46 @@ class VehicleEnvironment:
         smooth_y = current_y + (target_y - current_y) * 0.3  # 平滑因子
         vehicle.position = np.array([new_x, smooth_y])
 
-    # def get_environment_state(self):
-    #     """获取真实的环境状态用于DRL"""
-    #     state = []
+    def get_environment_state(self, global_model, gold_model):
+        """获取真实的环境状态用于DRL"""
+        state = []
 
-    #     for vehicle in self.vehicles:
-    #         try:
-    #             # 获取当前置信度，从全局模型推理中得到
-    #             if vehicle.data_batches:
-    #                 confidence = vehicle.get_inference_confidence(self.global_model, )
+        for vehicle in self.vehicles:
+            try:
+                # 获取当前置信度，从全局模型推理中得到
+                if vehicle.data_batches:
+                    confidence = vehicle.get_inference_confidence(self.global_model, vehicle.data_batches)
+                    vehicle.confidence_history.append(confidence)
+                else:
+                    confidence = 0.5
+
+                # 2. 获取测试损失 - 从实际模型评估中获取
+                if vehicle.uploaded_data:
+                    test_loss = vehilce.calculate_test_loss(self.global_model, gold_model)
+                    vehicle.test_loss_history.append(test_loss)
+                else:
+                    test_loss = 1.0
+                # 3. 获取质量评分 - 从缓存管理器中获取
+                quality_score = vehicle.update_quality_scores(self.cache_manager)
+
+                # 添加到状态向量
+                state.extend([confidence, test_loss, quality_score])
+
+            except Exception as e:
+                print(f"Error getting state for vehicle {vehicle.id}: {e}")
+                # 发生错误时使用默认值
+                state.extend([0.5, 1.0, 0.5])
+
+        # 确保状态向量长度正确
+        expected_length = 3 * config.NUM_VEHICLES
+        if len(state) < expected_length:
+            # 填充缺失的值
+            state.extend([0.5, 1.0, 0.5] * (config.NUM_VEHICLES - len(state) // 3))
+        elif len(state) > expected_length:
+            # 截断多余的值
+            state = state[:expected_length]
+
+        return np.array(state, dtype=np.float32)
 
 
     def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
@@ -464,10 +519,13 @@ class VehicleEnvironment:
     #         model = globalModel("office31")
     #         from models.gold_model import GoldModel
     #         goldModel = GoldModel("office31")
-    #         acc = vec.get_inference_confidence(model, vec.data_batches)
-    #         print(acc)
-    #         loss = vec.calculate_test_loss(model, goldModel, vec.data_batches)
-    #         print(loss)
+    #         acc = vec.get_inference_confidence(model)
+    #         print(f"acc:{acc}")
+    #         loss = vec.calculate_test_loss(model, goldModel)
+    #         print(f"loss:{loss}")
+    #         cache_manager = cacheManager()
+    #         quality_scores = vec.update_quality_scores(cache_manager)
+    #         print(f"quality_scores:{quality_scores}")
     #         exit()
 
     # def _refresh_vehicle_data(self):
