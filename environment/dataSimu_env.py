@@ -172,7 +172,7 @@ class DomainIncrementalDataSimulator:
                 f"已加载 {domain} 域的测试集，样本数: {len(self.test_data_cache[domain_key])}"
             )
 
-    def generate_vehicle_data(self, vehicle_id):
+    def generate_vehicle_data(self, vehicle_id, num_batches=None):
         """
         为指定车辆生成数据批次
         输入：
@@ -196,6 +196,12 @@ class DomainIncrementalDataSimulator:
 
         # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
         vehicle_dataset = Subset(train_dataset, vehicle_indices)
+        # 计算实际可用的最大批次数量
+        max_batches = len(vehicle_indices) // config.BATCH_SIZE
+        if num_batches is None:
+            num_batches = max_batches
+        else:
+            num_batches = min(num_batches, max_batches)
         # 创建数据批次
         dataloader = DataLoader(
             vehicle_dataset, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True
@@ -203,7 +209,9 @@ class DomainIncrementalDataSimulator:
 
         # 收集所有批次
         batches = []
-        for batch in dataloader:
+        for i, batch in enumerate(dataloader):
+            if i >= num_batches:
+                break
             batches.append(batch)
 
         print(

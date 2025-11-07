@@ -146,7 +146,7 @@ class VehicleEnvironment:
     4. 重置环境
     """
 
-    def __init__(self):
+    def __init__(self, global_model, gold_model, cache_manager, data_simulator):
         # 实体集合
         self.vehicles = []  # 车辆对象列表
         self.base_stations = []  # 基站对象列表，字典
@@ -159,7 +159,10 @@ class VehicleEnvironment:
         # 初始化物理环境
         self._initialize_environment()
         # 初始化数据环境
-        self.data_simulator = DomainIncrementalDataSimulator()
+        self.data_simulator = data_simulator
+        self.global_model = global_model
+        self.gold_model = gold_model
+        self.cache_manager = cache_manager
 
     def _initialize_environment(self):
         """
@@ -370,7 +373,7 @@ class VehicleEnvironment:
         smooth_y = current_y + (target_y - current_y) * 0.3  # 平滑因子
         vehicle.position = np.array([new_x, smooth_y])
 
-    def get_environment_state(self, global_model, gold_model):
+    def get_environment_state(self):
         """获取真实的环境状态用于DRL"""
         state = []
 
@@ -385,7 +388,7 @@ class VehicleEnvironment:
 
                 # 2. 获取测试损失 - 从实际模型评估中获取
                 if vehicle.uploaded_data:
-                    test_loss = vehilce.calculate_test_loss(self.global_model, gold_model)
+                    test_loss = vehilce.calculate_test_loss(self.global_model, self.gold_model)
                     vehicle.test_loss_history.append(test_loss)
                 else:
                     test_loss = 1.0
