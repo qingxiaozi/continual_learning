@@ -39,14 +39,43 @@ if __name__ == "__main__":
         print(f"upload_batches: {upload_batches}")
         bandwidth_allocations = action[1::2]
         print(f"bandwidth: {bandwidth_allocations}")
+
+        # 存储每个车辆的数据批次和对应的MAB臂
+        vehicle_batches_arms = {}
+
         for i, vehicle in enumerate(vehicle_env.vehicles):
-                # 根据DRL决策上传数据
-                num_batches = upload_batches[i]
-                if num_batches > 0:
-                    new_data = data_simulator.generate_vehicle_data(
-                        vehicle.id, num_batches=num_batches
-                    )
-                    # MAB数据质量评估
+            # 根据DRL决策上传数据
+            num_batches = upload_batches[i]
+            if num_batches > 0:
+                new_data = data_simulator.generate_vehicle_data(
+                    vehicle.id, num_batches=num_batches
+                )
+                # 为每个数据批次分配MAB臂
+                batch_arms = []
+                for j, batch in enumerate(new_data):
+                    print(f"j:{j}")
+                    arm_id = vehicle.id * 5 + j  # 为每个数据批次分配一个id
+                    batch_arms.append(arm_id)
+
+                vehicle_batches_arms[vehicle.id] = {
+                    'batches': new_data,
+                    'arms': batch_arms
+                }
+                # 暂时先用模拟质量评分更新缓存
+                quality_scores = [0.5] * len(new_data)  # 初始质量评分
+                cache_manager.update_cache(vehicle.id, new_data, quality_scores)
+                total_upload_size += len(new_data) * config.BATCH_SIZE * 3 * 224 * 224
+
+        # 训练全局模型并计算真实的MAB奖励
+        all_data = []
+        batch_arm_mapping = {}
+        # 构建训练数据集和臂映射
+        for vehicle_id, info in vehicle_batches_arms.items():
+            for j, (batch, arm_id) in enumerate(zip(info['batches'], info['arms'])):
+                all_data.append(batch)
+                batch_arm_mapping[arm_id] = batch
+
+
 
 
         exit()
