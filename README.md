@@ -10,7 +10,8 @@ continual_learning/
 │   ├── communication_env.py
 │   └── data_simulator.py
 ├── models/
-│   ├── neural_networks.py
+│   ├── global_model.py
+│   ├── gold_model.py
 │   ├── mab_selector.py
 │   └── drl_agent.py
 ├── learning/
@@ -68,8 +69,8 @@ emnist-digits-test-labels-idx1-ubyte: 测试标签<br>
 16×16像素的灰度图像<br>
 总计 9,298 个样本 (训练集: 7,291，测试集: 2,007)
 
-## Environment
-### 车辆环境（VehicleEnvironment）：
+## environment
+### 车辆环境（vehicle_env）
 初始化车辆和基站环境。<br>
 建立基站，确定其位置、覆盖范围、最大连接车辆数等属性；<br>
 建立车辆集群，确定其初始位置，将车辆与距离其最近的基站连接；<br>
@@ -77,14 +78,14 @@ emnist-digits-test-labels-idx1-ubyte: 测试标签<br>
 重置环境至初始状态。<br>
 遗留问题：车辆行驶过程中可能碰撞<br>
 
-### 通信系统（CommunicationSystem）：
+### 通信环境（communication_env）
 计算上下行通信速率<br>
 计算数据传输时延 (t_trans)<br>
 计算数据标注时延 (t_label)<br>
 计算模型重训练时延 (t_retrain)<br>
 计算模型广播时延 (t_broadcast)<br>
 
-### 数据模拟（DataDistributionSimulator）：
+### 数据模拟（dataSimu_env）
 功能：<br>
 分别处理office-31、digit10、DomainNet三个数据集，将其按照Non-IID（狄利克雷分布）的方式划分给多个智能车辆，并支持增量学习。<br>
 步骤：<br>
@@ -98,3 +99,17 @@ emnist-digits-test-labels-idx1-ubyte: 测试标签<br>
 |office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2871；dslr:498；webcam:795|图像大小|通道数|说明|
 |digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|样本数|图像大小|通道数|数字识别|
 |DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|样本数|图像大小|通道数|说明|
+<br>
+
+## models
+### 多臂老虎机（mab_selector）
+功能：<br>
+用于选择高质量的数据批次。<br>
+1、使用ucb算法选择所有臂（数据批次）中价值最高的臂。<br>
+2、更新臂的统计，包括被选择的次数、累积奖励和平均奖励。<br>
+3、计算一个数据批次在当前模型下的损失，并以该损失的负值作为该数据批次的奖励。注意：并未更新模型。<br>
+4、计算所有批次的归一化质量评分。<br>
+5、MAB状态重置，即被选择的此时、累积奖励、平均奖励均为0。<br>
+
+### 强化学习智能体（drl_agent）
+
