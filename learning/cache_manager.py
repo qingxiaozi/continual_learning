@@ -1,13 +1,10 @@
 import numpy as np
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 
 
 class cacheManager:
     """缓存管理器"""
-    def __init__(self, max_size=config.MAX_LOCAL_BATCHES):
+    def __init__(self, max_size=Config.MAX_LOCAL_BATCHES):
         self.max_size = max_size
         self.caches = {} # vehicle_id->cache_data
 

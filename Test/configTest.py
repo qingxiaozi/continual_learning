@@ -15,7 +15,7 @@ def test_config_basic():
 
     # 测试配置类实例化
     try:
-        config = Config()
+        Config = Config()
         print("✓ 配置类实例化成功")
     except Exception as e:
         print(f"✗ 配置类实例化失败: {e}")
@@ -23,37 +23,37 @@ def test_config_basic():
 
     # 测试参数访问
     try:
-        print(f"✓ 车辆数: {config.NUM_VEHICLES}")
-        print(f"✓ 设备类型: {config.DEVICE}")
-        print(f"✓ 隐藏层大小: {config.DRL_HIDDEN_SIZE}")
-        print(f"✓ 学习率: {config.DRL_LEARNING_RATE}")
+        print(f"✓ 车辆数: {Config.NUM_VEHICLES}")
+        print(f"✓ 设备类型: {Config.DEVICE}")
+        print(f"✓ 隐藏层大小: {Config.DRL_HIDDEN_SIZE}")
+        print(f"✓ 学习率: {Config.DRL_LEARNING_RATE}")
         print("✓ 所有参数访问正常")
     except AttributeError as e:
         print(f"✗ 参数访问错误: {e}")
         return
 
     # 测试数据类型
-    assert isinstance(config.NUM_VEHICLES, int), "NUM_VEHICLES应为整数"
-    assert isinstance(config.DRL_LEARNING_RATE, float), "DRL_LEARNING_RATE应为浮点数"
-    assert isinstance(config.DEVICE, torch.device), "DEVICE应为torch.device类型"
+    assert isinstance(Config.NUM_VEHICLES, int), "NUM_VEHICLES应为整数"
+    assert isinstance(Config.DRL_LEARNING_RATE, float), "DRL_LEARNING_RATE应为浮点数"
+    assert isinstance(Config.DEVICE, torch.device), "DEVICE应为torch.device类型"
     print("✓ 数据类型检查通过")
 
 
 def test_config_validation():
     """测试配置参数的合理性"""
     print("\n=== 配置参数验证测试 ===")
-    config = Config()
+    Config = Config()
 
     # 数值范围检查
     checks = [
-        (config.NUM_VEHICLES > 0, "车辆数应大于0"),
-        (0 < config.DRL_LEARNING_RATE < 1, "学习率应在0-1之间"),
-        (0 < config.DRL_GAMMA <= 1, "折扣因子应在0-1之间"),
-        (config.DRL_BATCH_SIZE > 0, "批次大小应大于0"),
-        (config.DRL_BUFFER_SIZE > config.DRL_BATCH_SIZE, "缓冲区应大于批次大小"),
-        (config.BASE_STATION_COVERAGE > 0, "基站覆盖范围应大于0"),
-        (config.BASE_BANDWIDTH > 0, "基础带宽应大于0"),
-        (config.NOISE_POWER > 0, "噪声应大于0"),
+        (Config.NUM_VEHICLES > 0, "车辆数应大于0"),
+        (0 < Config.DRL_LEARNING_RATE < 1, "学习率应在0-1之间"),
+        (0 < Config.DRL_GAMMA <= 1, "折扣因子应在0-1之间"),
+        (Config.DRL_BATCH_SIZE > 0, "批次大小应大于0"),
+        (Config.DRL_BUFFER_SIZE > Config.DRL_BATCH_SIZE, "缓冲区应大于批次大小"),
+        (Config.BASE_STATION_COVERAGE > 0, "基站覆盖范围应大于0"),
+        (Config.BASE_BANDWIDTH > 0, "基础带宽应大于0"),
+        (Config.NOISE_POWER > 0, "噪声应大于0"),
     ]
 
     all_passed = True
@@ -70,11 +70,11 @@ def test_config_validation():
 def test_device_compatibility():
     """测试设备兼容性"""
     print("\n=== 设备兼容性测试 ===")
-    config = Config()
+    Config = Config()
 
-    print(f"当前设备: {config.DEVICE}")
+    print(f"当前设备: {Config.DEVICE}")
 
-    if config.DEVICE.type == "cuda":
+    if Config.DEVICE.type == "cuda":
         print("✓ 使用GPU加速")
         print(f"GPU设备: {torch.cuda.get_device_name()}")
         print(
@@ -85,7 +85,7 @@ def test_device_compatibility():
 
     # 测试PyTorch基本功能
     try:
-        test_tensor = torch.randn(10, 10).to(config.DEVICE)
+        test_tensor = torch.randn(10, 10).to(Config.DEVICE)
         result = test_tensor @ test_tensor.T
         print("✓ PyTorch张量运算正常")
     except Exception as e:
@@ -141,13 +141,13 @@ def run_complete_test():
         print("⚠ 部分测试未通过，请检查配置参数。")
 
     # 显示关键配置信息
-    config = Config()
+    Config = Config()
     print("\n关键配置信息:")
-    print(f"- 训练设备: {config.DEVICE}")
-    print(f"- 车辆数量: {config.NUM_VEHICLES}")
-    print(f"- 训练轮次: {config.NUM_EPOCH}")
-    print(f"- 批次大小: {config.BATCH_SIZE}")
-    print(f"- 数据集: {config.CURRENT_DATASET}")
+    print(f"- 训练设备: {Config.DEVICE}")
+    print(f"- 车辆数量: {Config.NUM_VEHICLES}")
+    print(f"- 训练轮次: {Config.NUM_EPOCH}")
+    print(f"- 批次大小: {Config.BATCH_SIZE}")
+    print(f"- 数据集: {Config.CURRENT_DATASET}")
 
 
 if __name__ == "__main__":

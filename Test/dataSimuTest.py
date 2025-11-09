@@ -12,7 +12,7 @@ from environment.dataSimu_env import (
     Office31Dataset,
     BaseDataset,
 )
-from config.parameters import config
+from config.parameters import Config
 
 
 class TestDataSimulator:
@@ -27,7 +27,7 @@ class TestDataSimulator:
     def test_initialization(self):
         """测试数据模拟器初始化"""
         assert self.data_simulator.vehicle_env == self.vehicle_env
-        assert self.data_simulator.current_dataset == config.CURRENT_DATASET
+        assert self.data_simulator.current_dataset == Config.CURRENT_DATASET
         assert hasattr(self.data_simulator, "class_distributions")
         assert hasattr(self.data_simulator, "vehicle_data_assignments")
 
@@ -71,7 +71,7 @@ class TestDataSimulator:
     def test_dirichlet_distribution(self):
         """测试狄利克雷分布数据分配"""
         num_vehicles = len(self.vehicle_env.vehicles)
-        num_classes = self.data_simulator.dataset_info[config.CURRENT_DATASET][
+        num_classes = self.data_simulator.dataset_info[Config.CURRENT_DATASET][
             "num_classes"
         ]
 

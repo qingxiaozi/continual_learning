@@ -4,15 +4,12 @@ import torch.optim as optim
 import numpy as np
 import random
 from collections import deque
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 from environment.vehicle_env import VehicleEnvironment
 
 class DRLNetwork(nn.Module):
     """DRL策略网络 - 输出连续动作"""
-    def __init__(self, state_dim, action_dim, hidden_dim=config.DRL_HIDDEN_SIZE):
+    def __init__(self, state_dim, action_dim, hidden_dim=Config.DRL_HIDDEN_SIZE):
         super(DRLNetwork, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
@@ -28,7 +25,7 @@ class DRLNetwork(nn.Module):
 
 class ReplayBuffer:
     """经验回放缓冲区"""
-    def __init__(self, capacity= config.DRL_BUFFER_SIZE):
+    def __init__(self, capacity= Config.DRL_BUFFER_SIZE):
         self.buffer = deque(maxlen = capacity)
 
     def push(self, state, action, reward, next_state, done):
@@ -55,13 +52,13 @@ class DRLAgent:
         # 优化器
         self.optimizer = optim.Adam(
             self.policy_net.parameters(),
-            lr = config.DRL_LEARNING_RATE
+            lr = Config.DRL_LEARNING_RATE
         )
         # 经验回放
         self.memory = ReplayBuffer()
         # 超参数
-        self.gamma = config.DRL_GAMMA
-        self.batch_size = config.DRL_BATCH_SIZE
+        self.gamma = Config.DRL_GAMMA
+        self.batch_size = Config.DRL_BATCH_SIZE
         self.update_target_every = 10
         self.steps_done = 0
 
@@ -80,15 +77,15 @@ class DRLAgent:
     def _process_action(self, raw_action):
         """处理原始动作输出"""
         # 将动作分为数据标注量和带宽分配
-        num_vehicles = config.NUM_VEHICLES
+        num_vehicles = Config.NUM_VEHICLES
         action_processed = np.zeros(2 * num_vehicles)
 
         for i in range(num_vehicles):
             # 数据标注量决策 (0到MAX_UPLOAD_BATCHES)
             upload_action = raw_action[i * 2] if i * 2 < len(raw_action) else 0
             upload_batches = int(np.clip(
-                (upload_action + 1) * config.MAX_UPLOAD_BATCHES / 2,
-                0, config.MAX_UPLOAD_BATCHES
+                (upload_action + 1) * Config.MAX_UPLOAD_BATCHES / 2,
+                0, Config.MAX_UPLOAD_BATCHES
             ))
             # 带宽分配决策 (0到1)
             bw_action = raw_action[i * 2 + 1] if i * 2 + 1 < len(raw_action) else 0
@@ -158,19 +155,7 @@ class DRLAgent:
 
 
 if __name__ == "__main__":
-    env = VehicleEnvironment()
-    state_dim = 3 * config.NUM_VEHICLES  # 置信度、测试损失、质量评分
-    action_dim = 2 * config.NUM_VEHICLES  # 上传批次、带宽分配
+    env = VehicleEnvironment(None, None, None, None)
+    state_dim = 3 * Config.NUM_VEHICLES  # 置信度、测试损失、质量评分
+    action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
     drlAgent = DRLAgent(state_dim, action_dim)
-
-    # 训练智能体
-    print("开始训练...")
-    train_agent(drlAgent, env, episodes=100)
-    # 保存模型
-    agent.save_model("drl_agent.pth")
-    print("模型已保存")
-    # 加载模型进行测试
-    print("开始测试...")
-    agent2 = DRLAgent(env.state_dim, env.action_dim)
-    agent2.load_model("drl_agent.pth")
-    test_agent(agent2, env)

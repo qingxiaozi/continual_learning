@@ -1,13 +1,10 @@
+import os
 import torch
 import torch.nn as nn
 import torchvision.models as models
 from torch.utils.data import DataLoader
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
-from config.paths import paths
+from config.parameters import Config
+from config.paths import Paths
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 
 
@@ -15,10 +12,10 @@ class GoldModel:
     def __init__(self, dataset_name):
         self.dataset_name = dataset_name
         self.num_classes = self._get_num_classes(dataset_name)
-        self.device = config.DEVICE
+        self.device = Config.DEVICE
         self.model = self._initialize_model()
         self.model_path = os.path.join(
-            paths.RESULTS_DIR, f"golden_model_{dataset_name}.pth"
+            Paths.RESULTS_DIR, f"golden_model_{dataset_name}.pth"
         )
 
         if os.path.exists(self.model_path):
@@ -36,11 +33,11 @@ class GoldModel:
     def _get_num_classes(self, dataset_name):
         """根据数据集名称获取类别数量"""
         if dataset_name == "office31":
-            return config.OFFICE31_CLASSES
+            return Config.OFFICE31_CLASSES
         elif dataset_name == "digit10":
-            return config.DIGIT10_CLASSES
+            return Config.DIGIT10_CLASSES
         elif dataset_name == "domainnet":
-            return config.DOMAINNET_CLASSES
+            return Config.DOMAINNET_CLASSES
         else:
             return 10  # 默认值
 

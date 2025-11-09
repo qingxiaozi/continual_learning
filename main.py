@@ -1,10 +1,7 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 from learning.cache_manager import cacheManager
-from learning.evaluator import ModelEvaluator
+# from learning.evaluator import ModelEvaluator
 from environment.vehicle_env import VehicleEnvironment
 from models.drl_agent import DRLAgent
 from models.global_model import globalModel
@@ -170,10 +167,10 @@ if __name__ == "__main__":
     vehicle_env = VehicleEnvironment(global_model, gold_model, cache_manager, data_simulator)
     num_sessions = 10
     print("完整的联合优化模型")
-    state_dim = 3 * config.NUM_VEHICLES  # 置信度、测试损失、质量评分
-    action_dim = 2 * config.NUM_VEHICLES  # 上传批次、带宽分配
+    state_dim = 3 * Config.NUM_VEHICLES  # 置信度、测试损失、质量评分
+    action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
     drl_agent = DRLAgent(state_dim, action_dim)
-    mab_selector = MABDataSelector(num_arms = config.MAX_LOCAL_BATCHES * config.NUM_VEHICLES)
+    mab_selector = MABDataSelector(num_arms = Config.MAX_LOCAL_BATCHES * Config.NUM_VEHICLES)
 
     for session in range(num_sessions):
         data_simulator.update_session(session)
@@ -212,7 +209,7 @@ if __name__ == "__main__":
                 # 用初始质量评分更新缓存
                 quality_scores = [0.5] * len(new_data)  # 初始质量评分
                 cache_manager.update_cache(vehicle.id, new_data, quality_scores)
-                total_upload_size += len(new_data) * config.BATCH_SIZE * 3 * 224 * 224
+                total_upload_size += len(new_data) * Config.BATCH_SIZE * 3 * 224 * 224
 
         # 训练全局模型并计算真实的MAB奖励
         all_data = []

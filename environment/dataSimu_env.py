@@ -6,10 +6,7 @@ from torchvision import transforms
 from PIL import Image
 import scipy.io as sio
 from collections import defaultdict
-import sys
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 import matplotlib.pyplot as plt
 
 
@@ -26,8 +23,8 @@ class DomainIncrementalDataSimulator:
     """
 
     def __init__(self):
-        self.num_vehicles = config.NUM_VEHICLES
-        self.current_dataset = config.CURRENT_DATASET
+        self.num_vehicles = Config.NUM_VEHICLES
+        self.current_dataset = Config.CURRENT_DATASET
         self.current_domain_idx = 0
         self.current_session = 0
 
@@ -35,7 +32,7 @@ class DomainIncrementalDataSimulator:
         # self.golden_model = GoldenModelManager(self.current_dataset)
 
         # 域序列
-        self.domain_sequences = config.DOMAIN_SEQUENCES
+        self.domain_sequences = Config.DOMAIN_SEQUENCES
         self.current_domains = self.domain_sequences[self.current_dataset]
 
         # 已见域记录
@@ -45,17 +42,17 @@ class DomainIncrementalDataSimulator:
         # 数据集信息
         self.dataset_info = {
             "office31": {
-                "num_classes": config.OFFICE31_CLASSES,
+                "num_classes": Config.OFFICE31_CLASSES,
                 "domains": ["amazon", "webcam", "dslr"],
                 "data_loader": self._load_office31_data,
             },
             "digit10": {
-                "num_classes": config.DIGIT10_CLASSES,
+                "num_classes": Config.DIGIT10_CLASSES,
                 "domains": ["mnist", "emnist", "usps", "svhn"],
                 "data_loader": self._load_digit10_data,
             },
             "domainnet": {
-                "num_classes": config.DOMAINNET_CLASSES,
+                "num_classes": Config.DOMAINNET_CLASSES,
                 "domains": [
                     "clipart",
                     "infograph",
@@ -78,7 +75,7 @@ class DomainIncrementalDataSimulator:
         # 数据变换
         self.transform = transforms.Compose(
             [
-                transforms.Resize((config.IMAGE_SIZE, config.IMAGE_SIZE)),
+                transforms.Resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE)),
                 transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
@@ -100,11 +97,11 @@ class DomainIncrementalDataSimulator:
 
         for class_idx in range(num_classes):
             # 使用狄利克雷分布生成每个类别的车辆分配比例
-            alpha = np.full(num_vehicles, config.DIRICHLET_ALPHA)
+            alpha = np.full(num_vehicles, Config.DIRICHLET_ALPHA)
             distribution = np.random.dirichlet(alpha)
             self.class_distributions[class_idx] = distribution
         print("\n=== 数据环境初始化完成 ===")
-        print(f"狄利克雷分布系数 α = {config.DIRICHLET_ALPHA}")
+        print(f"狄利克雷分布系数 α = {Config.DIRICHLET_ALPHA}")
         print(f"初始化{num_vehicles}辆车的数据分配")
         print("=====================\n")
 
@@ -112,7 +109,7 @@ class DomainIncrementalDataSimulator:
         """
         获取当前域
         """
-        domain_idx = (self.current_session // config.DOMAIN_CHANGE_INTERVAL) % len(
+        domain_idx = (self.current_session // Config.DOMAIN_CHANGE_INTERVAL) % len(
             self.current_domains
         )
         return self.current_domains[domain_idx]
@@ -152,7 +149,7 @@ class DomainIncrementalDataSimulator:
             if len(full_dataset) == 0:
                 print(f"警告: 域 {domain} 的数据集为空")
                 return
-            train_size = int(config.TRAIN_TEST_SPLIT * len(full_dataset))
+            train_size = int(Config.TRAIN_TEST_SPLIT * len(full_dataset))
             test_size = len(full_dataset) - train_size
             if test_size <= 0:
                 print(f"警告: 域 {domain} 的测试集大小为0")
@@ -197,14 +194,14 @@ class DomainIncrementalDataSimulator:
         # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
         vehicle_dataset = Subset(train_dataset, vehicle_indices)
         # 计算实际可用的最大批次数量
-        max_batches = len(vehicle_indices) // config.BATCH_SIZE
+        max_batches = len(vehicle_indices) // Config.BATCH_SIZE
         if num_batches is None:
             num_batches = max_batches
         else:
             num_batches = min(num_batches, max_batches)
         # 创建数据批次
         dataloader = DataLoader(
-            vehicle_dataset, batch_size=config.BATCH_SIZE, shuffle=True, drop_last=True
+            vehicle_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, drop_last=True
         )
 
         # 收集所有批次
@@ -215,7 +212,7 @@ class DomainIncrementalDataSimulator:
             batches.append(batch)
 
         print(
-            f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次，每批 {config.BATCH_SIZE} 个样本"
+            f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次，每批 {Config.BATCH_SIZE} 个样本"
         )
         return batches
 
@@ -257,7 +254,7 @@ class DomainIncrementalDataSimulator:
         for class_idx, indices in class_indices.items():
             if class_idx not in self.class_distributions:
                 # 如果类别不在初始分布中，创建新的分布
-                alpha = np.full(num_vehicles, config.DIRICHLET_ALPHA)
+                alpha = np.full(num_vehicles, Config.DIRICHLET_ALPHA)
                 self.class_distributions[class_idx] = np.random.dirichlet(alpha)
 
             distribution = self.class_distributions[class_idx]
@@ -313,26 +310,26 @@ class DomainIncrementalDataSimulator:
         """
         加载office-31数据集
         """
-        dataset_path = os.path.join(config.DATA_BASE_PATH, "office-31", domain)
+        dataset_path = os.path.join(Config.DATA_BASE_PATH, "office-31", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：Office-31 {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(config.OFFICE31_CLASSES, 1000)
+            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
         return Office31Dataset(dataset_path, transform=self.transform)
 
     def _load_digit10_data(self, domain):
         """加载Digit10数据集"""
-        dataset_path = os.path.join(config.DATA_BASE_PATH, "digit10", domain)
+        dataset_path = os.path.join(Config.DATA_BASE_PATH, "digit10", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：digit10 {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(config.OFFICE31_CLASSES, 1000)
+            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
         return Digit10Dataset(dataset_path, transform=self.transform)
 
     def _load_domainnet_data(self, domain):
         """加载DomainNet数据集"""
-        dataset_path = os.path.join(config.DATA_BASE_PATH, "domainnet", domain)
+        dataset_path = os.path.join(Config.DATA_BASE_PATH, "domainnet", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：domainnet {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(config.OFFICE31_CLASSES, 1000)
+            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
         return DomainNetDataset(dataset_path, transform=self.transform)
 
     def evaluate_model(self, model, strategy=None):
@@ -347,7 +344,7 @@ class DomainIncrementalDataSimulator:
             dict: 包含各种评估指标的字典
         """
         if strategy is None:
-            strategy = config.TEST_STRATEGY
+            strategy = Config.TEST_STRATEGY
 
         results = {}
 
@@ -393,7 +390,7 @@ class DomainIncrementalDataSimulator:
 
         test_dataset = self.test_data_cache[domain_key]
         test_loader = DataLoader(
-            test_dataset, batch_size=config.BATCH_SIZE, shuffle=False
+            test_dataset, batch_size=Config.BATCH_SIZE, shuffle=False
         )
 
         # 计算准确率和损失
@@ -683,7 +680,7 @@ if __name__ == "__main__":
     print(f"车辆数量: {data_simulator.num_vehicles}")
     print(f"当前数据集: {data_simulator.current_dataset}")
     print(f"可用域: {data_simulator.current_domains}")
-    print(f"狄利克雷参数 α: {config.DIRICHLET_ALPHA}")
+    print(f"狄利克雷参数 α: {Config.DIRICHLET_ALPHA}")
     # 3. 演示域增量切换
     print("\n2. 域增量切换演示...")
     sessions_to_demo = [0, 1, 2, 3, 4]  # 演示的会话点
@@ -706,7 +703,7 @@ if __name__ == "__main__":
             vehicle_data = data_simulator.generate_vehicle_data(vehicle_id)
 
             if vehicle_data:
-                total_samples = len(vehicle_data) * config.BATCH_SIZE
+                total_samples = len(vehicle_data) * Config.BATCH_SIZE
                 print(
                     f"  车辆 {vehicle_id}: {total_samples} 个训练样本, {len(vehicle_data)} 个批次"
                 )

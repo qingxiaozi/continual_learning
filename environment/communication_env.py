@@ -1,9 +1,5 @@
 import numpy as np
-import sys
-import os
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 from environment.vehicle_env import VehicleEnvironment
 
 
@@ -22,21 +18,21 @@ class CommunicationSystem:
         self.vehicle_env = vehicle_env
 
         # 通信基本参数
-        self.base_bandwidth = config.BASE_BANDWIDTH  # B_base，基础带宽 20 MHz
-        self.noise_power = config.NOISE_POWER  # δ²，噪声功率 (W)，1e-10
-        self.I_v = config.INTERFERENCE_POWER  # 干扰功率 (W)，常数
-        self.base_station_power = config.BS_TRANSMIT_POWER  # p_b，基站发射功率 (W)
-        self.vehicle_transmit_power = config.VEHICLE_TRANSMIT_POWER  # 车辆发射功率 (W)
+        self.base_bandwidth = Config.BASE_BANDWIDTH  # B_base，基础带宽 20 MHz
+        self.noise_power = Config.NOISE_POWER  # δ²，噪声功率 (W)，1e-10
+        self.I_v = Config.INTERFERENCE_POWER  # 干扰功率 (W)，常数
+        self.base_station_power = Config.BS_TRANSMIT_POWER  # p_b，基站发射功率 (W)
+        self.vehicle_transmit_power = Config.VEHICLE_TRANSMIT_POWER  # 车辆发射功率 (W)
 
         # 信道模型参数
-        self.reference_gain = config.REFERENCE_GAIN  # G_0，参考距离（1m)处的路径增益
-        self.path_loss_exponent = config.PATH_LOSS_EXPONENT  # α: 路径损耗指数 2.7
-        self.shadowing_std = config.SHADOWING_STD  # 阴影衰落标准（8 dB）
+        self.reference_gain = Config.REFERENCE_GAIN  # G_0，参考距离（1m)处的路径增益
+        self.path_loss_exponent = Config.PATH_LOSS_EXPONENT  # α: 路径损耗指数 2.7
+        self.shadowing_std = Config.SHADOWING_STD  # 阴影衰落标准（8 dB）
 
         # 数据参数
         self.sample_size = 1024  # b0，单个样本的大小（bits），1
         self.samples_of_per_batch = (
-            config.SAMPLES_OF_BATCH
+            Config.SAMPLES_OF_BATCH
         )  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
@@ -45,9 +41,9 @@ class CommunicationSystem:
         self.edge_server_computation = 10e9  # C，边缘服务器计算能力（Cycles/s），1
 
         # 训练参数
-        self.training_epochs = config.NUM_EPOCH  # E，训练轮次
+        self.training_epochs = Config.NUM_EPOCH  # E，训练轮次
         self.cache_samples_per_vehicle = (
-            config.MAX_LOCAL_BATCHES * config.SAMPLES_OF_BATCH
+            Config.MAX_LOCAL_BATCHES * Config.SAMPLES_OF_BATCH
         )  # |D_v|，每车缓存样本数
 
         # 模型参数
@@ -402,8 +398,9 @@ class CommunicationSystem:
 
 
 if __name__ == "__main__":
+    print(Config.BASE_BANDWIDTH)
     # 创建环境和通信系统
-    vehicle_env = VehicleEnvironment()
+    vehicle_env = VehicleEnvironment(None, None,None, None )
     comm_system = CommunicationSystem(vehicle_env)
 
     # 模拟一个训练阶段

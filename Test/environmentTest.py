@@ -7,7 +7,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from environment.vehicle_env import Vehicle, VehicleEnvironment
 from environment.communication_env import CommunicationSystem
-from config.parameters import config
+from config.parameters import Config
 
 
 class TestVehicleEnvironment:
@@ -26,7 +26,7 @@ class TestVehicleEnvironment:
         测试环境初始化
         """
         env = VehicleEnvironment()
-        assert len(env.vehicles) == config.NUM_VEHICLES
+        assert len(env.vehicles) == Config.NUM_VEHICLES
         assert len(env.base_stations) <= 5
 
         # 检查每辆车都连接到了基站

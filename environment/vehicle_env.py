@@ -1,10 +1,10 @@
 import numpy as np
 import torch
-import sys
-import os
+# import sys
+# import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.parameters import Config
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 from learning.cache_manager import cacheManager
 import random
@@ -178,7 +178,7 @@ class VehicleEnvironment:
         self._log_initial_environment()
 
     def _initialize_base_stations(self):
-        coverage_radius = config.BASE_STATION_COVERAGE
+        coverage_radius = Config.BASE_STATION_COVERAGE
         optimal_bs_count = max(3, int(self.road_length / (coverage_radius * 0.8)) + 1)
         num_bs = min(optimal_bs_count, 5)  # 最多5个基站
         print(f"初始化 {num_bs} 个基站")
@@ -204,8 +204,8 @@ class VehicleEnvironment:
             print(f"基站 {i} 创建于位置 {bs_position}")
 
     def _initialize_vehicles(self):
-        print(f"初始化 {config.NUM_VEHICLES}辆智能车辆")
-        for i in range(config.NUM_VEHICLES):
+        print(f"初始化 {Config.NUM_VEHICLES}辆智能车辆")
+        for i in range(Config.NUM_VEHICLES):
             position = self._generate_vehicle_position(i)
             # 创建车辆实例
             vehicle = Vehicle(
@@ -404,10 +404,10 @@ class VehicleEnvironment:
                 state.extend([0.5, 1.0, 0.5])
 
         # 确保状态向量长度正确
-        expected_length = 3 * config.NUM_VEHICLES
+        expected_length = 3 * Config.NUM_VEHICLES
         if len(state) < expected_length:
             # 填充缺失的值
-            state.extend([0.5, 1.0, 0.5] * (config.NUM_VEHICLES - len(state) // 3))
+            state.extend([0.5, 1.0, 0.5] * (Config.NUM_VEHICLES - len(state) // 3))
         elif len(state) > expected_length:
             # 截断多余的值
             state = state[:expected_length]
@@ -876,7 +876,7 @@ def create_enhanced_trajectory_plot(env, trajectories):
 
 if __name__ == "__main__":
     # 初始化环境
-    env = VehicleEnvironment()
+    env = VehicleEnvironment(None, None, None, None)
     # env.update_session(0)
     # env.update_session(1)
     # 绘制三个分开的图

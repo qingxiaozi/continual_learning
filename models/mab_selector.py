@@ -1,9 +1,6 @@
 import numpy as np
 import torch
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.parameters import config
+from config.parameters import Config
 
 class MABDataSelector:
     """多臂老虎机数据选择器"""
@@ -12,9 +9,9 @@ class MABDataSelector:
         self.counts = np.zeros(num_arms)  # 每个臂被选择的次数
         self.rewards = np.zeros(num_arms)  # 每个臂的累积奖励
         self.avg_rewards = np.zeros(num_arms)  # 每个臂的平均奖励
-        self.exploration_factor = config.MAB_EXPLORATION_FACTOR
+        self.exploration_factor = Config.MAB_EXPLORATION_FACTOR
 
-    def select_arm(self, epoch, init_epochs=config.INIT_EPOCHS):
+    def select_arm(self, epoch, init_epochs=Config.INIT_EPOCHS):
         """选择臂（数据批次）"""
         if epoch < init_epochs:
             # 初始阶段：均匀探索
@@ -145,4 +142,4 @@ class MABDataSelector:
 
 # if __name__ == "__main__":
 #     main_detailed()  # 运行最简版本
-#     # main_detailed()  # 运行详细版本
+#     main_detailed()  # 运行详细版本
