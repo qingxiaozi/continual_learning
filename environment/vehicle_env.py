@@ -129,7 +129,7 @@ class Vehicle:
             quality_score = np.mean(recent_scores)
             self.quality_scores_history.append(quality_score)
             return quality_score
-        return 0.5  # 默认质量评分
+        return 0  # 默认质量评分
 
 
 class VehicleEnvironment:
@@ -377,7 +377,7 @@ class VehicleEnvironment:
             try:
                 # 获取当前置信度，从全局模型推理中得到
                 if vehicle.data_batches:
-                    confidence = vehicle.get_inference_confidence(self.global_model, vehicle.data_batches)
+                    confidence = vehicle.get_inference_confidence(self.global_model)
                     vehicle.confidence_history.append(confidence)
                 else:
                     confidence = 0.5
