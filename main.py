@@ -82,6 +82,8 @@ class BaselineComparison:
             print(f"action:{action}")
             # 步骤4: 执行通信和数据收集
             communication_results = self._execute_communication(action, session)
+            # 步骤5: 缓存管理和数据选择
+            cache_updates = self._manage_cache_and_data_selection()
             exit()
 
 
@@ -138,26 +140,77 @@ class BaselineComparison:
 
         # 收集上传数据
         uploaded_data = {}
-        for vehicle_id, upload_batches in upload_decisions:
-            if upload_batches > 0:
+        corrected_upload_decisions = []  # 修正后的上传决策，保持原格式
+        for vehicle_id, planned_upload_batches in upload_decisions:
+            actual_upload_batches = 0
+            if planned_upload_batches > 0:
                 vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
                 if vehicle and vehicle.data_batches:
-                    # 选择前upload_batches个批次上传
-                    uploaded_data[vehicle_id] = vehicle.data_batches[:upload_batches]
+                    # 确保不超过实际可用的批次数量
+                    available_batches = len(vehicle.data_batches)
+                    actual_upload_batches = min(planned_upload_batches, available_batches)
+
+                    # 选择前actual_upload_batches个批次上传
+                    uploaded_data[vehicle_id] = vehicle.data_batches[:actual_upload_batches]
                     vehicle.set_uploaded_data(uploaded_data[vehicle_id])
 
-        # 计算通信时延
+                    # 记录差异（用于调试）
+                    if actual_upload_batches != planned_upload_batches:
+                        print(f"车辆 {vehicle_id}: 计划上传 {planned_upload_batches} 批次, "
+                            f"实际可上传 {available_batches} 批次, "
+                            f"实际上传 {actual_upload_batches} 批次")
+
+            # 添加到修正后的决策列表
+            corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
+
+        # 使用修正后的upload_decisions计算通信时延
         delay_breakdown = self.communication_system.calculate_total_training_delay(
-            upload_decisions, bandwidth_allocations, session, Config.NUM_VEHICLES
+            corrected_upload_decisions, bandwidth_allocations, session, Config.NUM_VEHICLES
         )
 
         print(f"通信时延 - 传输: {delay_breakdown['transmission_delay']:.2f}s, "
-              f"总时延: {delay_breakdown['total_delay']:.2f}s")
+            f"总时延: {delay_breakdown['total_delay']:.2f}s")
 
         return {
             'delay_breakdown': delay_breakdown,
-            'uploaded_data': uploaded_data
+            'uploaded_data': uploaded_data,
+            'corrected_upload_decisions': corrected_upload_decisions  # 返回修正后的决策
         }
+
+    def _manage_cache_and_data_selection(self):
+        """缓存管理和数据选择"""
+        cache_updates = {}
+
+        for vehicle in self.vehicle_env.vehicles:
+            if vehicle.uploaded_data:
+                # 使用MAB选择器评估数据质量
+                quality_scores = []
+                for batch in vehicle.uploaded_data:
+                    if (isinstance(batch, list) and len(batch) >= 2 and
+                    isinstance(batch[0], torch.Tensor) and batch[0].dim() == 4):
+                        images = batch[0]
+
+                        reward = self.mab_selector.calculate_batch_reward(
+                            self.global_model, [images], torch.nn.CrossEntropyLoss()
+                        )
+                        quality_scores.append(reward)
+
+                # 更新缓存
+                self.cache_manager.update_cache(
+                    vehicle.id, vehicle.uploaded_data, quality_scores
+                )
+
+                cache_updates[vehicle.id] = {
+                    'new_batches': len(vehicle.uploaded_data),
+                    'avg_quality': np.mean(quality_scores) if quality_scores else 0
+                }
+
+        # 打印缓存统计
+        cache_stats = self.cache_manager.get_cache_stats()
+        total_batches = sum([stats['total_size'] for stats in cache_stats.values()])
+        print(f"缓存管理 - 总批次: {total_batches}")
+
+        return cache_updates
 
 if __name__ == "__main__":
     a = BaselineComparison()

@@ -30,7 +30,7 @@ class CommunicationSystem:
         self.shadowing_std = Config.SHADOWING_STD  # 阴影衰落标准（8 dB）
 
         # 数据参数
-        self.sample_size = 1024  # b0，单个样本的大小（bits），1
+        self.sample_size = 393216  # b0，单个样本的大小（bits），1
         self.samples_of_per_batch = (
             Config.SAMPLES_OF_BATCH
         )  # |b_v^s|，每个批次包含的样本数

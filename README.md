@@ -84,6 +84,7 @@ emnist-digits-test-labels-idx1-ubyte: 测试标签<br>
 计算数据标注时延 (t_label)<br>
 计算模型重训练时延 (t_retrain)<br>
 计算模型广播时延 (t_broadcast)<br>
+遗留问题：传输时延计算单位需要确认，总带宽为MHz，样本大小为bit，另外，样本大小更改为64*64*3<br>
 
 ### 数据模拟（dataSimu_env）
 功能：<br>

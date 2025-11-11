@@ -43,7 +43,7 @@ class MABDataSelector:
 
     def calculate_batch_reward(self, model, batch, criterion):
         """计算使用批次更新后的奖励（损失下降）"""
-        if not batch:
+        if batch is None:
             return 0.0
 
         # 获取当前损失
