@@ -1,12 +1,8 @@
 import numpy as np
 import torch
-# import sys
-# import os
-
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.parameters import Config
 from environment.dataSimu_env import DomainIncrementalDataSimulator
-from learning.cache_manager import cacheManager
+from learning.cache_manager import CacheManager
 import random
 import matplotlib.pyplot as plt
 from collections import defaultdict

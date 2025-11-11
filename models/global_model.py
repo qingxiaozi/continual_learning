@@ -4,7 +4,7 @@ import torchvision.models as models
 from config.parameters import Config
 
 
-class globalModel(nn.Module):
+class GlobalModel(nn.Module):
     def __init__(self, dataset_name):
         super().__init__()
         self.num_classes = self._get_num_classes(dataset_name)
@@ -29,7 +29,7 @@ class globalModel(nn.Module):
 
 
 if __name__ == "__main__":
-    print(globalModel)
-    a = globalModel("office31")
+    print(GlobalModel)
+    a = GlobalModel("office31")
     x = torch.randn(1, 3, 224, 224)
     print(a(x))

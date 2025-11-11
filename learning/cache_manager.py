@@ -2,7 +2,7 @@ import numpy as np
 from config.parameters import Config
 
 
-class cacheManager:
+class CacheManager:
     """缓存管理器"""
     def __init__(self, max_size=Config.MAX_LOCAL_BATCHES):
         self.max_size = max_size

@@ -4,7 +4,7 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 100  # train session
+    NUM_TRAINING_SESSIONS = 20  # train session
     NUM_EPOCH = 100  # 训练epoch数
     BATCH_SIZE = 32  # batch size
     INIT_EPOCHS = 10  # MAB初始探索轮次
@@ -71,7 +71,6 @@ class Config:
     # 域切换参数
     DOMAIN_CHANGE_INTERVAL = 1  # 每1个session切换一个域
     # 数据加载参数
-    BATCH_SIZE = 32
     IMAGE_SIZE = 224  # 统一调整到相同尺寸
     # 测试策略参数
     TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
@@ -82,6 +81,3 @@ class Config:
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-# Config = Config()
