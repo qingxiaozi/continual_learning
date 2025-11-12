@@ -84,6 +84,8 @@ class BaselineComparison:
             communication_results = self._execute_communication(action, session)
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
+            # 步骤6: 模型训练和更新
+            training_results = self._train_and_update_global_model()
             exit()
 
 
@@ -211,6 +213,35 @@ class BaselineComparison:
         print(f"缓存管理 - 总批次: {total_batches}")
 
         return cache_updates
+
+    def _train_and_update_global_model(self):
+        """训练和更新全局模型"""
+        # 收集所有缓存数据构建全局数据集
+        global_data_batches = []
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
+            global_data_batches.extend(cache['old_data'])
+            global_data_batches.extend(cache['new_data'])
+
+        if not global_data_batches:
+            print("警告: 全局数据集为空，跳过训练")
+            return {'loss': float('inf'), 'samples': 0}
+
+        # 创建数据加载器
+        from torch.utils.data import DataLoader, TensorDataset
+        # 这里需要将批次数据转换为适合训练的形式
+        # 简化实现：假设我们已经有了合适的数据格式
+
+        # 训练全局模型
+        training_loss = self.continual_learner.train_on_dataset(
+            global_data_batches, num_epochs=Config.NUM_EPOCH
+        )
+        print(f"模型训练 - 损失: {training_loss:.4f}, 样本数: {len(global_data_batches)}")
+
+        return {
+            'loss': training_loss,
+            'samples': len(global_data_batches)
+        }
 
 if __name__ == "__main__":
     a = BaselineComparison()
