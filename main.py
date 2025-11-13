@@ -87,14 +87,26 @@ class BaselineComparison:
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
             # 步骤6: 模型训练和更新
-            training_results = self._train_and_update_global_model()
+            training_results = self._train_and_update_global_model(session)
             # 步骤7: 性能评估
             evaluation_results = self._evaluate_model_performance(session)
             # 步骤8: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
-                state, action, evaluation_results, communication_results
+                state, action, evaluation_results, communication_results, training_results
             )
-            exit()
+            # 步骤9: 记录结果
+            self._record_session_results(
+                session, evaluation_results, communication_results, training_results
+            )
+            # 步骤10: 模型广播和更新
+            self._broadcast_and_update_models()
+
+            print(f"会话 {session + 1} 完成 - 准确率: {evaluation_results['current_accuracy']:.4f}")
+
+        # 最终评估和结果汇总
+        self._final_evaluation_and_summary()
+
+        return self.results
 
 
 
@@ -222,7 +234,7 @@ class BaselineComparison:
 
         return cache_updates
 
-    def _train_and_update_global_model(self):
+    def _train_and_update_global_model(self, session):
         """训练和更新全局模型"""
         # 收集所有缓存数据构建全局数据集
         global_data_batches = []
@@ -260,7 +272,7 @@ class BaselineComparison:
 
         print(f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}")
         # 绘制loss
-        self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name="training_loss.png")
+        self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name=f"training_loss_session_{session}.png")
 
         return {
             'loss_before': loss_before,
@@ -365,7 +377,12 @@ class BaselineComparison:
         next_state = self._get_environment_state()
 
         # 将动作转换为向量形式
-        action_vector = self._action_to_vector(action)
+        vector = []
+        for i in range(Config.NUM_VEHICLES):
+            upload_batches = action['upload_decisions'][i][1]
+            bandwidth_ratio = action['bandwidth_allocations'][i]
+            vector.extend([upload_batches, bandwidth_ratio])
+        action_vector = np.array(vector, dtype=np.float32)
 
         # 存储经验并优化DRL模型
         self.drl_agent.memory.push(state, action_vector, reward, next_state, False)
@@ -375,6 +392,56 @@ class BaselineComparison:
         print(f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 时延: {total_delay:.2f}s, 奖励: {reward:.4f}")
 
         return reward
+
+    def _record_session_results(self, session, eval_results, comm_results, training_results):
+        """记录会话结果"""
+        self.results['session_accuracies'].append(eval_results['current_accuracy'])
+        self.results['session_losses'].append(eval_results['current_loss'])
+        self.results['communication_delays'].append(comm_results['delay_breakdown']['total_delay'])
+
+        # 记录域性能
+        current_domain = eval_results['current_domain']
+        self.results['domain_performance'][current_domain].append(
+            eval_results['current_accuracy']
+        )
+
+        # 记录缓存利用率
+        cache_stats = self.cache_manager.get_cache_stats()
+        avg_utilization = np.mean([
+            stats['total_size'] / Config.MAX_LOCAL_BATCHES
+            for stats in cache_stats.values()
+        ])
+        self.results['cache_utilization'].append(avg_utilization)
+
+    def _broadcast_and_update_models(self):
+        """广播和更新模型"""
+        # 在实际系统中，这里会将更新后的全局模型参数广播给所有车辆
+        # 简化实现：直接更新车辆环境中的模型引用
+        print("模型更新完成 - 新全局模型已就绪")
+
+    def _final_evaluation_and_summary(self):
+        """最终评估和结果汇总"""
+        print("\n" + "=" * 60)
+        print("联合优化实验完成")
+        print("=" * 60)
+
+        # 计算总体统计
+        final_accuracy = self.results['session_accuracies'][-1] if self.results['session_accuracies'] else 0
+        avg_accuracy = np.mean(self.results['session_accuracies'])
+        avg_delay = np.mean(self.results['communication_delays'])
+
+        print(f"最终准确率: {final_accuracy:.4f}")
+        print(f"平均准确率: {avg_accuracy:.4f}")
+        print(f"平均通信时延: {avg_delay:.2f}s")
+        print(f"平均缓存利用率: {np.mean(self.results['cache_utilization']):.2f}")
+
+        # 打印各域性能
+        print("\n各域性能:")
+        for domain, performances in self.results['domain_performance'].items():
+            if performances:
+                avg_perf = np.mean(performances)
+                print(f"  {domain}: {avg_perf:.4f}")
+
 
 if __name__ == "__main__":
     a = BaselineComparison()

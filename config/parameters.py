@@ -4,7 +4,7 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 20  # train session
+    NUM_TRAINING_SESSIONS = 2  # train session
     NUM_EPOCH = 5  # 训练epoch数
     BATCH_SIZE = 32  # batch size
     INIT_EPOCHS = 10  # MAB初始探索轮次

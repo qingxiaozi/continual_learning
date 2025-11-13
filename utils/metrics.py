@@ -47,8 +47,7 @@ class ResultVisualizer:
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
             print(f"训练损失图已保存至: {plot_path}")
 
-        plt.tight_layout()
-        plt.show()
+        plt.close()
 
         # 打印训练总结
         if len(epoch_losses) > 1:

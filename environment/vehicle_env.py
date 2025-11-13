@@ -27,7 +27,7 @@ class Vehicle:
         self.uploaded_data = []  # 新上传的数据
         self.cache_data = []  # 车辆数据缓存,相当于在边缘服务器上的数据
 
-        self.data_quality_scores = []  # 数据质量评分
+        self.quality_scores_history = []  # 数据质量评分
         self.confidence_history = []  # 历史置信度记录
         self.test_loss_history = [] # 测试损失记录
 
@@ -384,7 +384,7 @@ class VehicleEnvironment:
 
                 # 2. 获取测试损失 - 从实际模型评估中获取
                 if vehicle.uploaded_data:
-                    test_loss = vehilce.calculate_test_loss(self.global_model, self.gold_model)
+                    test_loss = vehicle.calculate_test_loss(self.global_model, self.gold_model)
                     vehicle.test_loss_history.append(test_loss)
                 else:
                     test_loss = 1.0
