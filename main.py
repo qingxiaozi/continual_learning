@@ -78,7 +78,7 @@ class BaselineComparison:
             self._update_session_environment(session)
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
-            print(f"state:{state}")
+            print(f"当前环境状态 state 为:{state}")
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
             print(f"action:{action}")
@@ -90,6 +90,10 @@ class BaselineComparison:
             training_results = self._train_and_update_global_model()
             # 步骤7: 性能评估
             evaluation_results = self._evaluate_model_performance(session)
+            # 步骤8: 计算奖励和优化
+            reward = self._calculate_reward_and_optimize(
+                state, action, evaluation_results, communication_results
+            )
             exit()
 
 
@@ -222,32 +226,82 @@ class BaselineComparison:
         """训练和更新全局模型"""
         # 收集所有缓存数据构建全局数据集
         global_data_batches = []
+        global_dataset_size = 0
         for vehicle_id in range(Config.NUM_VEHICLES):
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
             global_data_batches.extend(cache['old_data'])
             global_data_batches.extend(cache['new_data'])
+            global_dataset_size += len(cache['old_data']) + len(cache['new_data'])
 
         if not global_data_batches:
             print("警告: 全局数据集为空，跳过训练")
-            return {'loss': float('inf'), 'samples': 0}
+            return {
+                'loss_before': 1.0,
+                'loss_after': 1.0,
+                'training_loss': float('inf'),
+                'samples': 0,
+                'global_dataset_size': 0
+            }
 
         # 创建数据加载器
         from torch.utils.data import DataLoader, TensorDataset
         # 这里需要将批次数据转换为适合训练的形式
         # 简化实现：假设我们已经有了合适的数据格式
 
+        # 计算训练前的损失（在上传数据上）
+        loss_before = self._compute_loss_on_uploaded_data(self.global_model)
+
         # 训练全局模型
         training_loss, epoch_losses = self.continual_learner.train_on_dataset(
             global_data_batches, num_epochs=Config.NUM_EPOCH
         )
-        print(f"模型训练 - 损失: {training_loss:.4f}, 样本数: {len(global_data_batches)}")
+        # 计算训练后的损失（在上传数据上）
+        loss_after = self._compute_loss_on_uploaded_data(self.global_model)
+
+        print(f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}")
         # 绘制loss
         self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name="training_loss.png")
 
         return {
-            'loss': training_loss,
-            'samples': len(global_data_batches)
+            'loss_before': loss_before,
+            'loss_after': loss_after,
+            'training_loss': training_loss,
+            'samples': len(global_data_batches),
+            'global_dataset_size': global_dataset_size * Config.SAMPLES_OF_BATCH
         }
+
+    def _compute_loss_on_uploaded_data(self, model):
+        """计算模型在上传数据上的损失"""
+        total_loss = 0.0
+        batch_count = 0
+
+        for vehicle in self.vehicle_env.vehicles:
+            if vehicle.uploaded_data:
+                for batch in vehicle.uploaded_data:
+                    loss = self._compute_batch_loss(model, batch)
+                    total_loss += loss
+                    batch_count += 1
+
+        return total_loss / batch_count if batch_count > 0 else 1.0
+
+    def _compute_batch_loss(self, model, batch):
+        """计算单个批次的损失"""
+        model.eval()
+        criterion = torch.nn.CrossEntropyLoss()
+
+        with torch.no_grad():
+            if isinstance(batch, (list, tuple)):
+                inputs, targets = batch
+            else:
+                inputs = batch
+                # 使用黄金模型生成标签
+                with torch.no_grad():
+                    targets = self.gold_model.model(inputs).argmax(dim=1)
+
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+
+        return loss.item()
 
     def _evaluate_model_performance(self, session):
         """评估模型性能"""
@@ -276,6 +330,51 @@ class BaselineComparison:
         print(f"eval_results:{eval_results}")
         return eval_results
 
+    def _calculate_reward_and_optimize(self, state, action, eval_results, comm_results, training_results):
+        """根据原始建模重新设计奖励计算函数"""
+        # 获取必要的参数
+        total_delay = comm_results['delay_breakdown']['total_delay']
+        global_dataset_size = training_results.get('global_dataset_size', 1)
+
+        # 计算损失降幅
+        total_loss_reduction = 0
+        total_upload_samples = 0
+
+        for vehicle in self.vehicle_env.vehicles:
+            if vehicle.uploaded_data:
+                # 计算该车辆上传的样本数
+                vehicle_upload_samples = len(vehicle.uploaded_data) * Config.SAMPLES_OF_BATCH
+                total_upload_samples += vehicle_upload_samples
+
+                # 这里需要计算模型在上传数据上的损失变化
+                # 由于我们实际训练前后没有分别记录每个车辆上传数据的损失
+                # 我们使用训练前后的整体损失变化作为近似
+                loss_before = training_results.get('loss_before', 1.0)
+                loss_after = training_results.get('loss_after', 1.0)
+                loss_reduction = loss_before - loss_after
+
+                total_loss_reduction += vehicle_upload_samples * loss_reduction
+
+        # 计算奖励
+        if total_delay > 0 and global_dataset_size > 0:
+            reward = total_loss_reduction / (global_dataset_size * total_delay)
+        else:
+            reward = 0.0
+
+        # 获取下一个状态
+        next_state = self._get_environment_state()
+
+        # 将动作转换为向量形式
+        action_vector = self._action_to_vector(action)
+
+        # 存储经验并优化DRL模型
+        self.drl_agent.memory.push(state, action_vector, reward, next_state, False)
+        if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
+            self.drl_agent.optimize_model()
+
+        print(f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 时延: {total_delay:.2f}s, 奖励: {reward:.4f}")
+
+        return reward
 
 if __name__ == "__main__":
     a = BaselineComparison()

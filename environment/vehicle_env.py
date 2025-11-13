@@ -125,7 +125,7 @@ class Vehicle:
         cache = cache_manager.get_vehicle_cache(self.id)
         if cache and 'quality_scores' in cache and cache['quality_scores']:
             # 使用最新的质量评分
-            recent_scores = cache['quality_scores'][-min(5, len(cache['quality_scores'])):]
+            recent_scores = cache['quality_scores'][-min(Config.MAX_LOCAL_BATCHES, len(cache['quality_scores'])):]
             quality_score = np.mean(recent_scores)
             self.quality_scores_history.append(quality_score)
             return quality_score
