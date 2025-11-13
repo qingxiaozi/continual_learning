@@ -13,6 +13,7 @@ from models.drl_agent import DRLAgent
 from models.global_model import GlobalModel
 from models.gold_model import GoldModel
 from models.mab_selector import MABDataSelector
+from utils.metrics import ResultVisualizer
 
 
 class BaselineComparison:
@@ -58,6 +59,7 @@ class BaselineComparison:
             'cache_utilization': [],
             'domain_performance': defaultdict(list)
         }
+        self.visualize = ResultVisualizer()
 
     def run_joint_optimization(self, num_sessions=None):
         """运行完整的联合优化过程"""
@@ -86,6 +88,8 @@ class BaselineComparison:
             cache_updates = self._manage_cache_and_data_selection()
             # 步骤6: 模型训练和更新
             training_results = self._train_and_update_global_model()
+            # 步骤7: 性能评估
+            evaluation_results = self._evaluate_model_performance(session)
             exit()
 
 
@@ -233,15 +237,45 @@ class BaselineComparison:
         # 简化实现：假设我们已经有了合适的数据格式
 
         # 训练全局模型
-        training_loss = self.continual_learner.train_on_dataset(
+        training_loss, epoch_losses = self.continual_learner.train_on_dataset(
             global_data_batches, num_epochs=Config.NUM_EPOCH
         )
         print(f"模型训练 - 损失: {training_loss:.4f}, 样本数: {len(global_data_batches)}")
+        # 绘制loss
+        self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name="training_loss.png")
 
         return {
             'loss': training_loss,
             'samples': len(global_data_batches)
         }
+
+    def _evaluate_model_performance(self, session):
+        """评估模型性能"""
+        current_domain = self.data_simulator.get_current_domain()
+
+        # 评估当前域性能
+        current_test_data = self.data_simulator.get_test_dataset(current_domain)
+        if current_test_data:
+            accuracy, loss = self.evaluator.evaluate_model(
+                self.global_model, current_test_data
+            )
+        else:
+            accuracy, loss = 0.0, float('inf')
+
+        # 累积评估（所有已见域）
+        cumulative_results = self.data_simulator.evaluate_model(
+            self.global_model, strategy='cumulative'
+        )
+
+        eval_results = {
+            'current_accuracy': accuracy,
+            'current_loss': loss,
+            'cumulative_results': cumulative_results,
+            'current_domain': current_domain
+        }
+        print(f"eval_results:{eval_results}")
+        return eval_results
+
 
 if __name__ == "__main__":
     a = BaselineComparison()

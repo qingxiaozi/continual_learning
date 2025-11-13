@@ -2,6 +2,7 @@ import torch
 import torch.optim as optim
 from config.parameters import Config
 
+
 class ContinualLearner:
     """持续学习器"""
     def __init__(self, model, gold_model):
@@ -13,6 +14,8 @@ class ContinualLearner:
     def train_on_dataset(self, dataloader, num_epochs=1):
         """在数据集上训练模型"""
         self.model.train()
+        # 记录每个epoch的损失值
+        epoch_losses = []
 
         for epoch in range(num_epochs):
             epoch_loss = 0.0
@@ -34,9 +37,10 @@ class ContinualLearner:
                 epoch_loss += loss.item()
 
             avg_loss = epoch_loss / len(dataloader)
+            epoch_losses.append(avg_loss)
             print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
 
-        return avg_loss
+        return avg_loss, epoch_losses
 
     def compute_test_loss(self, dataloader):
         """计算测试损失"""
