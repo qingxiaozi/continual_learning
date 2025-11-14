@@ -305,3 +305,148 @@ class ResultVisualizer:
         print(f"  最终损失: {metrics.get('final_loss', 0):.4f}")
         print(f"  平均损失: {metrics.get('average_loss', 0):.4f}")
         print(f"  损失范围: {metrics.get('min_loss', 0):.4f} - {metrics.get('max_loss', 0):.4f}")
+
+    def plot_data_heterogeneity(self, data_simulator, session, save_plot=True, plot_name=None):
+        """
+        绘制数据异质性示意图
+
+        参数:
+            data_simulator: DomainIncrementalDataSimulator实例
+            session: 当前会话ID
+            save_plot: 是否保存图片
+            plot_name: 图片名称，如果为None则自动生成
+        """
+        if plot_name is None:
+            plot_name = f"data_heterogeneity_session_{session}.png"
+
+        # 获取当前域的信息
+        current_domain = data_simulator.get_current_domain()
+        domain_key = f"{data_simulator.current_dataset}_{current_domain}"
+
+        # 检查是否有数据分配
+        if domain_key not in data_simulator.vehicle_data_assignments:
+            print(f"警告: 域 {domain_key} 没有数据分配信息")
+            return
+
+        # 获取类别信息
+        num_classes = data_simulator.dataset_info[data_simulator.current_dataset]["num_classes"]
+        class_labels = [f"Class {i}" for i in range(num_classes)]
+
+        # 获取车辆分配数据
+        vehicle_assignments = data_simulator.vehicle_data_assignments[domain_key]
+        train_dataset = data_simulator.train_data_cache[domain_key]
+
+        # 统计每个车辆每个类别的样本数量
+        vehicle_class_counts = {}
+
+        for vehicle_id, indices in vehicle_assignments.items():
+            class_counts = {i: 0 for i in range(num_classes)}
+
+            for idx in indices:
+                # 获取样本的标签
+                _, label = train_dataset[idx]
+                class_counts[label] += 1
+
+            vehicle_class_counts[vehicle_id] = class_counts
+
+        # 准备绘图数据
+        vehicle_ids = []
+        class_ids = []
+        sample_counts = []
+
+        for vehicle_id in range(data_simulator.num_vehicles):
+            if vehicle_id in vehicle_class_counts:
+                for class_id in range(num_classes):
+                    count = vehicle_class_counts[vehicle_id][class_id]
+                    if count > 0:  # 只绘制有样本的类别
+                        vehicle_ids.append(vehicle_id)
+                        class_ids.append(class_id)
+                        sample_counts.append(count)
+
+        if not sample_counts:
+            print("警告: 没有找到可绘制的数据")
+            return
+
+        # 创建图形
+        plt.figure(figsize=(12, 8))
+
+        # 创建散点图，点的大小表示样本数量
+        scatter = plt.scatter(
+            vehicle_ids,
+            class_ids,
+            s=[min(100 + count * 2, 500) for count in sample_counts],  # 动态调整点的大小
+            c=sample_counts,
+            cmap='viridis',
+            alpha=0.7,
+            edgecolors='black',
+            linewidth=0.5
+        )
+
+        # 设置图表属性
+        plt.title(f'Data Heterogeneity - Session {session}\n(Domain: {current_domain}, Dataset: {data_simulator.current_dataset})',
+                fontsize=14, fontweight='bold', pad=20)
+        plt.xlabel('Vehicle ID', fontsize=12)
+        plt.ylabel('Class Label', fontsize=12)
+
+        # 设置坐标轴
+        plt.xticks(range(data_simulator.num_vehicles))
+        plt.yticks(range(num_classes), class_labels)
+        plt.grid(True, alpha=0.3, linestyle='--')
+
+        # 添加颜色条
+        cbar = plt.colorbar(scatter, shrink=0.8)
+        cbar.set_label('Number of Samples', fontsize=10)
+
+        # 添加样本数量标注（只标注较大的点）
+        for i, (vehicle_id, class_id, count) in enumerate(zip(vehicle_ids, class_ids, sample_counts)):
+            if count > max(sample_counts) * 0.3:  # 只标注较大的样本点
+                plt.annotate(str(count),
+                            (vehicle_id, class_id),
+                            xytext=(5, 5),
+                            textcoords='offset points',
+                            fontsize=8,
+                            ha='left',
+                            va='bottom')
+
+        # 调整布局
+        plt.tight_layout()
+
+        # 保存或显示图表
+        if save_plot:
+            plot_path = os.path.join(self.save_dir, plot_name)
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            print(f"数据异质性图已保存至: {plot_path}")
+
+        plt.close()
+
+        # 打印统计信息
+        # self._print_heterogeneity_statistics(vehicle_class_counts, current_domain, session)
+
+    def _print_heterogeneity_statistics(self, vehicle_class_counts, domain, session):
+        """打印数据异质性统计信息"""
+        print(f"\n=== Session {session} - {domain} 数据异质性统计 ===")
+
+        total_samples = 0
+        class_coverage = {}  # 每个类别被多少车辆覆盖
+
+        for vehicle_id, class_counts in vehicle_class_counts.items():
+            vehicle_total = sum(class_counts.values())
+            total_samples += vehicle_total
+
+            # 统计每个类别的覆盖情况
+            for class_id, count in class_counts.items():
+                if count > 0:
+                    class_coverage[class_id] = class_coverage.get(class_id, 0) + 1
+
+            print(f"车辆 {vehicle_id}: {vehicle_total} 个样本, 覆盖 {sum(1 for c in class_counts.values() if c > 0)} 个类别")
+
+        # 计算异质性指标
+        vehicle_totals = [sum(counts.values()) for counts in vehicle_class_counts.values()]
+        heterogeneity_std = np.std(vehicle_totals) if vehicle_totals else 0
+
+        print(f"\n总体统计:")
+        print(f"总样本数: {total_samples}")
+        print(f"平均每车样本数: {np.mean(vehicle_totals):.1f}")
+        print(f"样本数标准差: {heterogeneity_std:.1f} (异质性指标)")
+        print(f"类别覆盖情况: 平均每个类别被 {np.mean(list(class_coverage.values())):.1f} 辆车覆盖")
+        print("====================================\n")

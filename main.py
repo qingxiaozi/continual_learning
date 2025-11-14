@@ -412,6 +412,9 @@ class BaselineComparison:
             for stats in cache_stats.values()
         ])
         self.results['cache_utilization'].append(avg_utilization)
+        # 添加数据异质性可视化
+        if session % Config.DOMAIN_CHANGE_INTERVAL == 0:  # 每次域切换时绘制
+            self.visualize.plot_data_heterogeneity(self.data_simulator, session,save_plot=True, plot_name=f"data_distribution_session_{session}.png")
 
     def _broadcast_and_update_models(self):
         """广播和更新模型"""
