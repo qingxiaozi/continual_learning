@@ -7,7 +7,7 @@ class Config:
     NUM_TRAINING_SESSIONS = 2  # train session
     NUM_EPOCH = 6  # 训练epoch数
     BATCH_SIZE = 32  # batch size
-    INIT_EPOCHS = 10  # MAB初始探索轮次
+    INIT_EPOCHS = 2  # MAB初始探索轮次
 
     # 通信参数
     BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围

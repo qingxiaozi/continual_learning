@@ -263,10 +263,12 @@ class BaselineComparison:
         # 计算训练前的损失（在上传数据上）
         loss_before = self._compute_loss_on_uploaded_data(self.global_model)
 
-        # 训练全局模型
-        training_loss, epoch_losses = self.continual_learner.train_on_dataset(
-            global_data_batches, num_epochs=Config.NUM_EPOCH
-        )
+        # # 训练全局模型
+        # training_loss, epoch_losses = self.continual_learner.train_on_dataset(
+        #     global_data_batches, num_epochs=Config.NUM_EPOCH
+        # )
+        training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(global_data_batches, num_epochs=Config.NUM_EPOCH)
+
         # 计算训练后的损失（在上传数据上）
         loss_after = self._compute_loss_on_uploaded_data(self.global_model)
 

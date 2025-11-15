@@ -2,22 +2,19 @@ import numpy as np
 import torch
 from config.parameters import Config
 
+
 class MABDataSelector:
     """多臂老虎机数据选择器"""
     def __init__(self, num_arms):
         self.num_arms = num_arms
-        self.counts = np.zeros(num_arms)  # 每个臂被选择的次数
+        self.counts = np.zeros(num_arms)  # 每个臂被实际训练的次数
         self.rewards = np.zeros(num_arms)  # 每个臂的累积奖励
         self.avg_rewards = np.zeros(num_arms)  # 每个臂的平均奖励
+        self.ucb_counts = np.zeros(num_arms)  # 每个臂被UCB算法选择的次数
         self.exploration_factor = Config.MAB_EXPLORATION_FACTOR
 
-    def select_arm(self, epoch, init_epochs=Config.INIT_EPOCHS):
+    def select_arm(self):
         """选择臂（数据批次）"""
-        if epoch < init_epochs:
-            # 初始阶段：均匀探索
-            return epoch % self.num_arms
-
-        # UCB算法
         total_counts = np.sum(self.counts)
         ucb_values = np.zeros(self.num_arms)
 
@@ -37,9 +34,28 @@ class MABDataSelector:
         """更新臂的奖励统计"""
         self.counts[arm] += 1
         self.rewards[arm] += reward
-
-        # 更新平均奖励
         self.avg_rewards[arm] = self.rewards[arm] / self.counts[arm]
+
+    def get_batch_rankings(self):
+        """获取批次排序（基于UCB选择次数）"""
+        # 按UCB选择次数降序排列
+        ranked_indices = np.argsort(self.ucb_counts)[::-1]
+        return ranked_indices
+
+    def record_ucb_selection(self, arm):
+        """记录UCB选择"""
+        self.ucb_counts[arm] += 1
+
+    def get_batch_quality_scores(self):
+        """获取所有批次的归一化质量评分"""
+        if np.sum(self.counts) == 0:
+            return np.ones(self.num_arms) / self.num_arms
+        # 基于选择次数和平均奖励计算质量评分
+        quality_scores = self.counts * self.avg_rewards
+        if np.sum(quality_scores) > 0:
+            quality_scores = quality_scores / np.sum(quality_scores)
+
+        return quality_scores
 
     def calculate_batch_reward(self, model, batch, criterion):
         """计算使用批次更新后的奖励（损失下降）"""
@@ -72,74 +88,9 @@ class MABDataSelector:
         # 返回负损失作为奖励（损失越小越好）
         return -avg_current_loss
 
-    def get_batch_quality_scores(self):
-        """获取所有批次的归一化质量评分"""
-        if np.sum(self.counts) == 0:
-            return np.ones(self.num_arms) / self.num_arms
-
-        # 基于选择次数和平均奖励计算质量评分
-        quality_scores = self.counts * self.avg_rewards
-        if np.sum(quality_scores) > 0:
-            quality_scores = quality_scores / np.sum(quality_scores)
-
-        return quality_scores
-
     def reset(self):
         """重置MAB状态"""
         self.counts = np.zeros(self.num_arms)
         self.rewards = np.zeros(self.num_arms)
         self.avg_rewards = np.zeros(self.num_arms)
-
-
-# def main_detailed():
-#     """包含简单模型的MAB使用示例"""
-#     import torch
-#     import torch.nn as nn
-
-#     # 简单的线性模型
-#     class SimpleModel(nn.Module):
-#         def __init__(self):
-#             super().__init__()
-#             self.linear = nn.Linear(10, 2)
-
-#         def forward(self, x):
-#             return self.linear(x)
-
-#     # 初始化
-#     num_batches = 3
-#     mab_selector = MABDataSelector(num_arms=num_batches)
-#     model = SimpleModel()
-#     criterion = nn.CrossEntropyLoss()
-
-#     # 模拟一些数据批次
-#     batches = []
-#     for i in range(num_batches):
-#         # 每个批次包含一些随机数据
-#         data = torch.randn(32, 10)  # 32个样本，10维特征
-#         targets = torch.randint(0, 2, (32,))  # 随机标签
-#         batches.append((data, targets))
-
-#     # 训练循环
-#     for epoch in range(15):
-#         # 选择批次
-#         batch_idx = mab_selector.select_arm(epoch)
-#         selected_batch = batches[batch_idx]
-
-#         print(f"Epoch {epoch}: 使用批次 {batch_idx}")
-
-#         # 计算奖励（使用当前模型在批次上的损失）
-#         reward = mab_selector.calculate_batch_reward(model, [selected_batch], criterion)
-
-#         # 更新MAB
-#         mab_selector.update_arm(batch_idx, reward)
-
-#         print(f"  奖励: {reward:.3f}")
-
-#     # 结果分析
-#     print("\n最终选择统计:")
-#     for i in range(num_batches):
-#         print(f"批次 {i}: 被选择 {mab_selector.counts[i]} 次")
-
-# if __name__ == "__main__":
-#     main_detailed()  # 运行最简版本
-#     main_detailed()  # 运行详细版本
+        self.ucb_counts = np.zeros(self.num_arms)
