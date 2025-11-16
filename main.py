@@ -190,8 +190,14 @@ class BaselineComparison:
             corrected_upload_decisions, bandwidth_allocations, session, Config.NUM_VEHICLES
         )
 
-        print(f"通信时延 - 传输: {delay_breakdown['transmission_delay']:.2f}s, "
-            f"总时延: {delay_breakdown['total_delay']:.2f}s")
+        print(f"""
+        通信时延详情:
+        ├─ 传输时延: {delay_breakdown['transmission_delay']:>8.2f} s
+        ├─ 标注时延: {delay_breakdown['labeling_delay']:>8.2f} s
+        ├─ 训练时延: {delay_breakdown['retraining_delay']:>8.2f} s
+        ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
+        ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
+        """)
 
         return {
             'delay_breakdown': delay_breakdown,

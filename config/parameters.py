@@ -12,16 +12,15 @@ class Config:
     # 通信参数
     BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
-    BS_TRANSMIT_POWER = 10  # W，基站发射功率，影响通信距离和质量（W）
-    VEHICLE_TRANSMIT_POWER = 0.1  # 车辆发射功率（W）
-    NOISE_POWER = 1e-10  # W，噪声功率，决定通信质量的下限
+    BS_TRANSMIT_POWER = 20  # W，基站发射功率，影响通信距离和质量（W）
+    VEHICLE_TRANSMIT_POWER = 2e-1  # 车辆发射功率（W）
+    NOISE_POWER = 3.981e-14  # W，噪声功率，决定通信质量的下限
     PATH_LOSS_EXPONENT = 2.7  # 路径损耗指数
     SHADOWING_STD = 8  # 阴影衰落标准差
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
 
     # 模型参数
-    MODEL_INPUT_SIZE = 224  # 模型输入尺寸的大小
     NUM_CLASSES = 10  # 类别的数量
     GOLD_MODEL_ACCURACY = 0.95  # 黄金模型准确率95%
     LEARNING_RATE = 0.001  # 学习率

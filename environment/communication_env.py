@@ -30,14 +30,14 @@ class CommunicationSystem:
         self.shadowing_std = Config.SHADOWING_STD  # 阴影衰落标准（8 dB）
 
         # 数据参数
-        self.sample_size = 393216  # b0，单个样本的大小（bits），1
+        self.sample_size = Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 32  # b0，单个样本的大小（bits），1
         self.samples_of_per_batch = (
             Config.SAMPLES_OF_BATCH
         )  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
-        self.golden_model_computation = 1e6  # 黄金模型处理一个样本的计算周期数，1
-        self.global_model_computation = 2e6  # 全局模型处理一个样本的计算周期数，1
+        self.golden_model_computation = 2e9  # 黄金模型处理一个样本的计算周期数，1
+        self.global_model_computation = 6e9  # 全局模型处理一个样本的计算周期数，1
         self.edge_server_computation = 10e9  # C，边缘服务器计算能力（Cycles/s），1
 
         # 训练参数
@@ -47,7 +47,7 @@ class CommunicationSystem:
         )  # |D_v|，每车缓存样本数
 
         # 模型参数
-        self.model_parameter_size = 50e6  # P_m，模型参数量的大小（bit），1
+        self.model_parameter_size = 3.578e8   # P_m，模型参数量的大小（bit），1
 
         # 缓存阴影衰落值，避免重复计算
         self._shadowing_cache = {}
