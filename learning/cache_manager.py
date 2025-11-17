@@ -20,6 +20,8 @@ class CacheManager:
 
         cache = self.caches[vehicle_id]
 
+        # 清空新数据，避免重复添加
+        cache["new_data"] = []
         # 添加新数据
         for batch in new_data_batches:
             cache["new_data"].append(batch)
@@ -62,6 +64,7 @@ class CacheManager:
         cache = self.caches[vehicle_id]
         cache["old_data"].extend(cache["new_data"])
         cache["new_data"] = []
+        self._maintain_cache_size(vehicle_id)
 
     def get_cache_stats(self):
         """获取缓存统计信息"""

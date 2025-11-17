@@ -49,6 +49,8 @@ class BaselineComparison:
         action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
         self.drl_agent = DRLAgent(state_dim, action_dim)
 
+        self.current_domain = self.data_simulator.get_current_domain()
+
         # 记录实验数据
         self.results = {
             "session_accuracies": [],
@@ -117,7 +119,20 @@ class BaselineComparison:
     def _update_session_environment(self, session):
         """更新会话和环境状态"""
         # 更新数据模拟器会话
+        previous_domain = self.current_domain
         self.data_simulator.update_session(session)
+        self.current_domain = self.data_simulator.get_current_domain()
+
+        # 如果域发生变化，提升所有车辆的缓存
+        if previous_domain != self.current_domain:
+            for vehicle_id in range(Config.NUM_VEHICLES):
+                self.cache_manager.promote_new_to_old(vehicle_id)
+            print(f"域从 {previous_domain} 切换到 {self.current_domain}，已提升缓存中的数据。")
+
+        # 清空所有车辆的上传数据
+        for vehicle in self.vehicle_env.vehicles:
+            vehicle.set_uploaded_data([])
+
         # 更新车辆位置（模拟移动）
         self.vehicle_env.update_vehicle_positions(time_delta=1.0)
         # 为车辆生成新数据
@@ -167,8 +182,15 @@ class BaselineComparison:
         # 收集上传数据
         uploaded_data = {}
         corrected_upload_decisions = []  # 修正后的上传决策，保持原格式
+
+        print("\n上传数据验证:")
+        print("车辆ID | 计划上传 | 实际可上传 | 实际上传 | 状态")
+        print("-" * 50)
+
         for vehicle_id, planned_upload_batches in upload_decisions:
             actual_upload_batches = 0
+            available_batches = 0
+
             if planned_upload_batches > 0:
                 vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
                 if vehicle and vehicle.data_batches:
@@ -183,16 +205,28 @@ class BaselineComparison:
                         :actual_upload_batches
                     ]
                     vehicle.set_uploaded_data(uploaded_data[vehicle_id])
+                else:
+                    available_batches = 0
+            else:
+                # 如果计划上传为0，检查车辆是否有数据
+                vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
+                available_batches = len(vehicle.data_batches) if vehicle and vehicle.data_batches else 0
 
-                    # 记录差异（用于调试）
-                    if actual_upload_batches != planned_upload_batches:
-                        print(
-                            f"车辆 {vehicle_id}: 计划上传 {planned_upload_batches} 批次, "
-                            f"实际可上传 {available_batches} 批次, "
-                            f"实际上传 {actual_upload_batches} 批次"
-                        )
+            # 记录差异（用于调试）- 只要不一致就打印
+            if actual_upload_batches != planned_upload_batches or planned_upload_batches == 0:
+                status = "不一致" if actual_upload_batches != planned_upload_batches else "计划不上传"
+                print(f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | {status}")
+            else:
+                print(f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | 一致")
 
             corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
+
+        # 计算统计信息
+        total_planned = sum([ud[1] for ud in upload_decisions])
+        total_actual = sum([cd[1] for cd in corrected_upload_decisions])
+        print("-" * 50)
+        print(f"总计     | {total_planned:6d}   | {'N/A':8s}   | {total_actual:6d}   |")
+        print(f"实际上传率: {total_actual/total_planned*100:.1f}% ({total_actual}/{total_planned})")
 
         return {
             "uploaded_data": uploaded_data,
@@ -230,7 +264,6 @@ class BaselineComparison:
                     "new_batches": len(vehicle.uploaded_data),
                     "avg_quality": np.mean(quality_scores) if quality_scores else 0,
                 }
-
         # 打印缓存统计
         cache_stats = self.cache_manager.get_cache_stats()
         total_batches = sum([stats["total_size"] for stats in cache_stats.values()])
