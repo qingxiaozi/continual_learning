@@ -6,6 +6,7 @@ from models.mab_selector import MABDataSelector
 
 class ContinualLearner:
     """持续学习器"""
+
     def __init__(self, model, gold_model):
         self.model = model
         self.gold_model = gold_model
@@ -61,7 +62,10 @@ class ContinualLearner:
                 reward = loss_before - loss_after
 
                 # 只在需要时更新统计
-                if self.epoch_count == self.init_epochs or self.epoch_count > self.init_epochs:
+                if (
+                    self.epoch_count == self.init_epochs
+                    or self.epoch_count > self.init_epochs
+                ):
                     self.mab_selector.update_arm(batch_idx, reward)
 
                 epoch_loss += loss.item()

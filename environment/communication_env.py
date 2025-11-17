@@ -30,10 +30,10 @@ class CommunicationSystem:
         self.shadowing_std = Config.SHADOWING_STD  # 阴影衰落标准（8 dB）
 
         # 数据参数
-        self.sample_size = Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 32  # b0，单个样本的大小（bits），1
-        self.samples_of_per_batch = (
-            Config.BATCH_SIZE
-        )  # |b_v^s|，每个批次包含的样本数
+        self.sample_size = (
+            Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 32
+        )  # b0，单个样本的大小（bits），1
+        self.samples_of_per_batch = Config.BATCH_SIZE  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
         self.golden_model_computation = 2e9  # 黄金模型处理一个样本的计算周期数，1
@@ -44,7 +44,7 @@ class CommunicationSystem:
         self.training_epochs = Config.NUM_EPOCH  # E，训练轮次
 
         # 模型参数
-        self.model_parameter_size = 3.578e8   # P_m，模型参数量的大小（bit），resnet18
+        self.model_parameter_size = 3.578e8  # P_m，模型参数量的大小（bit），resnet18
 
         # 缓存阴影衰落值，避免重复计算
         self._shadowing_cache = {}
@@ -223,7 +223,9 @@ class CommunicationSystem:
         if total_samples <= 0:
             return 0.0
         # 计算总计算需求
-        total_computation = self.training_epochs * total_samples * self.global_model_computation
+        total_computation = (
+            self.training_epochs * total_samples * self.global_model_computation
+        )
         # 计算重训练时延
         retraining_delay = total_computation / self.edge_server_computation
 
@@ -395,7 +397,7 @@ class CommunicationSystem:
 if __name__ == "__main__":
     print(Config.BASE_BANDWIDTH)
     # 创建环境和通信系统
-    vehicle_env = VehicleEnvironment(None, None,None, None )
+    vehicle_env = VehicleEnvironment(None, None, None, None)
     comm_system = CommunicationSystem(vehicle_env)
 
     # 模拟一个训练阶段

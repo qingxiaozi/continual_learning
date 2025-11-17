@@ -5,6 +5,7 @@ from config.parameters import Config
 
 class MABDataSelector:
     """多臂老虎机数据选择器"""
+
     def __init__(self, num_arms):
         self.num_arms = num_arms
         self.counts = np.zeros(num_arms)  # 每个臂被实际训练的次数
@@ -20,7 +21,7 @@ class MABDataSelector:
 
         for arm in range(self.num_arms):
             if self.counts[arm] == 0:
-                ucb_values[arm] = float('inf')
+                ucb_values[arm] = float("inf")
             else:
                 exploitation = self.avg_rewards[arm]
                 exploration = self.exploration_factor * np.sqrt(

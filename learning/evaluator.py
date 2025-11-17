@@ -5,6 +5,7 @@ from config.parameters import Config
 
 class ModelEvaluator:
     """模型评估器"""
+
     def __init__(self, gold_model):
         self.gold_model = gold_model
         self.criterion = torch.nn.CrossEntropyLoss()
@@ -20,6 +21,7 @@ class ModelEvaluator:
 
         # 检查数据是否为 DataLoader，如果不是则转换
         from torch.utils.data import DataLoader
+
         if not isinstance(data, DataLoader):
             dataloader = DataLoader(data, batch_size=32, shuffle=False)
         else:
@@ -35,7 +37,9 @@ class ModelEvaluator:
 
                 # 修复：确保 true_targets 是 Tensor 且数据类型正确
                 if not isinstance(true_targets, torch.Tensor):
-                    true_targets = torch.tensor(true_targets, dtype=torch.long, device=inputs.device)
+                    true_targets = torch.tensor(
+                        true_targets, dtype=torch.long, device=inputs.device
+                    )
 
                 # 确保目标是 long 类型
                 if true_targets.dtype != torch.long:
@@ -52,7 +56,9 @@ class ModelEvaluator:
                 total_loss += loss.item()
 
                 total_correct += (predictions == true_targets).sum().item()
-                total_samples += inputs.size(0)  # 使用 inputs.size(0) 而不是 len(inputs)
+                total_samples += inputs.size(
+                    0
+                )  # 使用 inputs.size(0) 而不是 len(inputs)
 
         accuracy = total_correct / total_samples if total_samples > 0 else 0
         avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0

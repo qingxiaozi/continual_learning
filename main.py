@@ -18,6 +18,7 @@ from utils.metrics import ResultVisualizer
 
 class BaselineComparison:
     """基线算法比较实验"""
+
     def __init__(self):
         # 初始化所有组件
         self.config = Config
@@ -34,10 +35,7 @@ class BaselineComparison:
 
         # 初始化环境
         self.vehicle_env = VehicleEnvironment(
-            self.global_model,
-            self.gold_model,
-            self.cache_manager,
-            self.data_simulator
+            self.global_model, self.gold_model, self.cache_manager, self.data_simulator
         )
 
         # 初始化通信系统
@@ -53,11 +51,11 @@ class BaselineComparison:
 
         # 记录实验数据
         self.results = {
-            'session_accuracies': [],
-            'session_losses': [],
-            'communication_delays': [],
-            'cache_utilization': [],
-            'domain_performance': defaultdict(list)
+            "session_accuracies": [],
+            "session_losses": [],
+            "communication_delays": [],
+            "cache_utilization": [],
+            "domain_performance": defaultdict(list),
         }
         self.visualize = ResultVisualizer()
 
@@ -85,7 +83,9 @@ class BaselineComparison:
             # 步骤4：收集全局信息，用于时延计算
             global_info = self._collect_global_training_info()
             # 步骤4: 执行通信和数据收集
-            communication_results = self._execute_communication(action, session, global_info['total_samples'])
+            communication_results = self._execute_communication(
+                action, session, global_info["total_samples"]
+            )
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
             # 步骤6: 模型训练和更新
@@ -94,7 +94,11 @@ class BaselineComparison:
             evaluation_results = self._evaluate_model_performance(session)
             # 步骤8: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
-                state, action, evaluation_results, communication_results, training_results
+                state,
+                action,
+                evaluation_results,
+                communication_results,
+                training_results,
             )
             # 步骤9: 记录结果
             self._record_session_results(
@@ -103,24 +107,24 @@ class BaselineComparison:
             # 步骤10: 模型广播和更新
             self._broadcast_and_update_models()
 
-            print(f"会话 {session + 1} 完成 - 准确率: {evaluation_results['current_accuracy']:.4f}")
+            print(
+                f"会话 {session + 1} 完成 - 准确率: {evaluation_results['current_accuracy']:.4f}"
+            )
 
         # 最终评估和结果汇总
         self._final_evaluation_and_summary()
 
         return self.results
 
-
-
     def _update_session_environment(self, session):
-            """更新会话和环境状态"""
-            # 更新数据模拟器会话
-            self.data_simulator.update_session(session)
-            # 更新车辆位置（模拟移动）
-            self.vehicle_env.update_vehicle_positions(time_delta=1.0)
-            # 为车辆生成新数据
-            self._refresh_vehicle_data()
-            print(f"环境更新完成 - 当前域: {self.data_simulator.get_current_domain()}")
+        """更新会话和环境状态"""
+        # 更新数据模拟器会话
+        self.data_simulator.update_session(session)
+        # 更新车辆位置（模拟移动）
+        self.vehicle_env.update_vehicle_positions(time_delta=1.0)
+        # 为车辆生成新数据
+        self._refresh_vehicle_data()
+        print(f"环境更新完成 - 当前域: {self.data_simulator.get_current_domain()}")
 
     def _refresh_vehicle_data(self):
         """为所有车辆刷新数据"""
@@ -153,8 +157,8 @@ class BaselineComparison:
         print(f"DRL决策 - 总上传批次: {sum([ud[1] for ud in upload_decisions])}")
 
         return {
-            'upload_decisions': upload_decisions,
-            'bandwidth_allocations': bandwidth_allocations
+            "upload_decisions": upload_decisions,
+            "bandwidth_allocations": bandwidth_allocations,
         }
 
     def _collect_global_training_info(self):
@@ -162,20 +166,22 @@ class BaselineComparison:
         total_samples = 0
         for vehicle_id in range(Config.NUM_VEHICLES):
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
-            vehicle_batches = len(cache['old_data']) + len(cache['new_data'])
+            vehicle_batches = len(cache["old_data"]) + len(cache["new_data"])
             total_samples += vehicle_batches * Config.BATCH_SIZE
         print(f"调试信息：")
-        print(f"""  'total_samples': {total_samples},  'total_batches': {total_samples // Config.BATCH_SIZE}""")
+        print(
+            f"""  'total_samples': {total_samples},  'total_batches': {total_samples // Config.BATCH_SIZE}"""
+        )
 
         return {
-            'total_samples': total_samples,
-            'total_batches': total_samples // Config.BATCH_SIZE
+            "total_samples": total_samples,
+            "total_batches": total_samples // Config.BATCH_SIZE,
         }
 
     def _execute_communication(self, action, session, total_samples=0):
         """执行通信和数据收集"""
-        upload_decisions = action['upload_decisions']
-        bandwidth_allocations = action['bandwidth_allocations']
+        upload_decisions = action["upload_decisions"]
+        bandwidth_allocations = action["bandwidth_allocations"]
 
         # 收集上传数据
         uploaded_data = {}
@@ -187,17 +193,23 @@ class BaselineComparison:
                 if vehicle and vehicle.data_batches:
                     # 确保不超过实际可用的批次数量
                     available_batches = len(vehicle.data_batches)
-                    actual_upload_batches = min(planned_upload_batches, available_batches)
+                    actual_upload_batches = min(
+                        planned_upload_batches, available_batches
+                    )
 
                     # 选择前actual_upload_batches个批次上传
-                    uploaded_data[vehicle_id] = vehicle.data_batches[:actual_upload_batches]
+                    uploaded_data[vehicle_id] = vehicle.data_batches[
+                        :actual_upload_batches
+                    ]
                     vehicle.set_uploaded_data(uploaded_data[vehicle_id])
 
                     # 记录差异（用于调试）
                     if actual_upload_batches != planned_upload_batches:
-                        print(f"车辆 {vehicle_id}: 计划上传 {planned_upload_batches} 批次, "
+                        print(
+                            f"车辆 {vehicle_id}: 计划上传 {planned_upload_batches} 批次, "
                             f"实际可上传 {available_batches} 批次, "
-                            f"实际上传 {actual_upload_batches} 批次")
+                            f"实际上传 {actual_upload_batches} 批次"
+                        )
 
             # 添加到修正后的决策列表
             corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
@@ -207,7 +219,8 @@ class BaselineComparison:
             corrected_upload_decisions, bandwidth_allocations, session, total_samples
         )
 
-        print(f"""
+        print(
+            f"""
         通信时延详情:
         ├─ 传输时延: {delay_breakdown['transmission_delay']:>8.2f} s
         ├─ 标注时延: {delay_breakdown['labeling_delay']:>8.2f} s
@@ -215,12 +228,13 @@ class BaselineComparison:
         ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
         ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
         训练样本数：  {total_samples:>8} samples
-        """)
+        """
+        )
 
         return {
-            'delay_breakdown': delay_breakdown,
-            'uploaded_data': uploaded_data,
-            'corrected_upload_decisions': corrected_upload_decisions  # 返回修正后的决策
+            "delay_breakdown": delay_breakdown,
+            "uploaded_data": uploaded_data,
+            "corrected_upload_decisions": corrected_upload_decisions,  # 返回修正后的决策
         }
 
     def _manage_cache_and_data_selection(self):
@@ -232,8 +246,12 @@ class BaselineComparison:
                 # 使用MAB选择器评估数据质量
                 quality_scores = []
                 for batch in vehicle.uploaded_data:
-                    if (isinstance(batch, list) and len(batch) >= 2 and
-                    isinstance(batch[0], torch.Tensor) and batch[0].dim() == 4):
+                    if (
+                        isinstance(batch, list)
+                        and len(batch) >= 2
+                        and isinstance(batch[0], torch.Tensor)
+                        and batch[0].dim() == 4
+                    ):
                         images = batch[0]
 
                         reward = self.mab_selector.calculate_batch_reward(
@@ -247,13 +265,13 @@ class BaselineComparison:
                 )
 
                 cache_updates[vehicle.id] = {
-                    'new_batches': len(vehicle.uploaded_data),
-                    'avg_quality': np.mean(quality_scores) if quality_scores else 0
+                    "new_batches": len(vehicle.uploaded_data),
+                    "avg_quality": np.mean(quality_scores) if quality_scores else 0,
                 }
 
         # 打印缓存统计
         cache_stats = self.cache_manager.get_cache_stats()
-        total_batches = sum([stats['total_size'] for stats in cache_stats.values()])
+        total_batches = sum([stats["total_size"] for stats in cache_stats.values()])
         print(f"缓存管理 - 总批次: {total_batches}")
 
         return cache_updates
@@ -265,21 +283,24 @@ class BaselineComparison:
         global_dataset_size = 0  # 包含多少个样本数
         for vehicle_id in range(Config.NUM_VEHICLES):
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
-            global_data_batches.extend(cache['old_data'])
-            global_data_batches.extend(cache['new_data'])
-            global_dataset_size += (len(cache['old_data']) + len(cache['new_data'])) * Config.BATCH_SIZE
+            global_data_batches.extend(cache["old_data"])
+            global_data_batches.extend(cache["new_data"])
+            global_dataset_size += (
+                len(cache["old_data"]) + len(cache["new_data"])
+            ) * Config.BATCH_SIZE
 
         if not global_data_batches:
             print("警告: 全局数据集为空，跳过训练")
             return {
-                'loss_before': 1.0,
-                'loss_after': 1.0,
-                'training_loss': float('inf'),
-                'global_dataset_size': 0
+                "loss_before": 1.0,
+                "loss_after": 1.0,
+                "training_loss": float("inf"),
+                "global_dataset_size": 0,
             }
 
         # 创建数据加载器
         from torch.utils.data import DataLoader, TensorDataset
+
         # 这里需要将批次数据转换为适合训练的形式
         # 简化实现：假设我们已经有了合适的数据格式
 
@@ -290,20 +311,28 @@ class BaselineComparison:
         # training_loss, epoch_losses = self.continual_learner.train_on_dataset(
         #     global_data_batches, num_epochs=Config.NUM_EPOCH
         # )
-        training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(global_data_batches, num_epochs=Config.NUM_EPOCH)
+        training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
+            global_data_batches, num_epochs=Config.NUM_EPOCH
+        )
 
         # 计算训练后的损失（在上传数据上）
         loss_after = self._compute_loss_on_uploaded_data(self.global_model)
         print(f"实际训练样本数：{global_dataset_size}")
-        print(f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}")
+        print(
+            f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}"
+        )
         # 绘制loss
-        self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name=f"training_loss_session_{session}.png")
+        self.visualize.plot_training_loss(
+            epoch_losses,
+            save_plot=True,
+            plot_name=f"training_loss_session_{session}.png",
+        )
 
         return {
-            'loss_before': loss_before,
-            'loss_after': loss_after,
-            'training_loss': training_loss,
-            'global_dataset_size': global_dataset_size * Config.BATCH_SIZE
+            "loss_before": loss_before,
+            "loss_after": loss_after,
+            "training_loss": training_loss,
+            "global_dataset_size": global_dataset_size * Config.BATCH_SIZE,
         }
 
     def _compute_loss_on_uploaded_data(self, model):
@@ -350,27 +379,29 @@ class BaselineComparison:
                 self.global_model, current_test_data
             )
         else:
-            accuracy, loss = 0.0, float('inf')
+            accuracy, loss = 0.0, float("inf")
 
         # 累积评估（所有已见域）
         cumulative_results = self.data_simulator.evaluate_model(
-            self.global_model, strategy='cumulative'
+            self.global_model, strategy="cumulative"
         )
 
         eval_results = {
-            'current_accuracy': accuracy,
-            'current_loss': loss,
-            'cumulative_results': cumulative_results,
-            'current_domain': current_domain
+            "current_accuracy": accuracy,
+            "current_loss": loss,
+            "cumulative_results": cumulative_results,
+            "current_domain": current_domain,
         }
         print(f"eval_results:{eval_results}")
         return eval_results
 
-    def _calculate_reward_and_optimize(self, state, action, eval_results, comm_results, training_results):
+    def _calculate_reward_and_optimize(
+        self, state, action, eval_results, comm_results, training_results
+    ):
         """根据原始建模重新设计奖励计算函数"""
         # 获取必要的参数
-        total_delay = comm_results['delay_breakdown']['total_delay']
-        global_dataset_size = training_results.get('global_dataset_size', 1)
+        total_delay = comm_results["delay_breakdown"]["total_delay"]
+        global_dataset_size = training_results.get("global_dataset_size", 1)
 
         # 计算损失降幅
         total_loss_reduction = 0
@@ -385,8 +416,8 @@ class BaselineComparison:
                 # 这里需要计算模型在上传数据上的损失变化
                 # 由于我们实际训练前后没有分别记录每个车辆上传数据的损失
                 # 我们使用训练前后的整体损失变化作为近似
-                loss_before = training_results.get('loss_before', 1.0)
-                loss_after = training_results.get('loss_after', 1.0)
+                loss_before = training_results.get("loss_before", 1.0)
+                loss_after = training_results.get("loss_after", 1.0)
                 loss_reduction = loss_before - loss_after
 
                 total_loss_reduction += vehicle_upload_samples * loss_reduction
@@ -403,8 +434,8 @@ class BaselineComparison:
         # 将动作转换为向量形式
         vector = []
         for i in range(Config.NUM_VEHICLES):
-            upload_batches = action['upload_decisions'][i][1]
-            bandwidth_ratio = action['bandwidth_allocations'][i]
+            upload_batches = action["upload_decisions"][i][1]
+            bandwidth_ratio = action["bandwidth_allocations"][i]
             vector.extend([upload_batches, bandwidth_ratio])
         action_vector = np.array(vector, dtype=np.float32)
 
@@ -413,32 +444,45 @@ class BaselineComparison:
         if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
             self.drl_agent.optimize_model()
 
-        print(f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 时延: {total_delay:.2f}s, 奖励: {reward:.4f}")
+        print(
+            f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 时延: {total_delay:.2f}s, 奖励: {reward:.4f}"
+        )
 
         return reward
 
-    def _record_session_results(self, session, eval_results, comm_results, training_results):
+    def _record_session_results(
+        self, session, eval_results, comm_results, training_results
+    ):
         """记录会话结果"""
-        self.results['session_accuracies'].append(eval_results['current_accuracy'])
-        self.results['session_losses'].append(eval_results['current_loss'])
-        self.results['communication_delays'].append(comm_results['delay_breakdown']['total_delay'])
+        self.results["session_accuracies"].append(eval_results["current_accuracy"])
+        self.results["session_losses"].append(eval_results["current_loss"])
+        self.results["communication_delays"].append(
+            comm_results["delay_breakdown"]["total_delay"]
+        )
 
         # 记录域性能
-        current_domain = eval_results['current_domain']
-        self.results['domain_performance'][current_domain].append(
-            eval_results['current_accuracy']
+        current_domain = eval_results["current_domain"]
+        self.results["domain_performance"][current_domain].append(
+            eval_results["current_accuracy"]
         )
 
         # 记录缓存利用率
         cache_stats = self.cache_manager.get_cache_stats()
-        avg_utilization = np.mean([
-            stats['total_size'] / Config.MAX_LOCAL_BATCHES
-            for stats in cache_stats.values()
-        ])
-        self.results['cache_utilization'].append(avg_utilization)
+        avg_utilization = np.mean(
+            [
+                stats["total_size"] / Config.MAX_LOCAL_BATCHES
+                for stats in cache_stats.values()
+            ]
+        )
+        self.results["cache_utilization"].append(avg_utilization)
         # 添加数据异质性可视化
         if session % Config.DOMAIN_CHANGE_INTERVAL == 0:  # 每次域切换时绘制
-            self.visualize.plot_data_heterogeneity(self.data_simulator, session,save_plot=True, plot_name=f"data_distribution_session_{session}.png")
+            self.visualize.plot_data_heterogeneity(
+                self.data_simulator,
+                session,
+                save_plot=True,
+                plot_name=f"data_distribution_session_{session}.png",
+            )
 
     def _broadcast_and_update_models(self):
         """广播和更新模型"""
@@ -453,9 +497,13 @@ class BaselineComparison:
         print("=" * 60)
 
         # 计算总体统计
-        final_accuracy = self.results['session_accuracies'][-1] if self.results['session_accuracies'] else 0
-        avg_accuracy = np.mean(self.results['session_accuracies'])
-        avg_delay = np.mean(self.results['communication_delays'])
+        final_accuracy = (
+            self.results["session_accuracies"][-1]
+            if self.results["session_accuracies"]
+            else 0
+        )
+        avg_accuracy = np.mean(self.results["session_accuracies"])
+        avg_delay = np.mean(self.results["communication_delays"])
 
         print(f"最终准确率: {final_accuracy:.4f}")
         print(f"平均准确率: {avg_accuracy:.4f}")
@@ -464,7 +512,7 @@ class BaselineComparison:
 
         # 打印各域性能
         print("\n各域性能:")
-        for domain, performances in self.results['domain_performance'].items():
+        for domain, performances in self.results["domain_performance"].items():
             if performances:
                 avg_perf = np.mean(performances)
                 print(f"  {domain}: {avg_perf:.4f}")

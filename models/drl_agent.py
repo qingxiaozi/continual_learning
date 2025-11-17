@@ -7,8 +7,10 @@ from collections import deque
 from config.parameters import Config
 from environment.vehicle_env import VehicleEnvironment
 
+
 class DRLNetwork(nn.Module):
     """DRL策略网络 - 输出连续动作"""
+
     def __init__(self, state_dim, action_dim, hidden_dim=Config.DRL_HIDDEN_SIZE):
         super(DRLNetwork, self).__init__()
         self.net = nn.Sequential(
@@ -16,7 +18,7 @@ class DRLNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim)
+            nn.Linear(hidden_dim, action_dim),
         )
 
     def forward(self, x):
@@ -25,8 +27,9 @@ class DRLNetwork(nn.Module):
 
 class ReplayBuffer:
     """经验回放缓冲区"""
-    def __init__(self, capacity= Config.DRL_BUFFER_SIZE):
-        self.buffer = deque(maxlen = capacity)
+
+    def __init__(self, capacity=Config.DRL_BUFFER_SIZE):
+        self.buffer = deque(maxlen=capacity)
 
     def push(self, state, action, reward, next_state, done):
         experience = (state, action, reward, next_state, done)
@@ -34,7 +37,7 @@ class ReplayBuffer:
 
     def sample(self, batch_size):
         batch = random.sample(self.buffer, batch_size)
-        state, action, reward, next_state, done = map(np.stack,zip(*batch))
+        state, action, reward, next_state, done = map(np.stack, zip(*batch))
         return state, action, reward, next_state, done
 
     def __len__(self):
@@ -43,6 +46,7 @@ class ReplayBuffer:
 
 class DRLAgent:
     """深度强化学习策略"""
+
     def __init__(self, state_dim, action_dim):
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -52,8 +56,7 @@ class DRLAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         # 优化器
         self.optimizer = optim.Adam(
-            self.policy_net.parameters(),
-            lr = Config.DRL_LEARNING_RATE
+            self.policy_net.parameters(), lr=Config.DRL_LEARNING_RATE
         )
         # 经验回放
         self.memory = ReplayBuffer()
@@ -84,10 +87,13 @@ class DRLAgent:
         for i in range(num_vehicles):
             # 数据标注量决策 (0到MAX_UPLOAD_BATCHES)
             upload_action = raw_action[i * 2] if i * 2 < len(raw_action) else 0
-            upload_batches = int(np.clip(
-                (upload_action + 1) * Config.MAX_UPLOAD_BATCHES / 2,
-                0, Config.MAX_UPLOAD_BATCHES
-            ))
+            upload_batches = int(
+                np.clip(
+                    (upload_action + 1) * Config.MAX_UPLOAD_BATCHES / 2,
+                    0,
+                    Config.MAX_UPLOAD_BATCHES,
+                )
+            )
             # 带宽分配决策 (0到1)
             bw_action = raw_action[i * 2 + 1] if i * 2 + 1 < len(raw_action) else 0
             bandwidth_ratio = 1 / (1 + np.exp(-bw_action))  # Sigmoid
@@ -108,7 +114,9 @@ class DRLAgent:
             return
 
         # 从回放缓冲区采样
-        states, actions, rewards, next_states, dones = self.memory.sample(self.batch_size)
+        states, actions, rewards, next_states, dones = self.memory.sample(
+            self.batch_size
+        )
 
         # 转换为张量
         states = torch.FloatTensor(states)
@@ -118,8 +126,9 @@ class DRLAgent:
         dones = torch.BoolTensor(dones)
 
         # 计算当前Q值
-        current_q_values = self.policy_net(states).gather(1,
-            actions.long().unsqueeze(1)).squeeze(1)
+        current_q_values = (
+            self.policy_net(states).gather(1, actions.long().unsqueeze(1)).squeeze(1)
+        )
 
         # 计算目标Q值
         with torch.no_grad():
@@ -141,18 +150,21 @@ class DRLAgent:
 
     def save_model(self, path):
         """保存模型"""
-        torch.save({
-            'policy_net_state_dict': self.policy_net.state_dict(),
-            'target_net_state_dict': self.target_net.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-        }, path)
+        torch.save(
+            {
+                "policy_net_state_dict": self.policy_net.state_dict(),
+                "target_net_state_dict": self.target_net.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+            },
+            path,
+        )
 
     def load_model(self, path):
         """加载模型"""
         checkpoint = torch.load(path)
-        self.policy_net.load_state_dict(checkpoint['policy_net_state_dict'])
-        self.target_net.load_state_dict(checkpoint['target_net_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
+        self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
 
 if __name__ == "__main__":

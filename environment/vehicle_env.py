@@ -29,7 +29,7 @@ class Vehicle:
 
         self.quality_scores_history = []  # 数据质量评分
         self.confidence_history = []  # 历史置信度记录
-        self.test_loss_history = [] # 测试损失记录
+        self.test_loss_history = []  # 测试损失记录
 
     def set_bs_connection(self, bs_id):
         self.bs_connection = bs_id
@@ -123,9 +123,11 @@ class Vehicle:
     def update_quality_scores(self, cache_manager):
         """从缓存管理器更新质量评分"""
         cache = cache_manager.get_vehicle_cache(self.id)
-        if cache and 'quality_scores' in cache and cache['quality_scores']:
+        if cache and "quality_scores" in cache and cache["quality_scores"]:
             # 使用最新的质量评分
-            recent_scores = cache['quality_scores'][-min(Config.MAX_LOCAL_BATCHES, len(cache['quality_scores'])):]
+            recent_scores = cache["quality_scores"][
+                -min(Config.MAX_LOCAL_BATCHES, len(cache["quality_scores"])) :
+            ]
             quality_score = np.mean(recent_scores)
             self.quality_scores_history.append(quality_score)
             return quality_score
@@ -384,7 +386,9 @@ class VehicleEnvironment:
 
                 # 2. 获取测试损失 - 从实际模型评估中获取
                 if vehicle.uploaded_data:
-                    test_loss = vehicle.calculate_test_loss(self.global_model, self.gold_model)
+                    test_loss = vehicle.calculate_test_loss(
+                        self.global_model, self.gold_model
+                    )
                     vehicle.test_loss_history.append(test_loss)
                 else:
                     test_loss = 1.0
@@ -409,7 +413,6 @@ class VehicleEnvironment:
             state = state[:expected_length]
 
         return np.array(state, dtype=np.float32)
-
 
     def _update_vehicle_connection(self, vehicle, old_bs_id, new_bs):
         """

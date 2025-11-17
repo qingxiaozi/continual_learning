@@ -22,7 +22,9 @@ class GoldModel:
             self.load_model()
             print(f"加载已训练的黄金模型: {self.model_path}")
         else:
-            print(f"未找到预训练黄金模型，需要先进行微调,运行fine_tune(train_dataset, val_dataset)函数即可")
+            print(
+                f"未找到预训练黄金模型，需要先进行微调,运行fine_tune(train_dataset, val_dataset)函数即可"
+            )
 
     # 添加 eval方法
     def eval(self):
