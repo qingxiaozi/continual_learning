@@ -78,12 +78,14 @@ class BaselineComparison:
             self._update_session_environment(session)
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
-            print(f"当前环境状态 state 为:{state}")
+            print(f"当前环境状态 state 为:\n{state}")
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
-            print(f"action:{action}")
+            print(f"智能体的 action 为:\n{action}")
+            # 步骤4：收集全局信息，用于时延计算
+            global_info = self._collect_global_training_info()
             # 步骤4: 执行通信和数据收集
-            communication_results = self._execute_communication(action, session)
+            communication_results = self._execute_communication(action, session, global_info['total_samples'])
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
             # 步骤6: 模型训练和更新
@@ -155,7 +157,22 @@ class BaselineComparison:
             'bandwidth_allocations': bandwidth_allocations
         }
 
-    def _execute_communication(self, action, session):
+    def _collect_global_training_info(self):
+        """收集全局训练信息，用于时延计算"""
+        total_samples = 0
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
+            vehicle_batches = len(cache['old_data']) + len(cache['new_data'])
+            total_samples += vehicle_batches * Config.BATCH_SIZE
+        print(f"调试信息：")
+        print(f"""  'total_samples': {total_samples},  'total_batches': {total_samples // Config.BATCH_SIZE}""")
+
+        return {
+            'total_samples': total_samples,
+            'total_batches': total_samples // Config.BATCH_SIZE
+        }
+
+    def _execute_communication(self, action, session, total_samples=0):
         """执行通信和数据收集"""
         upload_decisions = action['upload_decisions']
         bandwidth_allocations = action['bandwidth_allocations']
@@ -187,7 +204,7 @@ class BaselineComparison:
 
         # 使用修正后的upload_decisions计算通信时延
         delay_breakdown = self.communication_system.calculate_total_training_delay(
-            corrected_upload_decisions, bandwidth_allocations, session, Config.NUM_VEHICLES
+            corrected_upload_decisions, bandwidth_allocations, session, total_samples
         )
 
         print(f"""
@@ -197,6 +214,7 @@ class BaselineComparison:
         ├─ 训练时延: {delay_breakdown['retraining_delay']:>8.2f} s
         ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
         ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
+        训练样本数：  {total_samples:>8} samples
         """)
 
         return {
@@ -244,12 +262,12 @@ class BaselineComparison:
         """训练和更新全局模型"""
         # 收集所有缓存数据构建全局数据集
         global_data_batches = []
-        global_dataset_size = 0
+        global_dataset_size = 0  # 包含多少个样本数
         for vehicle_id in range(Config.NUM_VEHICLES):
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
             global_data_batches.extend(cache['old_data'])
             global_data_batches.extend(cache['new_data'])
-            global_dataset_size += len(cache['old_data']) + len(cache['new_data'])
+            global_dataset_size += (len(cache['old_data']) + len(cache['new_data'])) * Config.BATCH_SIZE
 
         if not global_data_batches:
             print("警告: 全局数据集为空，跳过训练")
@@ -257,7 +275,6 @@ class BaselineComparison:
                 'loss_before': 1.0,
                 'loss_after': 1.0,
                 'training_loss': float('inf'),
-                'samples': 0,
                 'global_dataset_size': 0
             }
 
@@ -277,7 +294,7 @@ class BaselineComparison:
 
         # 计算训练后的损失（在上传数据上）
         loss_after = self._compute_loss_on_uploaded_data(self.global_model)
-
+        print(f"实际训练样本数：{global_dataset_size}")
         print(f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}")
         # 绘制loss
         self.visualize.plot_training_loss(epoch_losses, save_plot = True, plot_name=f"training_loss_session_{session}.png")
@@ -286,8 +303,7 @@ class BaselineComparison:
             'loss_before': loss_before,
             'loss_after': loss_after,
             'training_loss': training_loss,
-            'samples': len(global_data_batches),
-            'global_dataset_size': global_dataset_size * Config.SAMPLES_OF_BATCH
+            'global_dataset_size': global_dataset_size * Config.BATCH_SIZE
         }
 
     def _compute_loss_on_uploaded_data(self, model):
@@ -363,7 +379,7 @@ class BaselineComparison:
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.uploaded_data:
                 # 计算该车辆上传的样本数
-                vehicle_upload_samples = len(vehicle.uploaded_data) * Config.SAMPLES_OF_BATCH
+                vehicle_upload_samples = len(vehicle.uploaded_data) * Config.BATCH_SIZE
                 total_upload_samples += vehicle_upload_samples
 
                 # 这里需要计算模型在上传数据上的损失变化

@@ -85,7 +85,7 @@ xx.gz是上述文件的压缩版本
 数据集：
 |数据集|域|类别数|类别|样本数|图像大小|通道数|说明|
 |------|------|------|------|------|------|------|------|
-|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2871；dslr:498；webcam:795|图像大小|通道数|说明|
+|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795|图像大小|通道数|说明|
 |digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|样本数|图像大小|通道数|数字识别|
 |DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|样本数|图像大小|通道数|说明|
 <br>
@@ -109,9 +109,9 @@ xx.gz是上述文件的压缩版本
 
 
 ####  接下来要做的
-1. 根据mab进行数据质量评分，估计需要修改逻辑架构 50%
-2. 修改通信相关参数，检查通信时延计算是否有误 2days，全局模型训练计算时间有误，是按照每辆车最大缓存批次数进行计算的，待改
-3. 修改模型训练，划分出验证集 2days
+1. 根据mab进行数据质量评分，估计需要修改逻辑架构 90%，待检查
+2. 修改通信相关参数，检查通信时延计算是否有误 2days，主程序中通信时延计算次序待改
+3. 修改模型训练，划分出验证集 2days，模型训练的时候，loss为0，需要早停
 4. 遗忘指标计算 1day
 5. 修改main.py，进行基线对比实验 10days
 6. 消融实验 5days

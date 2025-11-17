@@ -32,7 +32,7 @@ class CommunicationSystem:
         # 数据参数
         self.sample_size = Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 32  # b0，单个样本的大小（bits），1
         self.samples_of_per_batch = (
-            Config.SAMPLES_OF_BATCH
+            Config.BATCH_SIZE
         )  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
@@ -42,12 +42,9 @@ class CommunicationSystem:
 
         # 训练参数
         self.training_epochs = Config.NUM_EPOCH  # E，训练轮次
-        self.cache_samples_per_vehicle = (
-            Config.MAX_LOCAL_BATCHES * Config.SAMPLES_OF_BATCH
-        )  # |D_v|，每车缓存样本数
 
         # 模型参数
-        self.model_parameter_size = 3.578e8   # P_m，模型参数量的大小（bit），1
+        self.model_parameter_size = 3.578e8   # P_m，模型参数量的大小（bit），resnet18
 
         # 缓存阴影衰落值，避免重复计算
         self._shadowing_cache = {}
@@ -214,21 +211,19 @@ class CommunicationSystem:
 
         return labeling_delay
 
-    def calculate_retraining_delay(self, num_vehicles):
+    def calculate_retraining_delay(self, total_samples):
         """
         计算模型重训练时延 t_retrain
         公式: t_retrain = (E * |D_v| * |V| * c_global) / C
         参数:
-            num_vehicles: 车辆数量 |V|
+            total_samples: 所有车辆缓存数据样本量 |D_v| * |V|
         返回:
             float: 模型重训练时延 (秒)
         """
-        # 计算总训练样本数
-        total_samples = self.cache_samples_per_vehicle * num_vehicles
-        # 计算单轮训练的计算需求
-        computation_per_epoch = total_samples * self.global_model_computation
+        if total_samples <= 0:
+            return 0.0
         # 计算总计算需求
-        total_computation = self.training_epochs * computation_per_epoch
+        total_computation = self.training_epochs * total_samples * self.global_model_computation
         # 计算重训练时延
         retraining_delay = total_computation / self.edge_server_computation
 
@@ -253,7 +248,7 @@ class CommunicationSystem:
         return broadcast_delay
 
     def calculate_total_training_delay(
-        self, upload_decisions, bandwidth_allocations, session_id, num_vehicles
+        self, upload_decisions, bandwidth_allocations, session_id, total_samples
     ):
         """
         计算训练阶段总时延 T_s
@@ -264,7 +259,7 @@ class CommunicationSystem:
             upload_decisions: 上传决策列表，每个元素为 (vehicle_id, upload_batches)
             bandwidth_allocations: 带宽分配字典
             session_id: 训练会话ID
-            num_vehicles: 车辆数量
+            total_samples: 实际训练样本总数
 
         返回:
             dict: 包含各项时延和总时延的字典
@@ -274,7 +269,7 @@ class CommunicationSystem:
             upload_decisions, bandwidth_allocations, session_id
         )
         t_label = self.calculate_labeling_delay(upload_decisions)
-        t_retrain = self.calculate_retraining_delay(num_vehicles)
+        t_retrain = self.calculate_retraining_delay(total_samples)
         t_broadcast = self.calculate_broadcast_delay(session_id)
 
         # 计算总时延
@@ -416,10 +411,10 @@ if __name__ == "__main__":
     bandwidth_allocations = {
         vehicle.id: bandwidth_per_vehicle for vehicle in vehicle_env.vehicles
     }
-
+    total_samples = 20 * 3 * 32
     # 计算总时延
     delay_breakdown = comm_system.calculate_total_training_delay(
-        upload_decisions, bandwidth_allocations, session_id, num_vehicles
+        upload_decisions, bandwidth_allocations, session_id, total_samples
     )
 
     # 输出结果

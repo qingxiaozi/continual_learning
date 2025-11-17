@@ -4,8 +4,8 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 2  # train session
-    NUM_EPOCH = 6  # 训练epoch数
+    NUM_TRAINING_SESSIONS = 3  # train session
+    NUM_EPOCH = 2  # 训练epoch数
     BATCH_SIZE = 32  # batch size
     INIT_EPOCHS = 2  # MAB初始探索轮次
 
@@ -41,7 +41,6 @@ class Config:
     MIN_CACHE_SIZE = 100  # 边缘服务器的最小缓存批次
     MAX_UPLOAD_BATCHES = 5  # 单阶段最大上传批次
     MAX_LOCAL_BATCHES = 5  # 单个智能车最大缓存批次
-    SAMPLES_OF_BATCH = 32  # 每个batch中的样本数
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
