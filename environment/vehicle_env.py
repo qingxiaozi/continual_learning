@@ -1,8 +1,6 @@
 import numpy as np
 import torch
 from config.parameters import Config
-from environment.dataSimu_env import DomainIncrementalDataSimulator
-from learning.cache_manager import CacheManager
 import random
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -199,7 +197,7 @@ class VehicleEnvironment:
                 "utilization": 0.0,  # 利用率
             }
             self.base_stations.append(base_station)
-            print(f"基站 {i} 创建于位置 {bs_position}")
+            # print(f"基站 {i} 创建于位置 {bs_position}")
 
     def _initialize_vehicles(self):
         print(f"初始化 {Config.NUM_VEHICLES}辆智能车辆")
@@ -211,7 +209,7 @@ class VehicleEnvironment:
                 position=position,
             )
             self.vehicles.append(vehicle)
-            print(f"车辆 {i} 创建于位置 {position}")
+            # print(f"车辆 {i} 创建于位置 {position}")
 
     def _generate_vehicle_position(self, vehicle_id):
         """
@@ -500,58 +498,6 @@ class VehicleEnvironment:
         # 重新初始化
         self._initialize_environment()
         print("环境重置完成")
-
-    # def update_session(self, session_id):
-    #     "更新训练会话"
-    #     self.current_session = session_id
-    #     # 更新车辆位置，此处的time_delta需要计算，待定
-    #     self.update_vehicle_positions(time_delta=1)
-    #     # 更新数据模拟器
-    #     self.data_simulator.update_session(session_id)
-    #     # 为车辆生成新数据
-    #     self._refresh_vehicle_data()
-    #     print("*****************************")
-    #     print(f"*    Session {session_id} 更新完成     *")
-    #     print("*****************************")
-
-    #     # 每辆车执行推理
-    #     for vec in self.vehicles:
-    #         print(sys)
-    #         from models.global_model import globalModel
-    #         model = globalModel("office31")
-    #         from models.gold_model import GoldModel
-    #         goldModel = GoldModel("office31")
-    #         acc = vec.get_inference_confidence(model)
-    #         print(f"acc:{acc}")
-    #         loss = vec.calculate_test_loss(model, goldModel)
-    #         print(f"loss:{loss}")
-    #         cache_manager = cacheManager()
-    #         quality_scores = vec.update_quality_scores(cache_manager)
-    #         print(f"quality_scores:{quality_scores}")
-    #         exit()
-
-    # def _refresh_vehicle_data(self):
-    #     """为所有车辆刷新数据"""
-    #     for vehicle in self.vehicles:
-    #         # 生成新的数据批次
-    #         new_data = self.data_simulator.generate_vehicle_data(vehicle.id)
-
-    #         # 更新车辆数据
-    #         vehicle.data_batches = new_data
-
-    #         # 更新数据统计
-    #         if new_data:
-    #             total_samples = 0
-    #             for loader in new_data:
-    #                 if hasattr(loader, "dataset"):
-    #                     total_samples += len(loader.dataset)
-
-    #             vehicle.data_statistics = {
-    #                 "total_samples": total_samples,
-    #                 "num_batches": len(new_data),
-    #                 "current_domain": self.data_simulator.get_current_domain(),
-    #             }
-
 
 # 使用示例
 from matplotlib.patches import Rectangle

@@ -63,8 +63,6 @@ class CommunicationSystem:
         if vehicle is None or base_station is None:
             return 0.0
         # 计算距离
-        print(f"vehicle的位置为{vehicle.position}")
-        print(f"基站的位置为{base_station['position']}")
         distance = np.linalg.norm(vehicle.position - base_station["position"])
         # 避免除零
         distance = max(distance, 1.0)
@@ -79,10 +77,8 @@ class CommunicationSystem:
         else:
             shadowing_db = np.random.normal(0, self.shadowing_std)
             self._shadowing_cache[shadowing_key] = shadowing_db
-
         # 转换为线性值
         shadowing_linear = 10 ** (shadowing_db / 10)
-        print(shadowing_linear)
 
         return path_loss_component * shadowing_linear
 
