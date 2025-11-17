@@ -80,14 +80,12 @@ class BaselineComparison:
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
             print(f"智能体的 action 为:\n{action}")
-            # 步骤4：收集全局信息，用于时延计算
-            global_info = self._collect_global_training_info()
             # 步骤4: 执行通信和数据收集
-            communication_results = self._execute_communication(
-                action, session, global_info["total_samples"]
-            )
+            upload_results = self._execute_communication(action, session)
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
+            # 步骤6：计算通信时延
+            communication_results = self._calculate_communication_delay(action, session, upload_results['corrected_upload_decisions'])
             # 步骤6: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
             # 步骤7: 性能评估
@@ -161,24 +159,7 @@ class BaselineComparison:
             "bandwidth_allocations": bandwidth_allocations,
         }
 
-    def _collect_global_training_info(self):
-        """收集全局训练信息，用于时延计算"""
-        total_samples = 0
-        for vehicle_id in range(Config.NUM_VEHICLES):
-            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
-            vehicle_batches = len(cache["old_data"]) + len(cache["new_data"])
-            total_samples += vehicle_batches * Config.BATCH_SIZE
-        print(f"调试信息：")
-        print(
-            f"""  'total_samples': {total_samples},  'total_batches': {total_samples // Config.BATCH_SIZE}"""
-        )
-
-        return {
-            "total_samples": total_samples,
-            "total_batches": total_samples // Config.BATCH_SIZE,
-        }
-
-    def _execute_communication(self, action, session, total_samples=0):
+    def _execute_communication(self, action, session):
         """执行通信和数据收集"""
         upload_decisions = action["upload_decisions"]
         bandwidth_allocations = action["bandwidth_allocations"]
@@ -211,28 +192,9 @@ class BaselineComparison:
                             f"实际上传 {actual_upload_batches} 批次"
                         )
 
-            # 添加到修正后的决策列表
             corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
 
-        # 使用修正后的upload_decisions计算通信时延
-        delay_breakdown = self.communication_system.calculate_total_training_delay(
-            corrected_upload_decisions, bandwidth_allocations, session, total_samples
-        )
-
-        print(
-            f"""
-        通信时延详情:
-        ├─ 传输时延: {delay_breakdown['transmission_delay']:>8.2f} s
-        ├─ 标注时延: {delay_breakdown['labeling_delay']:>8.2f} s
-        ├─ 训练时延: {delay_breakdown['retraining_delay']:>8.2f} s
-        ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
-        ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
-        训练样本数：  {total_samples:>8} samples
-        """
-        )
-
         return {
-            "delay_breakdown": delay_breakdown,
             "uploaded_data": uploaded_data,
             "corrected_upload_decisions": corrected_upload_decisions,  # 返回修正后的决策
         }
@@ -272,9 +234,42 @@ class BaselineComparison:
         # 打印缓存统计
         cache_stats = self.cache_manager.get_cache_stats()
         total_batches = sum([stats["total_size"] for stats in cache_stats.values()])
-        print(f"缓存管理 - 总批次: {total_batches}")
+        print(f"缓存管理 - 当前缓存总批次: {total_batches}")
 
         return cache_updates
+
+    def _calculate_communication_delay(self, action, session, corrected_upload_decisions):
+        """计算通信时延 - 在数据更新后调用"""
+        bandwidth_allocations = action["bandwidth_allocations"]
+
+        global_data_batches = []
+        total_samples = 0  # 包含多少个样本数
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
+            total_samples += (
+                len(cache["old_data"]) + len(cache["new_data"])
+            ) * Config.BATCH_SIZE
+
+        # 使用修正后的upload_decisions计算通信时延
+        delay_breakdown = self.communication_system.calculate_total_training_delay(
+            corrected_upload_decisions, bandwidth_allocations, session, total_samples
+        )
+
+        print(
+            f"""
+        通信时延详情:
+        ├─ 传输时延: {delay_breakdown['transmission_delay']:>8.2f} s
+        ├─ 标注时延: {delay_breakdown['labeling_delay']:>8.2f} s
+        ├─ 训练时延: {delay_breakdown['retraining_delay']:>8.2f} s
+        ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
+        ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
+        训练样本数：{total_samples} samples
+        """
+        )
+        return {
+            "total_delay": delay_breakdown['total_delay'],
+            "total_samples": total_samples,
+        }
 
     def _train_and_update_global_model(self, session):
         """训练和更新全局模型"""
@@ -400,7 +395,7 @@ class BaselineComparison:
     ):
         """根据原始建模重新设计奖励计算函数"""
         # 获取必要的参数
-        total_delay = comm_results["delay_breakdown"]["total_delay"]
+        total_delay = comm_results["total_delay"]
         global_dataset_size = training_results.get("global_dataset_size", 1)
 
         # 计算损失降幅
@@ -456,9 +451,7 @@ class BaselineComparison:
         """记录会话结果"""
         self.results["session_accuracies"].append(eval_results["current_accuracy"])
         self.results["session_losses"].append(eval_results["current_loss"])
-        self.results["communication_delays"].append(
-            comm_results["delay_breakdown"]["total_delay"]
-        )
+        self.results["communication_delays"].append(comm_results["total_delay"])
 
         # 记录域性能
         current_domain = eval_results["current_domain"]
