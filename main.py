@@ -78,21 +78,22 @@ class BaselineComparison:
             self._update_session_environment(session)
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
-            print(f"当前环境状态 state 为:\n{state}")
+            # print(f"当前环境状态 state 为:\n{state}")
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
-            print(f"智能体的 action 为:\n{action}")
+            # print(f"智能体的 action 为:\n{action}")
             # 步骤4: 执行通信和数据收集
             upload_results = self._execute_communication(action, session)
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
+            # print(f"调试信息：车辆数据上传后缓存信息为{cache_updates}")
             # 步骤6：计算通信时延
             communication_results = self._calculate_communication_delay(action, session, upload_results['corrected_upload_decisions'])
-            # 步骤6: 模型训练和更新
+            # 步骤7: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
-            # 步骤7: 性能评估
+            # 步骤8: 性能评估
             evaluation_results = self._evaluate_model_performance(session)
-            # 步骤8: 计算奖励和优化
+            # 步骤9: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
                 state,
                 action,
@@ -100,11 +101,11 @@ class BaselineComparison:
                 communication_results,
                 training_results,
             )
-            # 步骤9: 记录结果
+            # 步骤10: 记录结果
             self._record_session_results(
                 session, evaluation_results, communication_results, training_results
             )
-            # 步骤10: 模型广播和更新
+            # 步骤11: 模型广播和更新
             self._broadcast_and_update_models()
 
             print(
@@ -241,19 +242,19 @@ class BaselineComparison:
             if vehicle.uploaded_data:
                 # 使用MAB选择器评估数据质量
                 quality_scores = []
-                for batch in vehicle.uploaded_data:
-                    if (
-                        isinstance(batch, list)
-                        and len(batch) >= 2
-                        and isinstance(batch[0], torch.Tensor)
-                        and batch[0].dim() == 4
-                    ):
-                        images = batch[0]
+                # for batch in vehicle.uploaded_data:
+                #     if (
+                #         isinstance(batch, list)
+                #         and len(batch) >= 2
+                #         and isinstance(batch[0], torch.Tensor)
+                #         and batch[0].dim() == 4
+                #     ):
+                #         images = batch[0]
 
-                        reward = self.mab_selector.calculate_batch_reward(
-                            self.global_model, [images], torch.nn.CrossEntropyLoss()
-                        )
-                        quality_scores.append(reward)
+                #         reward = self.mab_selector.calculate_batch_reward(
+                #             self.global_model, [images], torch.nn.CrossEntropyLoss()
+                #         )
+                #         quality_scores.append(reward)
 
                 # 更新缓存
                 self.cache_manager.update_cache(
@@ -309,10 +310,31 @@ class BaselineComparison:
         # 收集所有缓存数据构建全局数据集
         global_data_batches = []
         global_dataset_size = 0  # 包含多少个样本数
+        batch_mapping = {}  # 记录全局批次索引到车辆缓存的映射
+        batch_counter = 0
+
         for vehicle_id in range(Config.NUM_VEHICLES):
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
-            global_data_batches.extend(cache["old_data"])
-            global_data_batches.extend(cache["new_data"])
+
+            # 记录旧数据的映射
+            for batch_idx, batch in enumerate(cache["old_data"]):
+                global_data_batches.append(batch)
+                batch_mapping[batch_counter] = {
+                    'vehicle_id': vehicle_id,
+                    'data_type': 'old',
+                    'local_batch_idx': batch_idx
+                }
+                batch_counter += 1
+
+            # 记录新数据的映射
+            for batch_idx, batch in enumerate(cache["new_data"]):
+                global_data_batches.append(batch)
+                batch_mapping[batch_counter] = {
+                    'vehicle_id': vehicle_id,
+                    'data_type': 'new',
+                    'local_batch_idx': batch_idx
+                }
+                batch_counter += 1
             global_dataset_size += (
                 len(cache["old_data"]) + len(cache["new_data"])
             ) * Config.BATCH_SIZE
@@ -326,30 +348,16 @@ class BaselineComparison:
                 "global_dataset_size": 0,
             }
 
-        # 创建数据加载器
         from torch.utils.data import DataLoader, TensorDataset
-
-        # 这里需要将批次数据转换为适合训练的形式
-        # 简化实现：假设我们已经有了合适的数据格式
-
-        # 计算训练前的损失（在上传数据上）
         loss_before = self._compute_loss_on_uploaded_data(self.global_model)
-
-        # # 训练全局模型
-        # training_loss, epoch_losses = self.continual_learner.train_on_dataset(
-        #     global_data_batches, num_epochs=Config.NUM_EPOCH
-        # )
         training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
             global_data_batches, num_epochs=Config.NUM_EPOCH
         )
-
-        # 计算训练后的损失（在上传数据上）
         loss_after = self._compute_loss_on_uploaded_data(self.global_model)
-        print(f"实际训练样本数：{global_dataset_size}")
-        print(
-            f"模型训练 - 新上传数据在模型训练前的损失: {loss_before:.4f}, 新上传数据在模型训练后的损失: {loss_after:.4f}, 模型训练过程中的损失: {training_loss:.4f}"
-        )
-        # 绘制loss
+
+        # 训练完成后，根据MAB统计信息更新缓存质量评分
+        self._update_cache_with_mab_scores(batch_mapping)
+
         self.visualize.plot_training_loss(
             epoch_losses,
             save_plot=True,
@@ -362,6 +370,67 @@ class BaselineComparison:
             "training_loss": training_loss,
             "global_dataset_size": global_dataset_size * Config.BATCH_SIZE,
         }
+
+    def _update_cache_with_mab_scores(self, batch_mapping):
+        """根据MAB统计信息更新缓存质量评分"""
+        quality_scores = self.continual_learner.mab_selector.get_batch_quality_scores()
+        # 按车辆分组质量评分
+        vehicle_scores = {}
+        for global_batch_idx, quality_score in enumerate(quality_scores):
+            if global_batch_idx in batch_mapping:
+                mapping = batch_mapping[global_batch_idx]
+                vehicle_id = mapping['vehicle_id']
+                data_type = mapping['data_type']
+                if vehicle_id not in vehicle_scores:
+                    vehicle_scores[vehicle_id] = {'old': [], 'new': []}
+                vehicle_scores[vehicle_id][data_type].append({
+                'local_batch_idx': mapping['local_batch_idx'],
+                'quality_score': quality_score
+            })
+        # 更新每个车辆缓存的质量评分
+        for vehicle_id, scores_by_type in vehicle_scores.items():
+            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
+
+            # 合并所有质量评分，按原始顺序存储
+            all_quality_scores = []
+
+            # 处理旧数据质量评分（按原始顺序）
+            old_scores_info = scores_by_type['old']
+            if old_scores_info:
+                old_scores_info.sort(key=lambda x: x['local_batch_idx'])
+                old_quality_scores = [info['quality_score'] for info in old_scores_info]
+                all_quality_scores.extend(old_quality_scores)
+
+            # 处理新数据质量评分（按原始顺序）
+            new_scores_info = scores_by_type['new']
+            if new_scores_info:
+                new_scores_info.sort(key=lambda x: x['local_batch_idx'])
+                new_quality_scores = [info['quality_score'] for info in new_scores_info]
+                all_quality_scores.extend(new_quality_scores)
+
+            # # 调试信息：新数据批次对应关系
+            # old_data_formatted = [(info['local_batch_idx'], f"{info['quality_score']:.3f}") for info in old_scores_info]
+            # new_data_formatted = [(info['local_batch_idx'], f"{info['quality_score']:.3f}") for info in new_scores_info]
+            # print(f"车辆{vehicle_id}-旧数据: {old_data_formatted}")
+            # print(f"车辆{vehicle_id}-新数据: {new_data_formatted}")
+
+
+            # 验证并更新缓存
+            total_expected_batches = len(cache["old_data"]) + len(cache["new_data"])
+            if len(all_quality_scores) == total_expected_batches:
+                cache["quality_scores"] = all_quality_scores
+            else:
+                print(f"警告: 车辆 {vehicle_id} 质量评分数量不匹配 - "
+                    f"预期: {total_expected_batches}, 实际: {len(all_quality_scores)}")
+
+            # 统计信息
+            total_batches = len(old_scores_info) + len(new_scores_info)
+            all_scores = [info['quality_score'] for info in old_scores_info + new_scores_info]
+
+            print(f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
+                f"平均质量 {np.mean(all_scores):.4f}")
+
+        print(f"缓存更新后车辆的缓存信息为: {self.cache_manager.get_cache_stats()}")
 
     def _compute_loss_on_uploaded_data(self, model):
         """计算模型在上传数据上的损失"""

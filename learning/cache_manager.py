@@ -11,7 +11,12 @@ class CacheManager:
 
     def initialize_vehicle_cache(self, vehicle_id):
         """初始化车辆缓存"""
-        self.caches[vehicle_id] = {"old_data": [], "new_data": [], "quality_scores": []}
+        self.caches[vehicle_id] = {
+            "old_data": [],
+            "new_data": [],
+            "quality_scores": [],
+            "batch_mapping": []  # 记录批次在全局数据集中的索引
+            }
 
     def update_cache(self, vehicle_id, new_data_batches, quality_scores=None):
         """更新车辆缓存"""
@@ -33,6 +38,30 @@ class CacheManager:
         # 维护缓存大小
         self._maintain_cache_size(vehicle_id)
 
+    def update_quality_scores(self, vehicle_id, quality_scores):
+        """更新车辆缓存的质量评分"""
+        if vehicle_id in self.caches:
+            cache = self.caches[vehicle_id]
+            # 确保质量评分数量与旧数据批次数量匹配
+            if len(quality_scores) == len(cache["old_data"]):
+                cache["quality_scores"] = quality_scores
+            else:
+                print(f"警告: 车辆 {vehicle_id} 质量评分数量不匹配")
+                # 如果数量不匹配，只更新前min(len, len)个
+                min_len = min(len(quality_scores), len(cache["old_data"]))
+                cache["quality_scores"] = quality_scores[:min_len]
+
+    def set_batch_mapping(self, vehicle_id, batch_mapping):
+        """设置批次映射关系"""
+        if vehicle_id in self.caches:
+            self.caches[vehicle_id]["batch_mapping"] = batch_mapping
+
+    def get_batch_mapping(self, vehicle_id):
+        """获取批次映射关系"""
+        if vehicle_id in self.caches:
+            return self.caches[vehicle_id].get("batch_mapping", [])
+        return []
+
     def _maintain_cache_size(self, vehicle_id):
         """维护缓存大小"""
         cache = self.caches[vehicle_id]
@@ -47,14 +76,26 @@ class CacheManager:
                 for idx in sorted(quality_indices, reverse=True):
                     if idx < len(cache["old_data"]):
                         cache["old_data"].pop(idx)
+                        cache["quality_scores"].pop(idx)
             else:
                 # 随机移除
                 remove_count = min(excess, len(cache["old_data"]))
                 cache["old_data"] = cache["old_data"][remove_count:]
+                # 同时移除对应的质量评分
+                if cache["quality_scores"]:
+                    cache["quality_scores"] = cache["quality_scores"][remove_count:]
+
+            print(f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
+              f"剩余 {len(cache['old_data'])} 个批次, {len(cache['quality_scores'])} 个质量评分")
 
     def get_vehicle_cache(self, vehicle_id):
         """获取车辆缓存"""
-        return self.caches.get(vehicle_id, {"old_data": [], "new_data": []})
+        return self.caches.get(vehicle_id, {
+            "old_data": [],
+            "new_data": [],
+            "quality_scores": [],
+            "batch_mapping": []
+        })
 
     def promote_new_to_old(self, vehicle_id):
         """将新数据提升为旧数据"""
@@ -74,5 +115,6 @@ class CacheManager:
                 "old_data_size": len(cache["old_data"]),
                 "new_data_size": len(cache["new_data"]),
                 "total_size": len(cache["old_data"]) + len(cache["new_data"]),
+                "quality_scores": cache["quality_scores"]
             }
         return stats
