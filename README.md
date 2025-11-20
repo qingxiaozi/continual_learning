@@ -107,26 +107,26 @@ _final_evaluation_and_summary()
 
 ```
 
-## data
-### ./mnist/MNIST/raw
+### data
+#### ./mnist/MNIST/raw
 - train-images-idx3-ubyte: 训练集图像数据
 - train-labels-idx1-ubyte: 训练集标签数据
 - t10k-images-idx3-ubyte: 测试集图像数据（t10k代表10000个测试样本）
 - t10k-labels-idx1-ubyte: 测试集标签数据
 xx.gz是上述文件的压缩版本
-### ./emnist/EMNIST/raw
+#### ./emnist/EMNIST/raw
 - emnist-digits-train-images-idx3-ubyte: 训练图像
 - emnist-digits-train-labels-idx1-ubyte: 训练标签
 - emnist-digits-test-images-idx3-ubyte: 测试图像
 - emnist-digits-test-labels-idx1-ubyte: 测试标签
-### ./svhn
+#### ./svhn
 每个图像都是32x32像素的RGB图像
-### ./usps
+#### ./usps
 16×16像素的灰度图像<br>
 总计 9,298 个样本 (训练集: 7,291，测试集: 2,007)
 
-## environment
-### 车辆环境（vehicle_env）
+### environment
+#### 车辆环境（vehicle_env）
 1. 初始化车辆和基站环境。
 2. 建立基站，确定其位置、覆盖范围、最大连接车辆数等属性；
 3. 建立车辆集群，确定其初始位置，将车辆与距离其最近的基站连接；
@@ -134,7 +134,7 @@ xx.gz是上述文件的压缩版本
 5. 重置环境至初始状态。
 6. 遗留问题：车辆行驶过程中可能碰撞
 
-### 通信环境（communication_env）
+#### 通信环境（communication_env）
 1. 计算上下行通信速率
 2. 计算数据传输时延 (t_trans)
 3. 计算数据标注时延 (t_label)
@@ -142,7 +142,7 @@ xx.gz是上述文件的压缩版本
 5. 计算模型广播时延 (t_broadcast)
 6. 遗留问题：传输时延计算单位需要确认，总带宽为MHz，样本大小为bit
 
-### 数据模拟（dataSimu_env）
+#### 数据模拟（dataSimu_env）
 功能：<br>
 分别处理office-31、digit10、DomainNet三个数据集，将其按照Non-IID（狄利克雷分布）的方式划分给多个智能车辆，并支持增量学习。<br>
 步骤：<br>
@@ -155,12 +155,12 @@ xx.gz是上述文件的压缩版本
 |数据集|域|类别数|类别|样本数|图像大小|通道数|说明|
 |------|------|------|------|------|------|------|------|
 |office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795|图像大小|通道数|说明|
-|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|样本数|图像大小|通道数|数字识别|
-|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|样本数|图像大小|通道数|说明|
+|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST：70000；EMNIST：280000；USPS：9298；SVHN：630420|图像大小|通道数|数字识别|
+|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|Real: 约 172,000 张；Clipart: 约 48,000 张；Painting: 约 72,000 张；Quickdraw: 约 172,000 张；Sketch: 约 72,000 张；Infograph: 约 48,000 张|图像大小|通道数|说明|
 <br>
 
-## models
-### 多臂老虎机（mab_selector）
+### models
+#### 多臂老虎机（mab_selector）
 功能：<br>
 用于选择高质量的数据批次。<br>
 1. 使用ucb算法选择所有臂（数据批次）中价值最高的臂。
@@ -170,7 +170,7 @@ xx.gz是上述文件的压缩版本
 5. MAB状态重置，即被选择的此时、累积奖励、平均奖励均为0。
 
 
-### 强化学习智能体（drl_agent）
+#### 强化学习智能体（drl_agent）
 1. 选择动作。以一定概率生成随机动作，否则利用策略网络选择动作。
 2. 将数据标注量动作通过线性变换映射到[0, MAX_UPLOAD_BATCHES]的整数，将带宽分配进行归一化，使得总和为1。
 3. 模型优化。从回放缓冲区随机采样一个批次的经验，使用策略网络计算当前状态-动作对的Q值，使用目标网络计算下一个状态最大的Q值，根据贝尔曼方程计算目标Q值。使用均方误差损失函数计算当前Q值和目标Q值之间的差值，并通过优化器更新策略网络。
@@ -185,5 +185,3 @@ xx.gz是上述文件的压缩版本
 5. 修改main.py，进行基线对比实验 10days
 6. 消融实验 5days
 7. 完善digit和dominNet数据集训练 10days
-
-最佳预期：预计12月底完成。

@@ -76,23 +76,31 @@ class BaselineComparison:
             print(f"\n=== 训练会话 {session + 1}/{num_sessions} ===")
             # 步骤1: 更新会话和环境
             self._update_session_environment(session)
+
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
             # print(f"当前环境状态 state 为:\n{state}")
+
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
             # print(f"智能体的 action 为:\n{action}")
+
             # 步骤4: 执行通信和数据收集
             upload_results = self._execute_communication(action, session)
+
             # 步骤5: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
             # print(f"调试信息：车辆数据上传后缓存信息为{cache_updates}")
+
             # 步骤6：计算通信时延
             communication_results = self._calculate_communication_delay(action, session, upload_results['corrected_upload_decisions'])
+
             # 步骤7: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
+
             # 步骤8: 性能评估
             evaluation_results = self._evaluate_model_performance(session)
+
             # 步骤9: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
                 state,
@@ -101,10 +109,12 @@ class BaselineComparison:
                 communication_results,
                 training_results,
             )
+
             # 步骤10: 记录结果
             self._record_session_results(
                 session, evaluation_results, communication_results, training_results
             )
+
             # 步骤11: 模型广播和更新
             self._broadcast_and_update_models()
 
@@ -374,6 +384,10 @@ class BaselineComparison:
     def _update_cache_with_mab_scores(self, batch_mapping):
         """根据MAB统计信息更新缓存质量评分"""
         quality_scores = self.continual_learner.mab_selector.get_batch_quality_scores()
+
+        print(f"调试信息：经训练后，根据mab选择器结果，所获得的quality_scores为：")
+        print(quality_scores)
+
         # 按车辆分组质量评分
         vehicle_scores = {}
         for global_batch_idx, quality_score in enumerate(quality_scores):
@@ -408,13 +422,6 @@ class BaselineComparison:
                 new_quality_scores = [info['quality_score'] for info in new_scores_info]
                 all_quality_scores.extend(new_quality_scores)
 
-            # # 调试信息：新数据批次对应关系
-            # old_data_formatted = [(info['local_batch_idx'], f"{info['quality_score']:.3f}") for info in old_scores_info]
-            # new_data_formatted = [(info['local_batch_idx'], f"{info['quality_score']:.3f}") for info in new_scores_info]
-            # print(f"车辆{vehicle_id}-旧数据: {old_data_formatted}")
-            # print(f"车辆{vehicle_id}-新数据: {new_data_formatted}")
-
-
             # 验证并更新缓存
             total_expected_batches = len(cache["old_data"]) + len(cache["new_data"])
             if len(all_quality_scores) == total_expected_batches:
@@ -430,7 +437,11 @@ class BaselineComparison:
             print(f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
                 f"平均质量 {np.mean(all_scores):.4f}")
 
-        print(f"缓存更新后车辆的缓存信息为: {self.cache_manager.get_cache_stats()}")
+        import json
+        cache_stats = self.cache_manager.get_cache_stats()
+        formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
+        print("缓存更新后车辆的缓存信息:")
+        print(formatted_stats)
 
     def _compute_loss_on_uploaded_data(self, model):
         """计算模型在上传数据上的损失"""
@@ -499,6 +510,8 @@ class BaselineComparison:
         # 获取必要的参数
         total_delay = comm_results["total_delay"]
         global_dataset_size = training_results.get("global_dataset_size", 1)
+        print(f"total_delay:{total_delay}")
+        print(f"global_dataset_size:{global_dataset_size}")
 
         # 计算损失降幅
         total_loss_reduction = 0
@@ -524,7 +537,7 @@ class BaselineComparison:
             reward = total_loss_reduction / (global_dataset_size * total_delay)
         else:
             reward = 0.0
-
+        print(f"reward:{reward}")
         # 获取下一个状态
         next_state = self._get_environment_state()
 

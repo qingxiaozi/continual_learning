@@ -26,7 +26,7 @@ class ContinualLearner:
         num_batches = len(batch_list)
 
         # 初始化MAB选择器，臂的数量等于批次数量
-        self.mab_selector = MABDataSelector(num_arms=num_batches)  # 重新初始化MAB选择器
+        self.mab_selector = MABDataSelector(num_arms=num_batches)  # 初始化MAB选择器
         self.epoch_count = 0  # 重置epoch计数
         self.total_steps = 0  # 累计训练步骤
 

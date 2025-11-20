@@ -24,7 +24,7 @@ class MABDataSelector:
             else:
                 exploitation = self.avg_rewards[arm]  # 利用项为该臂的平均奖励
                 exploration = self.exploration_factor * np.sqrt(
-                    np.log(total_steps) / self.counts[arm]
+                    2 * np.log(total_steps) / self.counts[arm]
                 )  # 探索项基于选择次数
                 ucb_values[arm] = exploitation + exploration
 
@@ -51,9 +51,9 @@ class MABDataSelector:
         if np.sum(self.ucb_counts) == 0:
             return np.zeros(self.num_arms)
         # 质量评分 = MAB选择次数 * 平均奖励
-        quality_scores = self.ucb_counts * self.avg_rewards
-        if np.sum(quality_scores) > 0:
-            quality_scores = quality_scores / self.num_arms
+        quality_scores = self.ucb_counts * self.avg_rewards / self.num_arms
+        # if np.sum(quality_scores) > 0:
+        #     quality_scores = quality_scores / self.num_arms
 
         return quality_scores
 
