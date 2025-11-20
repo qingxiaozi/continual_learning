@@ -38,7 +38,7 @@ class CommunicationSystem:
         # 计算参数
         self.golden_model_computation = 2e9  # 黄金模型处理一个样本的计算周期数，1
         self.global_model_computation = 6e9  # 全局模型处理一个样本的计算周期数，1
-        self.edge_server_computation = 10e9  # C，边缘服务器计算能力（Cycles/s），1
+        self.edge_server_computation = 10e10  # C，边缘服务器计算能力（Cycles/s），1
 
         # 训练参数
         self.training_epochs = Config.NUM_EPOCH  # E，训练轮次

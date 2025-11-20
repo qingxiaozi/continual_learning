@@ -252,20 +252,6 @@ class BaselineComparison:
             if vehicle.uploaded_data:
                 # 使用MAB选择器评估数据质量
                 quality_scores = []
-                # for batch in vehicle.uploaded_data:
-                #     if (
-                #         isinstance(batch, list)
-                #         and len(batch) >= 2
-                #         and isinstance(batch[0], torch.Tensor)
-                #         and batch[0].dim() == 4
-                #     ):
-                #         images = batch[0]
-
-                #         reward = self.mab_selector.calculate_batch_reward(
-                #             self.global_model, [images], torch.nn.CrossEntropyLoss()
-                #         )
-                #         quality_scores.append(reward)
-
                 # 更新缓存
                 self.cache_manager.update_cache(
                     vehicle.id, vehicle.uploaded_data, quality_scores
@@ -359,11 +345,11 @@ class BaselineComparison:
             }
 
         from torch.utils.data import DataLoader, TensorDataset
-        loss_before = self._compute_loss_on_uploaded_data(self.global_model)
+        loss_before = self._compute_weighted_loss_on_uploaded_data(self.global_model)
         training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
             global_data_batches, num_epochs=Config.NUM_EPOCH
         )
-        loss_after = self._compute_loss_on_uploaded_data(self.global_model)
+        loss_after = self._compute_weighted_loss_on_uploaded_data(self.global_model)
 
         # 训练完成后，根据MAB统计信息更新缓存质量评分
         self._update_cache_with_mab_scores(batch_mapping)
@@ -378,7 +364,7 @@ class BaselineComparison:
             "loss_before": loss_before,
             "loss_after": loss_after,
             "training_loss": training_loss,
-            "global_dataset_size": global_dataset_size * Config.BATCH_SIZE,
+            "global_dataset_size": global_dataset_size,
         }
 
     def _update_cache_with_mab_scores(self, batch_mapping):
@@ -443,19 +429,21 @@ class BaselineComparison:
         print("缓存更新后车辆的缓存信息:")
         print(formatted_stats)
 
-    def _compute_loss_on_uploaded_data(self, model):
+    def _compute_weighted_loss_on_uploaded_data(self, model):
         """计算模型在上传数据上的损失"""
         total_loss = 0.0
-        batch_count = 0
+        # batch_count = 0
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.uploaded_data:
+                vehicle_data_size = len(vehicle.uploaded_data) * Config.BATCH_SIZE
                 for batch in vehicle.uploaded_data:
                     loss = self._compute_batch_loss(model, batch)
-                    total_loss += loss
-                    batch_count += 1
+                    total_loss += loss * Config.BATCH_SIZE
+                    # batch_count += 1
 
-        return total_loss / batch_count if batch_count > 0 else 1.0
+        # return total_loss / batch_count if batch_count > 0 else 1.0
+        return total_loss if total_loss > 0 else 1.0
 
     def _compute_batch_loss(self, model, batch):
         """计算单个批次的损失"""
@@ -514,23 +502,27 @@ class BaselineComparison:
         print(f"global_dataset_size:{global_dataset_size}")
 
         # 计算损失降幅
-        total_loss_reduction = 0
-        total_upload_samples = 0
+        # total_loss_reduction = 0
+        # # total_upload_samples = 0
 
-        for vehicle in self.vehicle_env.vehicles:
-            if vehicle.uploaded_data:
-                # 计算该车辆上传的样本数
-                vehicle_upload_samples = len(vehicle.uploaded_data) * Config.BATCH_SIZE
-                total_upload_samples += vehicle_upload_samples
+        loss_before = training_results.get("loss_before", 1.0)
+        loss_after = training_results.get("loss_after", 1.0)
+        total_loss_reduction = loss_before - loss_after
 
-                # 这里需要计算模型在上传数据上的损失变化
-                # 由于我们实际训练前后没有分别记录每个车辆上传数据的损失
-                # 我们使用训练前后的整体损失变化作为近似
-                loss_before = training_results.get("loss_before", 1.0)
-                loss_after = training_results.get("loss_after", 1.0)
-                loss_reduction = loss_before - loss_after
+        # for vehicle in self.vehicle_env.vehicles:
+        #     if vehicle.uploaded_data:
+        #         # 计算该车辆上传的样本数
+        #         vehicle_upload_samples = len(vehicle.uploaded_data) * Config.BATCH_SIZE
+        #         total_upload_samples += vehicle_upload_samples
 
-                total_loss_reduction += vehicle_upload_samples * loss_reduction
+        #         # 这里需要计算模型在上传数据上的损失变化
+        #         # 由于我们实际训练前后没有分别记录每个车辆上传数据的损失
+        #         # 我们使用训练前后的整体损失变化作为近似
+        #         loss_before = training_results.get("loss_before", 1.0)
+        #         loss_after = training_results.get("loss_after", 1.0)
+        #         loss_reduction = loss_before - loss_after
+
+        #         total_loss_reduction += vehicle_upload_samples * loss_reduction
 
         # 计算奖励
         if total_delay > 0 and global_dataset_size > 0:

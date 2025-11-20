@@ -5,9 +5,9 @@ class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
     NUM_TRAINING_SESSIONS = 3  # train session
-    NUM_EPOCH = 2  # 训练epoch数
+    NUM_EPOCH = 30  # 训练epoch数
     BATCH_SIZE = 32  # batch size
-    INIT_EPOCHS = 1  # MAB初始探索轮次
+    INIT_EPOCHS = 5  # MAB初始探索轮次
 
     # 通信参数
     BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围
