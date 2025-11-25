@@ -344,10 +344,11 @@ class BaselineComparison:
                 "global_dataset_size": 0,
             }
 
+        current_val_data = self.data_simulator.get_val_dataset(self.current_domain)
         from torch.utils.data import DataLoader, TensorDataset
         loss_before = self._compute_weighted_loss_on_uploaded_data(self.global_model)
         training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
-            global_data_batches, num_epochs=Config.NUM_EPOCH
+            global_data_batches, current_val_data, num_epochs=Config.NUM_EPOCH
         )
         loss_after = self._compute_weighted_loss_on_uploaded_data(self.global_model)
 
@@ -423,11 +424,11 @@ class BaselineComparison:
             print(f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
                 f"平均质量 {np.mean(all_scores):.4f}")
 
-        import json
-        cache_stats = self.cache_manager.get_cache_stats()
-        formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
-        print("缓存更新后车辆的缓存信息:")
-        print(formatted_stats)
+        # import json
+        # cache_stats = self.cache_manager.get_cache_stats()
+        # formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
+        # print("缓存更新后车辆的缓存信息:")
+        # print(formatted_stats)
 
     def _compute_weighted_loss_on_uploaded_data(self, model):
         """计算模型在上传数据上的损失"""
@@ -466,10 +467,8 @@ class BaselineComparison:
 
     def _evaluate_model_performance(self, session):
         """评估模型性能"""
-        current_domain = self.data_simulator.get_current_domain()
-
         # 评估当前域性能
-        current_test_data = self.data_simulator.get_test_dataset(current_domain)
+        current_test_data = self.data_simulator.get_test_dataset(self.current_domain)
         if current_test_data:
             accuracy, loss = self.evaluator.evaluate_model(
                 self.global_model, current_test_data
@@ -486,7 +485,7 @@ class BaselineComparison:
             "current_accuracy": accuracy,
             "current_loss": loss,
             "cumulative_results": cumulative_results,
-            "current_domain": current_domain,
+            "current_domain": self.current_domain,
         }
         print(f"eval_results:{eval_results}")
         return eval_results

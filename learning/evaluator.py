@@ -35,20 +35,6 @@ class ModelEvaluator:
                     inputs = batch
                     true_targets = self.gold_model(inputs).argmax(dim=1)
 
-                # 修复：确保 true_targets 是 Tensor 且数据类型正确
-                if not isinstance(true_targets, torch.Tensor):
-                    true_targets = torch.tensor(
-                        true_targets, dtype=torch.long, device=inputs.device
-                    )
-
-                # 确保目标是 long 类型
-                if true_targets.dtype != torch.long:
-                    true_targets = true_targets.long()
-
-                if inputs.dim() == 3:
-                    # 添加batch维度 [C, H, W] -> [1, C, H, W]
-                    inputs = inputs.unsqueeze(0)
-
                 outputs = model(inputs)
                 predictions = outputs.argmax(dim=1)
 

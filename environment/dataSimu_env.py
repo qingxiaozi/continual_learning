@@ -430,6 +430,14 @@ class DomainIncrementalDataSimulator:
         domain_key = f"{self.current_dataset}_{domain}"
         return self.test_data_cache.get(domain_key, None)
 
+    def get_val_dataset(self, domain=None):
+        """获取指定域的验证数据集"""
+        if domain is None:
+            domain = self.get_current_domain()
+
+        domain_key = f"{self.current_dataset}_{domain}"
+        return self.val_data_cache.get(domain_key, None)
+
     def get_cumulative_test_datasets(self):
         """获取所有已见域的测试数据集"""
         cumulative_datasets = {}

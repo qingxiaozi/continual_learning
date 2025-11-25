@@ -1,5 +1,7 @@
+import copy
 import torch
 import torch.optim as optim
+from torch.utils.data import DataLoader
 from config.parameters import Config
 from models.mab_selector import MABDataSelector
 
@@ -12,23 +14,24 @@ class ContinualLearner:
         self.gold_model = gold_model
         self.optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE)
         self.criterion = torch.nn.CrossEntropyLoss()
-
-        # # 集成MAB选择器
-        # self.mab_selector = MABDataSelector(num_arms=0)
         self.epoch_count = 0
         self.init_epochs = Config.INIT_EPOCHS
 
-    def train_with_mab_selection(self, data_loader, num_epochs=1):
+    def train_with_mab_selection(self, train_loader, val_loader, num_epochs=1):
         """在数据集上训练模型，集成MAB算法进行批次选择"""
         self.model.train()
         epoch_losses = []
-        batch_list = list(data_loader)
+        val_losses = []
+        batch_list = list(train_loader)
         num_batches = len(batch_list)
 
-        # 初始化MAB选择器，臂的数量等于批次数量
         self.mab_selector = MABDataSelector(num_arms=num_batches)  # 初始化MAB选择器
         self.epoch_count = 0  # 重置epoch计数
         self.total_steps = 0  # 累计训练步骤
+
+        best_val_loss = float('inf')
+        patience_counter = 0
+        best_model_state = copy.deepcopy(self.model.state_dict())
 
         for epoch in range(num_epochs):
             self.epoch_count += 1
@@ -45,7 +48,6 @@ class ContinualLearner:
                 batch_idx = step % num_batches
                 batch = batch_list[batch_idx]
 
-                # 训练步骤
                 loss_before, inputs, targets = self._compute_batch_loss(batch)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
@@ -53,7 +55,6 @@ class ContinualLearner:
                 loss.backward()
                 self.optimizer.step()
 
-                # 计算奖励和更新统计
                 loss_after, _, _ = self._compute_batch_loss(batch)
                 reward = loss_before - loss_after
 
@@ -64,7 +65,29 @@ class ContinualLearner:
 
             avg_loss = epoch_loss / num_batches
             epoch_losses.append(avg_loss)
-            print(f"Epoch {self.epoch_count}, Loss: {avg_loss:.4f}")
+
+            if val_loader is not None:
+                patience = 5
+                val_loss = self._evaluate_on_validation(val_loader)
+                val_losses.append(val_loss)
+
+                # 检查是否是最佳模型
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    patience_counter = 0
+                    best_model_state = copy.deepcopy(self.model.state_dict())
+                    print(f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f} *")
+                else:
+                    patience_counter += 1
+                    print(f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f}, patience_counter/patience: {patience_counter}/{patience}")
+
+                # 早停检查
+                if patience_counter >= patience:
+                    print(f"早停触发！在epoch {self.epoch_count}停止")
+                    self.model.load_state_dict(best_model_state)  # 恢复最佳模型
+                    break
+            else:
+                print("验证集不存在")
 
         # 在训练结束后添加调试
         print(f"MAB调试 - counts: {self.mab_selector.counts}")
@@ -104,6 +127,33 @@ class ContinualLearner:
             print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
 
         return avg_loss, epoch_losses
+
+    def _evaluate_on_validation(self, val_dataset):
+        """在验证集上评估模型"""
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=Config.BATCH_SIZE,        # 设置合适的批次大小
+            shuffle=False,
+            drop_last=False,
+            num_workers=0
+        )
+
+        self.model.eval()
+        total_loss = 0.0
+        batch_count = 0
+
+        with torch.no_grad():
+            for batch in val_loader:
+                inputs, targets = batch[0], batch[1]
+                if targets.dim() == 0:
+                    targets = targets.unsqueeze(0)
+                outputs = self.model(inputs)
+                loss = self.criterion(outputs, targets)
+                total_loss += loss.item()
+                batch_count += 1
+
+        self.model.train()
+        return total_loss / batch_count if batch_count > 0 else float('inf')
 
     def compute_test_loss(self, dataloader):
         """计算测试损失"""
