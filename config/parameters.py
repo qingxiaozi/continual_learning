@@ -69,10 +69,11 @@ class Config:
     # 域切换参数
     DOMAIN_CHANGE_INTERVAL = 1  # 每1个session切换一个域
     # 数据加载参数
-    IMAGE_SIZE = 64  # 统一调整到相同尺寸
+    IMAGE_SIZE = 32  # 统一调整到相同尺寸
     # 测试策略参数
     TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
-    TRAIN_TEST_SPLIT = 0.8  # 训练集比例
+    TEST_RATIO = 0.2  # 测试集比例
+    VAL_RATIO = 0.2  # 验证集比例
 
     # 评估参数
     EVALUATION_FREQUENCY = 5  # 每5个session评估一次

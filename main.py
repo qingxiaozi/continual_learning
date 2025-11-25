@@ -83,7 +83,7 @@ class BaselineComparison:
 
             # 步骤3: DRL智能体决策
             action = self._drl_decision_making(state, session)
-            # print(f"智能体的 action 为:\n{action}")
+            print(f"智能体的 action 为:\n{action}")
 
             # 步骤4: 执行通信和数据收集
             upload_results = self._execute_communication(action, session)
