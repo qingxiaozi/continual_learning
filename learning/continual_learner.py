@@ -12,12 +12,32 @@ class ContinualLearner:
     def __init__(self, model, gold_model):
         self.model = model
         self.gold_model = gold_model
-        self.optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE)
+        self.optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4, betas=(0.9, 0.999))
         self.criterion = torch.nn.CrossEntropyLoss()
         self.epoch_count = 0
         self.init_epochs = Config.INIT_EPOCHS
 
+    # def check_data_preprocessing(self, train_loader, val_loader):
+    #     """检查训练集和验证集的数据预处理是否一致"""
+    #     print("=== 数据预处理检查 ===")
+
+    #     # 检查第一个批次
+    #     train_batch = next(iter(train_loader))
+    #     val_batch = next(iter(val_loader))
+
+    #     train_inputs, train_targets = train_batch
+    #     val_inputs, val_targets = val_batch
+
+    #     print(f"训练集 - 输入范围: [{train_inputs.min():.3f}, {train_inputs.max():.3f}]")
+    #     print(f"验证集 - 输入范围: [{val_inputs.min():.3f}, {val_inputs.max():.3f}]")
+    #     print(f"训练集 - 输入均值: {train_inputs.mean():.3f}, 标准差: {train_inputs.std():.3f}")
+    #     print(f"验证集 - 输入均值: {val_inputs.mean():.3f}, 标准差: {val_inputs.std():.3f}")
+
+    #     print(f"训练集标签分布: {torch.bincount(train_targets)}")
+    #     print(f"验证集标签分布: {torch.bincount(torch.tensor(val_targets))}")
+
     def train_with_mab_selection(self, train_loader, val_loader, num_epochs=1):
+        # self.check_data_preprocessing(train_loader, val_loader)
         """在数据集上训练模型，集成MAB算法进行批次选择"""
         self.model.train()
         epoch_losses = []
