@@ -73,18 +73,31 @@ class DomainIncrementalDataSimulator:
         self.vehicle_data_assignments = (
             {}
         )  # 每辆车的数据，key为数据集_域名（office31_amazon），值为一个字典，其中键为vehicle_id，值为该车辆在该域中分配到的索引列表
-        # 数据变换
-        self.transform = transforms.Compose(
-            [
-                transforms.Resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE)),
-                transforms.Lambda(lambda x: x.convert("RGB") if x.mode != "RGB" else x),
-                transforms.ToTensor(),
-                transforms.Normalize(
-                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                ),
-            ]
-        )
 
+        # 1. 基础预处理（用于缓存原始数据）
+        self.base_transform = transforms.Compose([
+            transforms.Resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE)),
+            transforms.Lambda(lambda x: x.convert("RGB") if x.mode != "RGB" else x),
+            transforms.ToTensor(),  # 只转换到Tensor，不归一化
+        ])
+
+        # 2. 训练时的增强+归一化
+        self.train_transform = transforms.Compose([
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+
+        # 3. 验证/测试时的归一化
+        self.test_transform = transforms.Compose([
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+
+        self.transform = self.base_transform
         # 初始化数据分配
         self._initialize_data_distribution()
 
@@ -157,12 +170,22 @@ class DomainIncrementalDataSimulator:
             val_size = int(Config.VAL_RATIO * total_size)
             train_size = total_size - test_size - val_size
 
-            if test_size <= 0:
-                print(f"警告: 域 {domain} 的测试集大小为0")
-                return
-            train_dataset, val_dataset, test_dataset = random_split(
-                full_dataset, [train_size, val_size, test_size]
+            original_dataset = self._load_domain_data(domain)
+            train_indices, val_indices, test_indices = random_split(
+                range(len(original_dataset)), [train_size, val_size, test_size]
             )
+            train_dataset = self._create_subset_with_transform(
+                original_dataset, train_indices, self.train_transform
+            )
+            val_dataset = self._create_subset_with_transform(
+                original_dataset, val_indices, self.test_transform
+            )
+            test_dataset = self._create_subset_with_transform(
+                original_dataset, test_indices, self.test_transform
+            )
+            # train_dataset, val_dataset, test_dataset = random_split(
+            #     full_dataset, [train_size, val_size, test_size]
+            # )
 
             # 缓存
             self.train_data_cache[domain_key] = train_dataset
@@ -175,6 +198,27 @@ class DomainIncrementalDataSimulator:
             print(f"已加载 {domain} 域的数据集 - 训练集: {len(self.train_data_cache[domain_key])}, "
                   f"验证集: {len(self.val_data_cache[domain_key])}, "
                   f"测试集: {len(self.test_data_cache[domain_key])}")
+
+    def _create_subset_with_transform(self, original_dataset, indices, transform):
+        """创建应用了特定变换的子集"""
+        class TransformSubset(Dataset):
+            def __init__(self, dataset, indices, transform):
+                self.dataset = dataset
+                self.indices = indices
+                self.transform = transform
+
+            def __len__(self):
+                return len(self.indices)
+
+            def __getitem__(self, idx):
+                # 从原始数据集获取数据
+                image, label = self.dataset[self.indices[idx]]
+                # 应用新的变换
+                if self.transform:
+                    image = self.transform(image)
+                return image, label
+
+        return TransformSubset(original_dataset, indices, transform)
 
     def generate_vehicle_data(self, vehicle_id, num_batches=None):
         """
@@ -311,33 +355,30 @@ class DomainIncrementalDataSimulator:
     def _load_domain_data(self, domain):
         """加载指定域的数据(未分割)"""
         loader_func = self.dataset_info[self.current_dataset]["data_loader"]
-        return loader_func(domain)
+        return loader_func(domain, transform=self.base_transform)
 
-    def _load_office31_data(self, domain):
+    def _load_office31_data(self, domain, transform=None):
         """
         加载office-31数据集
         """
         dataset_path = os.path.join(Config.DATA_BASE_PATH, "office-31", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：Office-31 {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
-        return Office31Dataset(dataset_path, transform=self.transform)
+        return Office31Dataset(dataset_path, transform=transform)
 
-    def _load_digit10_data(self, domain):
+    def _load_digit10_data(self, domain, transform=None):
         """加载Digit10数据集"""
         dataset_path = os.path.join(Config.DATA_BASE_PATH, "digit10", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：digit10 {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
-        return Digit10Dataset(dataset_path, transform=self.transform)
+        return Digit10Dataset(dataset_path, transform=transform)
 
-    def _load_domainnet_data(self, domain):
+    def _load_domainnet_data(self, domain, transform=None):
         """加载DomainNet数据集"""
         dataset_path = os.path.join(Config.DATA_BASE_PATH, "domainnet", domain)
         if not os.path.exists(dataset_path):
             print(f"警告：domainnet {domain}路径不存在：{dataset_path}")
-            # return self._create_simulated_dataset(Config.OFFICE31_CLASSES, 1000)
-        return DomainNetDataset(dataset_path, transform=self.transform)
+        return DomainNetDataset(dataset_path, transform=transform)
 
     def evaluate_model(self, model, strategy=None):
         """
