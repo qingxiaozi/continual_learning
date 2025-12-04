@@ -585,8 +585,43 @@ class Digit10Dataset(BaseDataset):
         self._load_data()
 
     def _load_data(self):
-        print("Digit10Dataset待补充")
+        """
+        加载office-31数据
+        """
+        classes = [
+            d
+            for d in os.listdir(self.data_path)
+            if os.path.isdir(os.path.join(self.data_path, d))
+        ]
+        classes.sort()
+        # 为每个类别分配一个唯一的数字索引{'back_pack':0, 'bike':1, ...}
+        self.class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+        self.idx_to_class = {i: cls_name for cls_name, i in self.class_to_idx.items()}
 
+        for class_name in classes:
+            class_path = os.path.join(self.data_path, class_name)
+            class_idx = self.class_to_idx[class_name]
+            for img_file in os.listdir(class_path):
+                if img_file.lower().endswith((".jpg", ".jpeg", ".png")):
+                    img_path = os.path.join(class_path, img_file)
+                    self.data.append(img_path)
+                    self.labels.append(class_idx)
+
+    def __getitem__(self, idx):
+        image_path = self.data[idx]
+        label = self.labels[idx]
+        # 加载图像
+        image = Image.open(image_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
+    def get_class_name(self, label_idx):
+        """
+        根据标签索引获取类别名称
+        """
+        return self.idx_to_class.get(label_idx, "Unknown")
 
 class DomainNetDataset(BaseDataset):
     def __init__(self, data_path, transform=None):
