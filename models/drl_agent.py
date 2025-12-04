@@ -3,45 +3,129 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import random
+import math
 from collections import deque
 from config.parameters import Config
 from environment.vehicle_env import VehicleEnvironment
 
 
 class DRLNetwork(nn.Module):
-    """DRL策略网络 - 输出连续动作"""
+    """DRL策略网络 - 独立决策"""
 
-    def __init__(self, state_dim, action_dim, hidden_dim=Config.DRL_HIDDEN_SIZE):
+    def __init__(self, state_dim, num_vehicles, num_batch_choices, hidden_dim=Config.DRL_HIDDEN_SIZE):
+        '''
+        Args:
+            state_dim：状态维度
+            num_vehicles：车辆数量
+            num_batch_choices：每辆车可选的数据批次数
+        '''
         super(DRLNetwork, self).__init__()
-        self.net = nn.Sequential(
+        self.num_vehicles = num_vehicles
+        self.num_batch_choices = num_batch_choices
+        # 共享特征提取层
+        self.shared_layers = nn.Sequential(
             nn.Linear(state_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
         )
+        # 为每辆车独立输出Q值
+        # 总输出维度：num_vehicles × num_batch_choices
+        self.q_value_layer = nn.Linear(hidden_dim, self.num_vehicles * self.num_batch_choices)
+
+        # self.net = nn.Sequential(
+        #     nn.Linear(state_dim, hidden_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(hidden_dim, hidden_dim),
+        #     nn.ReLU(),
+        #     nn.Linear(hidden_dim, action_dim),
+        # )
 
     def forward(self, x):
-        return self.net(x)
+        # return self.net(x)
+        """
+        输入: [batch_size, state_dim]
+        输出: [batch_size, num_vehicles, num_batch_choices]
+        """
+        features = self.shared_layers(x)
+        q_values = self.q_value_layer(features)
+        batch_size = x.shape[0]
+        q_values = q_values.view(batch_size, self.num_vehicles, self.num_batch_choices)
+        return q_values
 
 
-class ReplayBuffer:
-    """经验回放缓冲区"""
+class PrioritizedReplayBuffer:
+    """优先经验回放缓冲区（非均匀采样）"""
 
-    def __init__(self, capacity=Config.DRL_BUFFER_SIZE):
-        self.buffer = deque(maxlen=capacity)
+    def __init__(self, capacity=Config.DRL_BUFFER_SIZE, alpha=0.6, beta=0.4, beta_increment=0.001):
+        self.capacity = capacity
+        self.alpha = alpha  # 优先级指数
+        self.beta = beta    # 重要性采样权重指数
+        self.beta_increment = beta_increment
+        self.buffer = []
+        self.priorities = np.zeros(capacity, dtype=np.float32)
+        self.position = 0
+        self.size = 0
 
-    def push(self, state, action, reward, next_state, done):
-        experience = (state, action, reward, next_state, done)
-        self.buffer.append(experience)
+    def push(self, state, actions, reward, next_state, done, td_error=None):
+        """存储经验，带初始优先级"""
+        priority = (abs(td_error) + 1e-5) ** self.alpha if td_error is not None else 1.0
+
+        if self.size < self.capacity:
+            self.buffer.append((state, actions, reward, next_state, done))
+        else:
+            self.buffer[self.position] = (state, actions, reward, next_state, done)
+
+        self.priorities[self.position] = priority
+        self.position = (self.position + 1) % self.capacity
+        self.size = min(self.size + 1, self.capacity)
 
     def sample(self, batch_size):
-        batch = random.sample(self.buffer, batch_size)
-        state, action, reward, next_state, done = map(np.stack, zip(*batch))
-        return state, action, reward, next_state, done
+        """根据优先级采样批次"""
+        if self.size < batch_size:
+            return None
+
+        # 计算采样概率
+        priorities = self.priorities[:self.size]
+        probs = priorities / priorities.sum()
+
+        # 根据概率采样索引
+        indices = np.random.choice(self.size, batch_size, p=probs)
+
+        # 计算重要性采样权重
+        total = self.size * probs[indices]
+        weights = (total ** -self.beta)
+        weights = weights / weights.max()  # 归一化
+        self.beta = min(1.0, self.beta + self.beta_increment)  # 增加beta
+
+        # 提取样本
+        states, actions, rewards, next_states, dones = [], [], [], [], []
+        for idx in indices:
+            state, action, reward, next_state, done = self.buffer[idx]
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+            next_states.append(next_state)
+            dones.append(done)
+
+        return (
+            np.array(states, dtype=np.float32),
+            np.array(actions, dtype=np.int64),
+            np.array(rewards, dtype=np.float32),
+            np.array(next_states, dtype=np.float32),
+            np.array(dones, dtype=np.bool_),
+            indices,
+            weights
+        )
+
+    def update_priorities(self, indices, td_errors):
+        """更新样本的优先级"""
+        for idx, td_error in zip(indices, td_errors):
+            priority = (abs(td_error) + 1e-5) ** self.alpha
+            self.priorities[idx] = priority
 
     def __len__(self):
-        return len(self.buffer)
+        return self.size
 
 
 class DRLAgent:
