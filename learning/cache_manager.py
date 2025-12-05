@@ -15,8 +15,8 @@ class CacheManager:
             "old_data": [],
             "new_data": [],
             "quality_scores": [],
-            "batch_mapping": []  # 记录批次在全局数据集中的索引
-            }
+            "batch_mapping": [],  # 记录批次在全局数据集中的索引
+        }
 
     def update_cache(self, vehicle_id, new_data_batches, quality_scores=None):
         """更新车辆缓存"""
@@ -85,17 +85,17 @@ class CacheManager:
                 if cache["quality_scores"]:
                     cache["quality_scores"] = cache["quality_scores"][remove_count:]
 
-            print(f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
-              f"剩余 {len(cache['old_data'])} 个批次, {len(cache['quality_scores'])} 个质量评分")
+            print(
+                f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
+                f"剩余 {len(cache['old_data'])} 个批次, {len(cache['quality_scores'])} 个质量评分"
+            )
 
     def get_vehicle_cache(self, vehicle_id):
         """获取车辆缓存"""
-        return self.caches.get(vehicle_id, {
-            "old_data": [],
-            "new_data": [],
-            "quality_scores": [],
-            "batch_mapping": []
-        })
+        return self.caches.get(
+            vehicle_id,
+            {"old_data": [], "new_data": [], "quality_scores": [], "batch_mapping": []},
+        )
 
     def promote_new_to_old(self, vehicle_id):
         """将新数据提升为旧数据"""
@@ -115,6 +115,6 @@ class CacheManager:
                 "old_data_size": len(cache["old_data"]),
                 "new_data_size": len(cache["new_data"]),
                 "total_size": len(cache["old_data"]) + len(cache["new_data"]),
-                "quality_scores": cache["quality_scores"]
+                "quality_scores": cache["quality_scores"],
             }
         return stats

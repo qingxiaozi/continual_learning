@@ -12,7 +12,12 @@ class ContinualLearner:
     def __init__(self, model, gold_model):
         self.model = model
         self.gold_model = gold_model
-        self.optimizer = optim.Adam(model.parameters(), lr=Config.LEARNING_RATE, weight_decay=1e-4, betas=(0.9, 0.999))
+        self.optimizer = optim.Adam(
+            model.parameters(),
+            lr=Config.LEARNING_RATE,
+            weight_decay=1e-4,
+            betas=(0.9, 0.999),
+        )
         self.criterion = torch.nn.CrossEntropyLoss()
         self.epoch_count = 0
         self.init_epochs = Config.INIT_EPOCHS
@@ -49,7 +54,7 @@ class ContinualLearner:
         self.epoch_count = 0  # 重置epoch计数
         self.total_steps = 0  # 累计训练步骤
 
-        best_val_loss = float('inf')
+        best_val_loss = float("inf")
         patience_counter = 0
         best_model_state = copy.deepcopy(self.model.state_dict())
 
@@ -78,7 +83,7 @@ class ContinualLearner:
                 loss_after, _, _ = self._compute_batch_loss(batch)
                 reward = loss_before - loss_after
 
-                if (self.epoch_count >= self.init_epochs):
+                if self.epoch_count >= self.init_epochs:
                     self.mab_selector.update_arm(batch_idx, reward)
 
                 epoch_loss += loss.item()
@@ -96,10 +101,14 @@ class ContinualLearner:
                     best_val_loss = val_loss
                     patience_counter = 0
                     best_model_state = copy.deepcopy(self.model.state_dict())
-                    print(f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f} *")
+                    print(
+                        f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f} *"
+                    )
                 else:
                     patience_counter += 1
-                    print(f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f}, patience_counter/patience: {patience_counter}/{patience}")
+                    print(
+                        f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f}, patience_counter/patience: {patience_counter}/{patience}"
+                    )
 
                 # 早停检查
                 if patience_counter >= patience:
@@ -152,10 +161,10 @@ class ContinualLearner:
         """在验证集上评估模型"""
         val_loader = DataLoader(
             val_dataset,
-            batch_size=Config.BATCH_SIZE,        # 设置合适的批次大小
+            batch_size=Config.BATCH_SIZE,  # 设置合适的批次大小
             shuffle=False,
             drop_last=False,
-            num_workers=0
+            num_workers=0,
         )
 
         self.model.eval()
@@ -173,7 +182,7 @@ class ContinualLearner:
                 batch_count += 1
 
         self.model.train()
-        return total_loss / batch_count if batch_count > 0 else float('inf')
+        return total_loss / batch_count if batch_count > 0 else float("inf")
 
     def compute_test_loss(self, dataloader):
         """计算测试损失"""
@@ -212,7 +221,11 @@ class ContinualLearner:
         """
         self.model.eval()
         with torch.no_grad():
-            if isinstance(batch, (list, tuple)) and len(batch) >= 2 and not use_gold_model:
+            if (
+                isinstance(batch, (list, tuple))
+                and len(batch) >= 2
+                and not use_gold_model
+            ):
                 inputs, targets = batch[0], batch[1]
             else:
                 inputs = batch

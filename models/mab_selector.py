@@ -62,11 +62,15 @@ class MABDataSelector:
         stats = {}
         for arm in range(self.num_arms):
             stats[arm] = {
-                'count': self.counts[arm],
-                'total_reward': self.rewards[arm],
-                'avg_reward': self.avg_rewards[arm],
-                'ucb_count': self.ucb_counts[arm],
-                'quality_score': self.ucb_counts[arm] * self.avg_rewards[arm] / self.num_arms if self.ucb_counts[arm] > 0 else 0
+                "count": self.counts[arm],
+                "total_reward": self.rewards[arm],
+                "avg_reward": self.avg_rewards[arm],
+                "ucb_count": self.ucb_counts[arm],
+                "quality_score": (
+                    self.ucb_counts[arm] * self.avg_rewards[arm] / self.num_arms
+                    if self.ucb_counts[arm] > 0
+                    else 0
+                ),
             }
         return stats
 

@@ -75,27 +75,31 @@ class DomainIncrementalDataSimulator:
         )  # 每辆车的数据，key为数据集_域名（office31_amazon），值为一个字典，其中键为vehicle_id，值为该车辆在该域中分配到的索引列表
 
         # 1. 基础预处理（用于缓存原始数据）
-        self.base_transform = transforms.Compose([
-            transforms.Resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE)),
-            transforms.Lambda(lambda x: x.convert("RGB") if x.mode != "RGB" else x),
-            transforms.ToTensor(),  # 只转换到Tensor，不归一化
-        ])
+        self.base_transform = transforms.Compose(
+            [
+                transforms.Resize((Config.IMAGE_SIZE, Config.IMAGE_SIZE)),
+                transforms.Lambda(lambda x: x.convert("RGB") if x.mode != "RGB" else x),
+                transforms.ToTensor(),  # 只转换到Tensor，不归一化
+            ]
+        )
 
         # 2. 训练时的增强+归一化
-        self.train_transform = transforms.Compose([
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
-        ])
+        self.train_transform = transforms.Compose(
+            [
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                )
+            ]
+        )
 
         # 3. 验证/测试时的归一化
-        self.test_transform = transforms.Compose([
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
-        ])
+        self.test_transform = transforms.Compose(
+            [
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                )
+            ]
+        )
 
         self.transform = self.base_transform
         # 初始化数据分配
@@ -195,12 +199,15 @@ class DomainIncrementalDataSimulator:
         # 保存到已见域测试集
         if domain_key not in self.seen_domains_test_sets:
             self.seen_domains_test_sets[domain_key] = self.test_data_cache[domain_key]
-            print(f"已加载 {domain} 域的数据集 - 训练集: {len(self.train_data_cache[domain_key])}, "
-                  f"验证集: {len(self.val_data_cache[domain_key])}, "
-                  f"测试集: {len(self.test_data_cache[domain_key])}")
+            print(
+                f"已加载 {domain} 域的数据集 - 训练集: {len(self.train_data_cache[domain_key])}, "
+                f"验证集: {len(self.val_data_cache[domain_key])}, "
+                f"测试集: {len(self.test_data_cache[domain_key])}"
+            )
 
     def _create_subset_with_transform(self, original_dataset, indices, transform):
         """创建应用了特定变换的子集"""
+
         class TransformSubset(Dataset):
             def __init__(self, dataset, indices, transform):
                 self.dataset = dataset
@@ -262,9 +269,7 @@ class DomainIncrementalDataSimulator:
                 break
             batches.append(batch)
 
-        print(
-            f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次"
-        )
+        print(f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次")
         return batches
 
     def _get_vehicle_data_indices(self, vehicle_id, train_dataset):
@@ -503,13 +508,15 @@ class DomainIncrementalDataSimulator:
         }
 
         if domain_key in self.train_data_cache:
-            info.update({
-                "dataset_sizes": {
-                    "train": len(self.train_data_cache[domain_key]),
-                    "val": len(self.val_data_cache[domain_key]),
-                    "test": len(self.test_data_cache[domain_key]),
+            info.update(
+                {
+                    "dataset_sizes": {
+                        "train": len(self.train_data_cache[domain_key]),
+                        "val": len(self.val_data_cache[domain_key]),
+                        "test": len(self.test_data_cache[domain_key]),
+                    }
                 }
-            })
+            )
 
         return info
 
@@ -622,6 +629,7 @@ class Digit10Dataset(BaseDataset):
         根据标签索引获取类别名称
         """
         return self.idx_to_class.get(label_idx, "Unknown")
+
 
 class DomainNetDataset(BaseDataset):
     def __init__(self, data_path, transform=None):

@@ -93,7 +93,9 @@ class BaselineComparison:
             # print(f"调试信息：车辆数据上传后缓存信息为{cache_updates}")
 
             # 步骤6：计算通信时延
-            communication_results = self._calculate_communication_delay(action, session, upload_results['corrected_upload_decisions'])
+            communication_results = self._calculate_communication_delay(
+                action, session, upload_results["corrected_upload_decisions"]
+            )
 
             # 步骤7: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
@@ -138,7 +140,9 @@ class BaselineComparison:
         if previous_domain != self.current_domain:
             for vehicle_id in range(Config.NUM_VEHICLES):
                 self.cache_manager.promote_new_to_old(vehicle_id)
-            print(f"域从 {previous_domain} 切换到 {self.current_domain}，已提升缓存中的数据。")
+            print(
+                f"域从 {previous_domain} 切换到 {self.current_domain}，已提升缓存中的数据。"
+            )
 
         # 清空所有车辆的上传数据
         for vehicle in self.vehicle_env.vehicles:
@@ -221,14 +225,27 @@ class BaselineComparison:
             else:
                 # 如果计划上传为0，检查车辆是否有数据
                 vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-                available_batches = len(vehicle.data_batches) if vehicle and vehicle.data_batches else 0
+                available_batches = (
+                    len(vehicle.data_batches) if vehicle and vehicle.data_batches else 0
+                )
 
             # 记录差异（用于调试）- 只要不一致就打印
-            if actual_upload_batches != planned_upload_batches or planned_upload_batches == 0:
-                status = "不一致" if actual_upload_batches != planned_upload_batches else "计划不上传"
-                print(f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | {status}")
+            if (
+                actual_upload_batches != planned_upload_batches
+                or planned_upload_batches == 0
+            ):
+                status = (
+                    "不一致"
+                    if actual_upload_batches != planned_upload_batches
+                    else "计划不上传"
+                )
+                print(
+                    f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | {status}"
+                )
             else:
-                print(f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | 一致")
+                print(
+                    f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | 一致"
+                )
 
             corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
 
@@ -237,7 +254,9 @@ class BaselineComparison:
         total_actual = sum([cd[1] for cd in corrected_upload_decisions])
         print("-" * 50)
         print(f"总计     | {total_planned:6d}   | {'N/A':8s}   | {total_actual:6d}   |")
-        print(f"实际上传率: {total_actual/total_planned*100:.1f}% ({total_actual}/{total_planned})")
+        print(
+            f"实际上传率: {total_actual/total_planned*100:.1f}% ({total_actual}/{total_planned})"
+        )
 
         return {
             "uploaded_data": uploaded_data,
@@ -268,7 +287,9 @@ class BaselineComparison:
 
         return cache_updates
 
-    def _calculate_communication_delay(self, action, session, corrected_upload_decisions):
+    def _calculate_communication_delay(
+        self, action, session, corrected_upload_decisions
+    ):
         """计算通信时延 - 在数据更新后调用"""
         bandwidth_allocations = action["bandwidth_allocations"]
 
@@ -297,7 +318,7 @@ class BaselineComparison:
         """
         )
         return {
-            "total_delay": delay_breakdown['total_delay'],
+            "total_delay": delay_breakdown["total_delay"],
             "total_samples": total_samples,
         }
 
@@ -316,9 +337,9 @@ class BaselineComparison:
             for batch_idx, batch in enumerate(cache["old_data"]):
                 global_data_batches.append(batch)
                 batch_mapping[batch_counter] = {
-                    'vehicle_id': vehicle_id,
-                    'data_type': 'old',
-                    'local_batch_idx': batch_idx
+                    "vehicle_id": vehicle_id,
+                    "data_type": "old",
+                    "local_batch_idx": batch_idx,
                 }
                 batch_counter += 1
 
@@ -326,9 +347,9 @@ class BaselineComparison:
             for batch_idx, batch in enumerate(cache["new_data"]):
                 global_data_batches.append(batch)
                 batch_mapping[batch_counter] = {
-                    'vehicle_id': vehicle_id,
-                    'data_type': 'new',
-                    'local_batch_idx': batch_idx
+                    "vehicle_id": vehicle_id,
+                    "data_type": "new",
+                    "local_batch_idx": batch_idx,
                 }
                 batch_counter += 1
             global_dataset_size += (
@@ -346,6 +367,7 @@ class BaselineComparison:
 
         current_val_data = self.data_simulator.get_val_dataset(self.current_domain)
         from torch.utils.data import DataLoader, TensorDataset
+
         loss_before = self._compute_weighted_loss_on_uploaded_data(self.global_model)
         training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
             global_data_batches, current_val_data, num_epochs=Config.NUM_EPOCH
@@ -380,14 +402,16 @@ class BaselineComparison:
         for global_batch_idx, quality_score in enumerate(quality_scores):
             if global_batch_idx in batch_mapping:
                 mapping = batch_mapping[global_batch_idx]
-                vehicle_id = mapping['vehicle_id']
-                data_type = mapping['data_type']
+                vehicle_id = mapping["vehicle_id"]
+                data_type = mapping["data_type"]
                 if vehicle_id not in vehicle_scores:
-                    vehicle_scores[vehicle_id] = {'old': [], 'new': []}
-                vehicle_scores[vehicle_id][data_type].append({
-                'local_batch_idx': mapping['local_batch_idx'],
-                'quality_score': quality_score
-            })
+                    vehicle_scores[vehicle_id] = {"old": [], "new": []}
+                vehicle_scores[vehicle_id][data_type].append(
+                    {
+                        "local_batch_idx": mapping["local_batch_idx"],
+                        "quality_score": quality_score,
+                    }
+                )
         # 更新每个车辆缓存的质量评分
         for vehicle_id, scores_by_type in vehicle_scores.items():
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
@@ -396,17 +420,17 @@ class BaselineComparison:
             all_quality_scores = []
 
             # 处理旧数据质量评分（按原始顺序）
-            old_scores_info = scores_by_type['old']
+            old_scores_info = scores_by_type["old"]
             if old_scores_info:
-                old_scores_info.sort(key=lambda x: x['local_batch_idx'])
-                old_quality_scores = [info['quality_score'] for info in old_scores_info]
+                old_scores_info.sort(key=lambda x: x["local_batch_idx"])
+                old_quality_scores = [info["quality_score"] for info in old_scores_info]
                 all_quality_scores.extend(old_quality_scores)
 
             # 处理新数据质量评分（按原始顺序）
-            new_scores_info = scores_by_type['new']
+            new_scores_info = scores_by_type["new"]
             if new_scores_info:
-                new_scores_info.sort(key=lambda x: x['local_batch_idx'])
-                new_quality_scores = [info['quality_score'] for info in new_scores_info]
+                new_scores_info.sort(key=lambda x: x["local_batch_idx"])
+                new_quality_scores = [info["quality_score"] for info in new_scores_info]
                 all_quality_scores.extend(new_quality_scores)
 
             # 验证并更新缓存
@@ -414,15 +438,21 @@ class BaselineComparison:
             if len(all_quality_scores) == total_expected_batches:
                 cache["quality_scores"] = all_quality_scores
             else:
-                print(f"警告: 车辆 {vehicle_id} 质量评分数量不匹配 - "
-                    f"预期: {total_expected_batches}, 实际: {len(all_quality_scores)}")
+                print(
+                    f"警告: 车辆 {vehicle_id} 质量评分数量不匹配 - "
+                    f"预期: {total_expected_batches}, 实际: {len(all_quality_scores)}"
+                )
 
             # 统计信息
             total_batches = len(old_scores_info) + len(new_scores_info)
-            all_scores = [info['quality_score'] for info in old_scores_info + new_scores_info]
+            all_scores = [
+                info["quality_score"] for info in old_scores_info + new_scores_info
+            ]
 
-            print(f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
-                f"平均质量 {np.mean(all_scores):.4f}")
+            print(
+                f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
+                f"平均质量 {np.mean(all_scores):.4f}"
+            )
 
         # import json
         # cache_stats = self.cache_manager.get_cache_stats()

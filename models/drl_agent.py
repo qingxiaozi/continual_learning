@@ -12,13 +12,19 @@ from environment.vehicle_env import VehicleEnvironment
 class DRLNetwork(nn.Module):
     """DRL策略网络 - 独立决策"""
 
-    def __init__(self, state_dim, num_vehicles, num_batch_choices, hidden_dim=Config.DRL_HIDDEN_SIZE):
-        '''
+    def __init__(
+        self,
+        state_dim,
+        num_vehicles,
+        num_batch_choices,
+        hidden_dim=Config.DRL_HIDDEN_SIZE,
+    ):
+        """
         Args:
             state_dim：状态维度
             num_vehicles：车辆数量
             num_batch_choices：每辆车可选的数据批次数
-        '''
+        """
         super(DRLNetwork, self).__init__()
         self.num_vehicles = num_vehicles
         self.num_batch_choices = num_batch_choices
@@ -31,7 +37,9 @@ class DRLNetwork(nn.Module):
         )
         # 为每辆车独立输出Q值
         # 总输出维度：num_vehicles × num_batch_choices
-        self.q_value_layer = nn.Linear(hidden_dim, self.num_vehicles * self.num_batch_choices)
+        self.q_value_layer = nn.Linear(
+            hidden_dim, self.num_vehicles * self.num_batch_choices
+        )
 
         # self.net = nn.Sequential(
         #     nn.Linear(state_dim, hidden_dim),
@@ -57,10 +65,12 @@ class DRLNetwork(nn.Module):
 class PrioritizedReplayBuffer:
     """优先经验回放缓冲区（非均匀采样）"""
 
-    def __init__(self, capacity=Config.DRL_BUFFER_SIZE, alpha=0.6, beta=0.4, beta_increment=0.001):
+    def __init__(
+        self, capacity=Config.DRL_BUFFER_SIZE, alpha=0.6, beta=0.4, beta_increment=0.001
+    ):
         self.capacity = capacity
         self.alpha = alpha  # 优先级指数
-        self.beta = beta    # 重要性采样权重指数
+        self.beta = beta  # 重要性采样权重指数
         self.beta_increment = beta_increment
         self.buffer = []
         self.priorities = np.zeros(capacity, dtype=np.float32)
@@ -86,7 +96,7 @@ class PrioritizedReplayBuffer:
             return None
 
         # 计算采样概率
-        priorities = self.priorities[:self.size]
+        priorities = self.priorities[: self.size]
         probs = priorities / priorities.sum()
 
         # 根据概率采样索引
@@ -94,7 +104,7 @@ class PrioritizedReplayBuffer:
 
         # 计算重要性采样权重
         total = self.size * probs[indices]
-        weights = (total ** -self.beta)
+        weights = total**-self.beta
         weights = weights / weights.max()  # 归一化
         self.beta = min(1.0, self.beta + self.beta_increment)  # 增加beta
 
@@ -115,7 +125,7 @@ class PrioritizedReplayBuffer:
             np.array(next_states, dtype=np.float32),
             np.array(dones, dtype=np.bool_),
             indices,
-            weights
+            weights,
         )
 
     def update_priorities(self, indices, td_errors):
@@ -133,7 +143,8 @@ class DRLAgent:
 
     def __init__(self, state_dim, action_dim):
         self.state_dim = state_dim
-        self.action_dim = action_dim
+        self.num_vehicles = Config.NUM_VEHICLES
+        self.num_batch_choices = Config.MAX_UPLOAD_BATCHES + 1
         # 网络
         self.policy_net = DRLNetwork(state_dim, action_dim)
         self.target_net = DRLNetwork(state_dim, action_dim)
@@ -143,11 +154,17 @@ class DRLAgent:
             self.policy_net.parameters(), lr=Config.DRL_LEARNING_RATE
         )
         # 经验回放
-        self.memory = ReplayBuffer()
+        # 优先经验回放
+        self.memory = PrioritizedReplayBuffer(
+            capacity=Config.DRL_BUFFER_SIZE,
+            alpha=0.6,  # 优先级指数
+            beta=0.4,  # 重要性采样初始值
+            beta_increment=0.001,
+        )
         # 超参数
         self.gamma = Config.DRL_GAMMA
         self.batch_size = Config.DRL_BATCH_SIZE
-        self.update_target_every = 10
+        self.update_target_every = 100
         self.steps_done = 0
 
     def select_action(self, state, epsilon=0.1):
