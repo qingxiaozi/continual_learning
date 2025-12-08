@@ -35,22 +35,12 @@ class DRLNetwork(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
         )
-        # 为每辆车独立输出Q值
-        # 总输出维度：num_vehicles × num_batch_choices
+        # 为每辆车独立输出Q值：num_vehicles × num_batch_choices
         self.q_value_layer = nn.Linear(
             hidden_dim, self.num_vehicles * self.num_batch_choices
         )
 
-        # self.net = nn.Sequential(
-        #     nn.Linear(state_dim, hidden_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(hidden_dim, hidden_dim),
-        #     nn.ReLU(),
-        #     nn.Linear(hidden_dim, action_dim),
-        # )
-
     def forward(self, x):
-        # return self.net(x)
         """
         输入: [batch_size, state_dim]
         输出: [batch_size, num_vehicles, num_batch_choices]
@@ -139,21 +129,20 @@ class PrioritizedReplayBuffer:
 
 
 class DRLAgent:
-    """深度强化学习策略"""
+    """深度强化学习策略，独立决策DQN"""
 
-    def __init__(self, state_dim, action_dim):
+    def __init__(self, state_dim):
         self.state_dim = state_dim
         self.num_vehicles = Config.NUM_VEHICLES
         self.num_batch_choices = Config.MAX_UPLOAD_BATCHES + 1
         # 网络
-        self.policy_net = DRLNetwork(state_dim, action_dim)
-        self.target_net = DRLNetwork(state_dim, action_dim)
+        self.policy_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
+        self.target_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         # 优化器
         self.optimizer = optim.Adam(
             self.policy_net.parameters(), lr=Config.DRL_LEARNING_RATE
         )
-        # 经验回放
         # 优先经验回放
         self.memory = PrioritizedReplayBuffer(
             capacity=Config.DRL_BUFFER_SIZE,
@@ -165,100 +154,160 @@ class DRLAgent:
         self.gamma = Config.DRL_GAMMA
         self.batch_size = Config.DRL_BATCH_SIZE
         self.update_target_every = 100
+        self.tau = 0.005  # 软更新参数
+
+        # epsilon-greedy参数
+        self.epsilon_start = Config.DRL_EPSILON_START if hasattr(Config, 'DRL_EPSILON_START') else 0.9
+        self.epsilon_end = Config.DRL_EPSILON_END if hasattr(Config, 'DRL_EPSILON_END') else 0.05
+        self.epsilon_decay = Config.DRL_EPSILON_DECAY if hasattr(Config, 'DRL_EPSILON_DECAY') else 800
         self.steps_done = 0
 
-    def select_action(self, state, epsilon=0.1):
-        """选择动作"""
-        if random.random() < epsilon:
-            # 随机探索
-            action = np.random.randn(self.action_dim)
-        else:
-            # 利用策略
-            state_tensor = torch.FloatTensor(state).unsqueeze(0)
-            with torch.no_grad():
-                action = self.policy_net(state_tensor).squeeze(0).numpy()
-        return self._process_action(action)
+    def _get_epsilon(self):
+        """计算当前epsilon值（指数衰减）"""
+        epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * \
+                  math.exp(-1. * self.steps_done / self.epsilon_decay)
+        return epsilon
 
-    def _process_action(self, raw_action):
-        """处理原始动作输出"""
-        # 将动作分为数据标注量和带宽分配
-        num_vehicles = Config.NUM_VEHICLES
-        action_processed = np.zeros(2 * num_vehicles)
+    def select_action(self, state, available_batches=None, training=True):
+        """选择动作 - 考虑车辆实际可用批次数量限制
+        Args:
+            state: 状态向量
+            available_batches: 每辆车实际可用的批次数量列表 [num_vehicles]
+                            如果为None，则假设无限可用
+            training: 是否处于训练模式
+        """
+        epsilon = self._get_epsilon() if training else 0.0
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            q_values = self.policy_net(state_tensor)  # [1, num_vehicles, num_batch_choices]
+            q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
+        # 如果未提供可用批次，假设可以上传最大数量
+        if available_batches is None:
+            available_batches = [self.num_batch_choices - 1] * self.num_vehicles
 
-        for i in range(num_vehicles):
-            # 数据标注量决策 (0到MAX_UPLOAD_BATCHES)
-            upload_action = raw_action[i * 2] if i * 2 < len(raw_action) else 0
-            upload_batches = int(
-                np.clip(
-                    (upload_action + 1) * Config.MAX_UPLOAD_BATCHES / 2,
-                    0,
-                    Config.MAX_UPLOAD_BATCHES,
-                )
-            )
-            # 带宽分配决策 (0到1)
-            bw_action = raw_action[i * 2 + 1] if i * 2 + 1 < len(raw_action) else 0
-            bandwidth_ratio = 1 / (1 + np.exp(-bw_action))  # Sigmoid
+        batch_choices = []
+        for v in range(self.num_vehicles):
+            # 获取该车辆的最大可用批次
+            max_available = available_batches[v]
+            if max_available <= 0:
+                # 没有可用数据，只能选择0
+                batch = 0
+            else:
+                if random.random() < epsilon:
+                    # 随机探索：在可用范围内随机选择
+                    batch = random.randint(0, max_available)
+                else:
+                    # 利用：选择最大Q值的批次，但不超过可用数量
+                    # 只考虑前max_available+1个动作（从0到max_available）
+                    valid_q_values = q_values[v, :max_available+1]
+                    batch = valid_q_values.argmax().item()
 
-            action_processed[i * 2] = upload_batches
-            action_processed[i * 2 + 1] = bandwidth_ratio
+            batch_choices.append(batch)
 
-        # 归一化带宽分配
-        total_bandwidth = np.sum(action_processed[1::2])
-        if total_bandwidth > 0:
-            action_processed[1::2] = action_processed[1::2] / total_bandwidth
+        # 构建完整的动作向量
+        action_vector = np.zeros(2 * self.num_vehicles)
+        for i, batch in enumerate(batch_choices):
+            action_vector[i * 2] = batch  # 批次决策
+            action_vector[i * 2 + 1] = 0.0  # 带宽分配占位符
 
-        return action_processed
+        return action_vector, batch_choices
+
+    def store_experience(self, state, batch_choices, reward, next_state, done, td_error=None):
+        """存储经验到优先回放缓冲区"""
+        self.memory.push(state, batch_choices, reward, next_state, done, td_error)
 
     def optimize_model(self):
-        """优化DRL模型"""
-        if len(self.memory) < self.batch_size:
-            return
+        """优化模型（使用Double DQN和优先经验回放）"""
+        batch_data = self.memory.sample(self.batch_size)
+        if batch_data is None:
+            return None
 
-        # 从回放缓冲区采样
-        states, actions, rewards, next_states, dones = self.memory.sample(
-            self.batch_size
-        )
+        states, batch_actions, rewards, next_states, dones, indices, weights = batch_data
 
         # 转换为张量
         states = torch.FloatTensor(states)
-        actions = torch.FloatTensor(actions)
-        rewards = torch.FloatTensor(rewards)
         next_states = torch.FloatTensor(next_states)
+        rewards = torch.FloatTensor(rewards)
         dones = torch.BoolTensor(dones)
+        weights = torch.FloatTensor(weights)
 
-        # 计算当前Q值
-        current_q_values = (
-            self.policy_net(states).gather(1, actions.long().unsqueeze(1)).squeeze(1)
-        )
+        # 批次动作转换为张量 [batch_size, num_vehicles]
+        batch_actions = torch.LongTensor(batch_actions)
 
-        # 计算目标Q值
-        with torch.no_grad():
-            next_q_values = self.target_net(next_states).max(1)[0]
-            target_q_values = rewards + (self.gamma * next_q_values * ~dones)
+        # 收集所有车辆的TD误差
+        batch_td_errors = []
+        total_loss = 0.0
 
-        # 计算损失
-        loss = nn.MSELoss()(current_q_values, target_q_values)
+        for v in range(self.num_vehicles):
+            # 获取该车辆的动作
+            vehicle_actions = batch_actions[:, v]  # [batch_size]
+
+            # 计算当前Q值
+            current_q = self.policy_net(states)[:, v, :]  # [batch_size, num_batch_choices]
+            chosen_q = current_q.gather(1, vehicle_actions.unsqueeze(1)).squeeze(1)  # [batch_size]
+
+            # Double DQN：使用policy_net选择动作，target_net评估
+            with torch.no_grad():
+                # 选择下一个状态的最佳动作（根据policy_net）
+                next_q_policy = self.policy_net(next_states)[:, v, :]  # [batch_size, num_batch_choices]
+                next_actions = next_q_policy.argmax(dim=1, keepdim=True)  # [batch_size, 1]
+
+                # 评估这些动作的Q值（根据target_net）
+                next_q_target = self.target_net(next_states)[:, v, :]  # [batch_size, num_batch_choices]
+                next_max_q = next_q_target.gather(1, next_actions).squeeze(1)  # [batch_size]
+
+                # 计算目标Q值
+                target_q = rewards + self.gamma * next_max_q * (~dones)  # [batch_size]
+
+            # 计算TD误差和损失
+            td_errors = target_q - chosen_q
+            batch_td_errors.append(td_errors.detach().numpy())
+
+            # 使用重要性采样权重
+            loss = (td_errors ** 2 * weights).mean()
+            total_loss += loss
+
+        # 平均损失
+        loss = total_loss / self.num_vehicles
 
         # 优化
         self.optimizer.zero_grad()
         loss.backward()
+
+        # 梯度裁剪
+        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+
         self.optimizer.step()
 
-        # 更新目标网络
+        # 更新经验优先级
+        avg_td_errors = np.mean(np.array(batch_td_errors), axis=0)
+        self.memory.update_priorities(indices, avg_td_errors)
+
+        # 软更新目标网络
+        self.soft_update_target_network()
+
         self.steps_done += 1
+
+        return loss.item()
+
+    def soft_update_target_network(self):
+        """软更新目标网络（更平滑）"""
+        for target_param, policy_param in zip(self.target_net.parameters(), self.policy_net.parameters()):
+            target_param.data.copy_(self.tau * policy_param.data + (1.0 - self.tau) * target_param.data)
+
+    def hard_update_target_network(self):
+        """硬更新目标网络（定期更新）"""
         if self.steps_done % self.update_target_every == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
     def save_model(self, path):
         """保存模型"""
-        torch.save(
-            {
-                "policy_net_state_dict": self.policy_net.state_dict(),
-                "target_net_state_dict": self.target_net.state_dict(),
-                "optimizer_state_dict": self.optimizer.state_dict(),
-            },
-            path,
-        )
+        torch.save({
+            "policy_net_state_dict": self.policy_net.state_dict(),
+            "target_net_state_dict": self.target_net.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "steps_done": self.steps_done,
+        }, path)
 
     def load_model(self, path):
         """加载模型"""
@@ -266,10 +315,88 @@ class DRLAgent:
         self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
         self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.steps_done = checkpoint.get("steps_done", 0)
 
 
-if __name__ == "__main__":
-    env = VehicleEnvironment(None, None, None, None)
-    state_dim = 3 * Config.NUM_VEHICLES  # 置信度、测试损失、质量评分
-    action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
-    drlAgent = DRLAgent(state_dim, action_dim)
+# class IntegratedController:
+#     """集成控制器：结合DQN决策和带宽分配"""
+
+#     def __init__(self, state_dim):
+#         self.agent = DRLAgent(state_dim)
+
+#     def make_decision(self, state, available_batches=None,vehicle_states=None):
+#         """
+#         做出完整决策
+#         Returns:
+#             complete_action: 完整动作向量 [批次1, 带宽1, 批次2, 带宽2, ...]
+#             batch_choices: 批次选择列表
+#         """
+#         # 1. DQN选择批次
+#         action_vector, batch_choices = self.agent.select_action(state, available_batches=available_batches)
+
+#         # 2. 分配带宽
+#         bandwidth_ratios = allocate_bandwidth(batch_choices, vehicle_states)
+
+#         # 3. 更新动作向量中的带宽部分
+#         for i in range(len(batch_choices)):
+#             action_vector[i * 2 + 1] = bandwidth_ratios[i]
+
+#         return action_vector, batch_choices
+
+#     def train_step(self, state, batch_choices, reward, next_state, done, td_error_estimate=None):
+#         """训练一步"""
+#         # 存储经验
+#         self.agent.store_experience(state, batch_choices, reward, next_state, done, td_error_estimate)
+
+#         # 优化模型
+#         loss = self.agent.optimize_model()
+#         return loss
+
+
+# if __name__ == "__main__":
+#     # 状态维度：每个车辆有3个状态特征（置信度、测试损失、加权奖励）
+#     state_dim = 3 * Config.NUM_VEHICLES
+
+#     # 创建集成控制器
+#     controller = IntegratedController(state_dim)
+
+#     # 模拟状态（3个特征 × 车辆数）
+#     test_state = np.random.randn(state_dim)
+
+#     # 模拟车辆可用批次（每辆车的实际可上传批次数量）
+#     test_available_batches = np.random.randint(0, Config.MAX_UPLOAD_BATCHES+1, Config.NUM_VEHICLES)
+
+#     # 模拟车辆状态（可选，用于带宽分配）
+#     test_vehicle_states = []
+#     for i in range(Config.NUM_VEHICLES):
+#         # 每个车辆的状态：[数据质量, 信道条件, 优先级]
+#         quality = np.random.rand()  # 数据质量 0-1
+#         channel = np.random.rand()  # 信道条件 0-1
+#         priority = np.random.rand()  # 优先级 0-1
+#         test_vehicle_states.append([quality, channel, priority])
+
+#     # 做出决策（考虑可用批次限制）
+#     action, batches = controller.make_decision(
+#         test_state,
+#         available_batches=test_available_batches,
+#         vehicle_states=test_vehicle_states
+#     )
+
+#     # 打印结果
+#     print(f"车辆数: {Config.NUM_VEHICLES}")
+#     print(f"最大上传批次: {Config.MAX_UPLOAD_BATCHES}")
+#     print(f"可用批次: {test_available_batches}")
+#     print(f"选择的批次: {batches}")
+#     print(f"选择的批次是否超出可用: {any(b > a for b, a in zip(batches, test_available_batches))}")
+#     print(f"带宽比例: {action[1::2]}")
+#     print(f"总带宽和: {sum(action[1::2]):.4f}")
+
+#     # 模拟训练一步
+#     next_state = np.random.randn(state_dim)
+#     reward = np.random.randn()
+#     done = False
+
+#     # 训练
+#     loss = controller.train_step(test_state, batches, reward, next_state, done)
+#     if loss is not None:
+#         print(f"训练损失: {loss:.4f}")

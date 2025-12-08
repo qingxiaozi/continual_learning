@@ -2,7 +2,7 @@
 ```
 continual_learning/
 ├── main.py
-├── Config/
+├── config/
 │   ├── parameters.py
 │   └── paths.py
 ├── environment/
