@@ -207,20 +207,24 @@ class CommunicationSystem:
 
         return labeling_delay
 
-    def calculate_retraining_delay(self, total_samples):
+    def calculate_retraining_delay(self, total_samples, actual_epochs=None):
         """
         计算模型重训练时延 t_retrain
         公式: t_retrain = (E * |D_v| * |V| * c_global) / C
         参数:
+            actual_epochs: 实际训练epoch数，默认为None，表示使用配置的训练轮次
             total_samples: 所有车辆缓存数据样本量 |D_v| * |V|
         返回:
             float: 模型重训练时延 (秒)
         """
         if total_samples <= 0:
             return 0.0
-        # 计算总计算需求
+
+        if actual_epochs is None:
+            actual_epochs = self.training_epochs
+
         total_computation = (
-            self.training_epochs * total_samples * self.global_model_computation
+            actual_epochs * total_samples * self.global_model_computation
         )
         # 计算重训练时延
         retraining_delay = total_computation / self.edge_server_computation
@@ -246,19 +250,17 @@ class CommunicationSystem:
         return broadcast_delay
 
     def calculate_total_training_delay(
-        self, upload_decisions, bandwidth_allocations, session_id, total_samples
+        self, upload_decisions, bandwidth_allocations, session_id, total_samples, actual_epochs=None
     ):
         """
         计算训练阶段总时延 T_s
-
         公式: T_s = t_trans + t_label + t_retrain + t_broadcast
-
         参数:
             upload_decisions: 上传决策列表，每个元素为 (vehicle_id, upload_batches)
             bandwidth_allocations: 带宽分配字典
             session_id: 训练会话ID
             total_samples: 实际训练样本总数
-
+            actual_epochs: 实际训练epoch数（考虑早停）
         返回:
             dict: 包含各项时延和总时延的字典
         """
@@ -267,12 +269,11 @@ class CommunicationSystem:
             upload_decisions, bandwidth_allocations, session_id
         )
         t_label = self.calculate_labeling_delay(upload_decisions)
-        t_retrain = self.calculate_retraining_delay(total_samples)
+        t_retrain = self.calculate_retraining_delay(total_samples, actual_epochs)
         t_broadcast = self.calculate_broadcast_delay(session_id)
 
-        # 计算总时延
         total_delay = t_trans + t_label + t_retrain + t_broadcast
-        # 返回详细结果
+
         delay_breakdown = {
             "transmission_delay": t_trans,
             "labeling_delay": t_label,

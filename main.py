@@ -98,18 +98,18 @@ class BaselineComparison:
             cache_updates = self._manage_cache_and_data_selection()
             # print(f"调试信息：车辆数据上传后缓存信息为{cache_updates}")
 
-            # 步骤7：计算通信时延
-            communication_results = self._calculate_communication_delay(
-                batch_choices, allocation_info, session
-            )
-
-            # 步骤8: 模型训练和更新
+            # 步骤7: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
 
-            # 步骤8: 性能评估
+            # 步骤8：计算通信时延
+            communication_results = self._calculate_communication_delay(
+                batch_choices, allocation_info, session, training_results
+            )
+
+            # 步骤9: 性能评估
             evaluation_results = self._evaluate_model_performance()
 
-            # 步骤9: 计算奖励和优化
+            # 步骤10: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
                 state,
                 batch_choices,
@@ -158,7 +158,7 @@ class BaselineComparison:
         self.vehicle_env.update_vehicle_positions(time_delta=1.0)
         # 为车辆生成新数据
         self._refresh_vehicle_data()
-        print(f"环境更新完成 - 当前域: {self.data_simulator.get_current_domain()}")
+        print(f"\n 环境更新完成 - 当前域: {self.data_simulator.get_current_domain()}")
 
     def _refresh_vehicle_data(self):
         """为所有车辆刷新数据"""
@@ -208,9 +208,10 @@ class BaselineComparison:
             'bandwidth_ratios': bandwidth_ratios,
             'min_max_delay': min_max_delay
         }
-
-        print(f"决策结果 - 总上传批次: {sum(batch_choices)}, 带宽分配: {bandwidth_ratios}")
-
+        print(f"\n决策结果")
+        print(f"总上传批次: {sum(batch_choices)}")
+        print(f"上传批次: {batch_choices}")
+        print(f"带宽分配: {bandwidth_ratios}")
         return action_vector, batch_choices, allocation_info
 
     def _upload_datas(self, batch_choices):
@@ -246,12 +247,17 @@ class BaselineComparison:
                 }
         # 打印缓存统计
         cache_stats = self.cache_manager.get_cache_stats()
+        new_batches = sum([stats["new_data_size"] for stats in cache_stats.values()])
+        old_batches = sum([stats["old_data_size"] for stats in cache_stats.values()])
         total_batches = sum([stats["total_size"] for stats in cache_stats.values()])
-        print(f"缓存管理 - 当前缓存总批次: {total_batches}")
+        print(f"\n缓存管理")
+        print(f"当前缓存总批次: {total_batches}")
+        print(f"缓存中新数据批次：{new_batches}")
+        print(f"缓存中旧数据批次：{old_batches}")
 
         return cache_updates
 
-    def _calculate_communication_delay(self, batch_choices, allocation_info, session):
+    def _calculate_communication_delay(self, batch_choices, allocation_info, session, training_results=None):
         """计算通信时延 - 使用分配器的计算方法"""
         # 构建带宽分配字典
         bandwidth_allocations = {}
@@ -268,12 +274,21 @@ class BaselineComparison:
         # 计算总样本数
         total_samples = self._get_total_samples()
 
+        # 获取实际训练epoch数（从训练结果中）
+        actual_epochs = None
+        if training_results and 'actual_epochs' in training_results:
+            actual_epochs = training_results['actual_epochs']
+
         # 计算时延
         delay_breakdown = self.communication_system.calculate_total_training_delay(
-            upload_decisions, bandwidth_allocations, session, total_samples
+            upload_decisions, bandwidth_allocations, session, total_samples, actual_epochs
         )
 
+        print(f"\n通信计算")
         print(f"传输时延: {delay_breakdown['transmission_delay']:.2f}s")
+        print(f"标注时延: {delay_breakdown['labeling_delay']:.2f}s")
+        print(f"训练时延: {delay_breakdown['retraining_delay']:.2f}s")
+        print(f"广播时延: {delay_breakdown['broadcast_delay']:.2f}s")
         print(f"通信时延: {delay_breakdown['total_delay']:.2f}s")
 
         return {
@@ -325,16 +340,30 @@ class BaselineComparison:
                 "loss_before": 1.0,
                 "loss_after": 1.0,
                 "training_loss": float("inf"),
-                # "global_dataset_size": 0,
+                "actual_epochs": 0,
             }
 
         current_val_data = self.data_simulator.get_val_dataset(self.current_domain)
-        from torch.utils.data import DataLoader, TensorDataset
 
         loss_before = self._compute_weighted_loss_on_uploaded_data(self.global_model)
-        training_loss, epoch_losses = self.continual_learner.train_with_mab_selection(
+        training_result = self.continual_learner.train_with_mab_selection(
             global_data_batches, current_val_data, num_epochs=Config.NUM_EPOCH
         )
+        print(f"调试信息：")
+        print(training_result)
+
+        # 初始化默认值
+        training_loss = float("inf")
+        epoch_losses = []
+        val_losses = []
+        actual_epochs = Config.NUM_EPOCH  # 默认使用配置值
+
+        if training_result is not None:
+            training_loss = training_result.get("training_loss", float("inf"))
+            val_losses = training_result.get("val_losses", [])
+            epoch_losses = training_result.get("epoch_losses", [])
+            actual_epochs = training_result.get("actual_epochs", len(epoch_losses))
+
         loss_after = self._compute_weighted_loss_on_uploaded_data(self.global_model)
 
         # 训练完成后，根据MAB统计信息更新缓存质量评分
@@ -342,6 +371,7 @@ class BaselineComparison:
 
         self.visualize.plot_training_loss(
             epoch_losses,
+            val_losses,
             save_plot=True,
             plot_name=f"training_loss_session_{session}.png",
         )
@@ -350,6 +380,7 @@ class BaselineComparison:
             "loss_before": loss_before,
             "loss_after": loss_after,
             "training_loss": training_loss,
+            "actual_epochs": actual_epochs,  # 关键：返回实际训练epoch数
         }
 
     def _update_cache_with_mab_scores(self, batch_mapping):

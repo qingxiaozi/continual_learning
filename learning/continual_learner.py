@@ -12,18 +12,43 @@ class ContinualLearner:
     def __init__(self, model, gold_model):
         self.model = model
         self.gold_model = gold_model
+        # 弹性网络正则化参数
+        self.elastic_alpha = 0.5  # L1和L2的权重平衡，0.5表示各占一半
+        self.l1_lambda = 0.001    # L1正则化强度
+        self.l2_lambda = 0.001    # L2正则化强度（已包含在weight_decay中）
+
         self.optimizer = optim.Adam(
             model.parameters(),
             lr=Config.LEARNING_RATE,
-            weight_decay=1e-4,
+            weight_decay=self.l2_lambda,  # L2正则化
             betas=(0.9, 0.999),
         )
         self.criterion = torch.nn.CrossEntropyLoss()
         self.epoch_count = 0
         self.init_epochs = Config.INIT_EPOCHS
 
+    def _elastic_net_loss(self, outputs, targets, model):
+            """计算带弹性网络正则化的损失"""
+            # 1. 计算原始损失
+            ce_loss = self.criterion(outputs, targets)
+
+            # 2. 计算弹性网络正则化项
+            l1_regularization = 0.0
+            l2_regularization = 0.0
+
+            for param in model.parameters():
+                if param.requires_grad:
+                    # L1正则化（Lasso）
+                    l1_regularization += torch.norm(param, p=1)
+                    # L2正则化（Ridge）已经在Adam的weight_decay中实现
+                    # 这里也可以显式计算：l2_regularization += torch.norm(param, p=2) ** 2
+
+            # 3. 组合弹性网络损失
+            elastic_loss = ce_loss + self.elastic_alpha * self.l1_lambda * l1_regularization
+
+            return elastic_loss
+
     def train_with_mab_selection(self, train_loader, val_loader, num_epochs=1):
-        # self.check_data_preprocessing(train_loader, val_loader)
         """在数据集上训练模型，集成MAB算法进行批次选择"""
         self.model.train()
         epoch_losses = []
@@ -39,8 +64,11 @@ class ContinualLearner:
         patience_counter = 0
         best_model_state = copy.deepcopy(self.model.state_dict())
 
+        actual_epochs = 0  # 记录实际训练的epoch数
+
         for epoch in range(num_epochs):
             self.epoch_count += 1
+            actual_epochs += 1  # 每开始一个epoch就计数
             epoch_loss = 0.0
             ucb_selections = []
 
@@ -99,13 +127,13 @@ class ContinualLearner:
             else:
                 print("验证集不存在")
 
-        # 在训练结束后添加调试
-        print(f"MAB调试 - counts: {self.mab_selector.counts}")
-        print(f"MAB调试 - rewards: {self.mab_selector.rewards}")
-        print(f"MAB调试 - avg_rewards: {self.mab_selector.avg_rewards}")
-        print(f"MAB调试 - ucb_counts: {self.mab_selector.ucb_counts}")
-
-        return avg_loss, epoch_losses
+        return {
+            "training_loss": avg_loss,
+            "epoch_losses": epoch_losses,
+            "val_losses": val_losses,
+            "actual_epochs": actual_epochs,  # 关键：返回实际训练epoch数
+            "config_epochs": num_epochs,
+        }
 
     def train_on_dataset(self, dataloader, num_epochs=1):
         """在数据集上训练模型"""

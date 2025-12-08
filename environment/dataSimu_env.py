@@ -355,7 +355,7 @@ class DomainIncrementalDataSimulator:
             f"最小{min(vehicle_counts)}, 最大{max(vehicle_counts)}"
         )
         print(f"训练数据异构程度: 标准差{np.std(vehicle_counts):.1f}")
-        print("==============================\n")
+        print("=======================================\n")
 
     def _load_domain_data(self, domain):
         """加载指定域的数据(未分割)"""

@@ -311,7 +311,7 @@ class VehicleEnvironment:
         print(f"车辆数量: {len(self.vehicles)}")
         print(f"已连接车辆: {connected_vehicles}")
         print(f"基站平均利用率: {np.mean(bs_utilization):.2f}")
-        print("=====================\n")
+        print("==========================\n")
 
     def update_vehicle_positions(self, time_delta=1.0):
         """

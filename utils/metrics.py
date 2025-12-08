@@ -17,18 +17,23 @@ class ResultVisualizer:
         sns.set_palette("husl")
 
     def plot_training_loss(
-        self, epoch_losses, save_plot=True, plot_name="training_loss.png"
+        self, epoch_losses, val_losses=None, save_plot=True, plot_name="training_loss.png"
     ):
-        """绘制训练损失曲线"""
+        """绘制训练损失和验证损失曲线"""
         plt.figure(figsize=(10, 6))
 
-        # 绘制损失曲线
+        # 绘制训练损失曲线
         epochs = range(1, len(epoch_losses) + 1)
-        plt.plot(epochs, epoch_losses, "b-", linewidth=2, label="Training Loss")
-        plt.scatter(epochs, epoch_losses, color="red", s=30, zorder=5)
+        plt.plot(epochs, epoch_losses, "b-", linewidth=2, label="Training Loss", marker='o', markersize=4)
+
+        # 如果提供了验证损失，绘制验证损失曲线
+        if val_losses and len(val_losses) > 0:
+            val_epochs = range(1, len(val_losses) + 1)
+            plt.plot(val_epochs, val_losses, "r-", linewidth=2, label="Validation Loss", marker='s', markersize=4)
 
         # 设置图表属性
-        plt.title("Training Loss vs Epochs", fontsize=14, fontweight="bold")
+        title = "Training Loss vs Epochs" if not val_losses else "Training and Validation Loss"
+        plt.title(title, fontsize=14, fontweight="bold")
         plt.xlabel("Epoch", fontsize=12)
         plt.ylabel("Loss", fontsize=12)
         plt.grid(True, alpha=0.3)
@@ -37,12 +42,15 @@ class ResultVisualizer:
         # 设置x轴为整数
         plt.xticks(epochs)
 
-        # 自动调整y轴范围，确保能看清下降趋势
+        # 自动调整y轴范围
         if len(epoch_losses) > 1:
-            loss_range = max(epoch_losses) - min(epoch_losses)
+            all_losses = epoch_losses
+            if val_losses:
+                all_losses = epoch_losses + val_losses[:len(epoch_losses)]  # 只取与训练损失对应长度的验证损失
+            loss_range = max(all_losses) - min(all_losses)
             plt.ylim(
-                min(epoch_losses) - 0.1 * loss_range,
-                max(epoch_losses) + 0.1 * loss_range,
+                min(all_losses) - 0.1 * loss_range,
+                max(all_losses) + 0.1 * loss_range,
             )
 
         # 保存或显示图表
@@ -53,19 +61,31 @@ class ResultVisualizer:
 
         plt.close()
 
-        # 打印训练总结
-        if len(epoch_losses) > 1:
-            self._print_training_summary(epoch_losses)
+        # # 打印训练总结
+        # if len(epoch_losses) > 1:
+        #     self._print_training_summary(epoch_losses, val_losses)
 
-    def _print_training_summary(self, epoch_losses):
+    def _print_training_summary(self, train_losses, val_losses=None):
         """打印训练总结"""
-        print(f"\n训练总结:")
-        print(f"初始损失: {epoch_losses[0]:.4f}")
-        print(f"最终损失: {epoch_losses[-1]:.4f}")
-        print(f"损失下降: {epoch_losses[0] - epoch_losses[-1]:.4f}")
-        print(
-            f"下降百分比: {(epoch_losses[0] - epoch_losses[-1]) / epoch_losses[0] * 100:.2f}%"
-        )
+        print("\n训练总结:")
+        print(f"总训练轮次: {len(train_losses)}")
+        print(f"最终训练损失: {train_losses[-1]:.6f}")
+
+        if train_losses[0] > 0:
+            improvement = (train_losses[0] - train_losses[-1]) / train_losses[0] * 100
+            print(f"训练损失改善: {improvement:.2f}%")
+
+        if val_losses and len(val_losses) > 0:
+            print(f"最终验证损失: {val_losses[-1]:.6f}")
+
+            # 找出最佳验证损失及其对应的epoch
+            best_val_epoch = val_losses.index(min(val_losses)) + 1
+            best_val_loss = min(val_losses)
+            print(f"最佳验证损失: {best_val_loss:.6f} (第 {best_val_epoch} 轮)")
+
+            if val_losses[0] > 0:
+                val_improvement = (val_losses[0] - val_losses[-1]) / val_losses[0] * 100
+                print(f"验证损失改善: {val_improvement:.2f}%")
 
     def calculate_metrics(
         self, performance_history, time_history=None, communication_costs=None
