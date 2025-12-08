@@ -13,6 +13,7 @@ from models.drl_agent import DRLAgent
 from models.global_model import GlobalModel
 from models.gold_model import GoldModel
 from models.mab_selector import MABDataSelector
+from models.bandwidth_allocator import BandwidthAllocator
 from utils.metrics import ResultVisualizer
 
 
@@ -46,8 +47,10 @@ class BaselineComparison:
 
         # 初始化DRL智能体
         state_dim = 3 * Config.NUM_VEHICLES  # 置信度、测试损失、质量评分
-        action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
-        self.drl_agent = DRLAgent(state_dim, action_dim)
+        # action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
+        self.drl_agent = DRLAgent(state_dim)
+        # 新增：初始化集成控制器
+        # self.integrated_controller = self.drl_agent  # DRLAgent现在包含了集成控制功能
 
         self.current_domain = self.data_simulator.get_current_domain()
 
@@ -79,37 +82,40 @@ class BaselineComparison:
 
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
-            # print(f"当前环境状态 state 为:\n{state}")
 
-            # 步骤3: DRL智能体决策
-            action = self._drl_decision_making(state, session)
-            print(f"智能体的 action 为:\n{action}")
+            # 步骤3：获取车辆可用批次数量
+            available_batches = self._get_available_batches()
 
-            # 步骤4: 执行通信和数据收集
-            upload_results = self._execute_communication(action, session)
+            # 步骤4：集成决策（上传批次 + 带宽分配）
+            action_vector, batch_choices, allocation_info = self._integrated_decision(state, available_batches, session)
 
-            # 步骤5: 缓存管理和数据选择
+            # 步骤5: 执行通信和数据收集
+            upload_results = self._upload_datas(batch_choices)
+            # for vec in self.vehicle_env.vehicles:
+            #     print(f"车辆 {vec.id} 上传数据批次数量: {len(vec.uploaded_data)}")
+
+            # 步骤6: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
             # print(f"调试信息：车辆数据上传后缓存信息为{cache_updates}")
 
-            # 步骤6：计算通信时延
+            # 步骤7：计算通信时延
             communication_results = self._calculate_communication_delay(
-                action, session, upload_results["corrected_upload_decisions"]
+                batch_choices, allocation_info, session
             )
 
-            # 步骤7: 模型训练和更新
+            # 步骤8: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
 
             # 步骤8: 性能评估
-            evaluation_results = self._evaluate_model_performance(session)
+            evaluation_results = self._evaluate_model_performance()
 
             # 步骤9: 计算奖励和优化
             reward = self._calculate_reward_and_optimize(
                 state,
-                action,
+                batch_choices,
                 evaluation_results,
                 communication_results,
-                training_results,
+                training_results
             )
 
             # 步骤10: 记录结果
@@ -165,103 +171,61 @@ class BaselineComparison:
         """获取环境状态用于DRL决策"""
         return self.vehicle_env.get_environment_state()
 
-    def _drl_decision_making(self, state, session):
-        """DRL智能体决策过程"""
-        # 使用epsilon-greedy策略，随着训练进行减少探索
-        epsilon = max(0.1, 0.5 * (1 - session / Config.NUM_TRAINING_SESSIONS))
-        action = self.drl_agent.select_action(state, epsilon=epsilon)
-
-        # 解析动作
-        upload_decisions = []
-        bandwidth_allocations = {}
-
-        for i in range(Config.NUM_VEHICLES):
-            upload_batches = int(action[i * 2])
-            bandwidth_ratio = action[i * 2 + 1]
-
-            upload_decisions.append((i, upload_batches))
-            bandwidth_allocations[i] = bandwidth_ratio
-
-        print(f"DRL决策 - 总上传批次: {sum([ud[1] for ud in upload_decisions])}")
-
-        return {
-            "upload_decisions": upload_decisions,
-            "bandwidth_allocations": bandwidth_allocations,
-        }
-
-    def _execute_communication(self, action, session):
-        """执行通信和数据收集"""
-        upload_decisions = action["upload_decisions"]
-        bandwidth_allocations = action["bandwidth_allocations"]
-
-        # 收集上传数据
-        uploaded_data = {}
-        corrected_upload_decisions = []  # 修正后的上传决策，保持原格式
-
-        print("\n上传数据验证:")
-        print("车辆ID | 计划上传 | 实际可上传 | 实际上传 | 状态")
-        print("-" * 50)
-
-        for vehicle_id, planned_upload_batches in upload_decisions:
-            actual_upload_batches = 0
-            available_batches = 0
-
-            if planned_upload_batches > 0:
-                vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-                if vehicle and vehicle.data_batches:
-                    # 确保不超过实际可用的批次数量
-                    available_batches = len(vehicle.data_batches)
-                    actual_upload_batches = min(
-                        planned_upload_batches, available_batches
-                    )
-
-                    # 选择前actual_upload_batches个批次上传
-                    uploaded_data[vehicle_id] = vehicle.data_batches[
-                        :actual_upload_batches
-                    ]
-                    vehicle.set_uploaded_data(uploaded_data[vehicle_id])
-                else:
-                    available_batches = 0
+    def _get_available_batches(self):
+        """获取每辆车实际可用的批次数量"""
+        available_batches = []
+        for v in range(Config.NUM_VEHICLES):
+            vehicle = self.vehicle_env._get_vehicle_by_id(v)
+            if vehicle and vehicle.data_batches:
+                available_batches.append(len(vehicle.data_batches))
             else:
-                # 如果计划上传为0，检查车辆是否有数据
-                vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-                available_batches = (
-                    len(vehicle.data_batches) if vehicle and vehicle.data_batches else 0
-                )
+                available_batches.append(0)
+        return available_batches
 
-            # 记录差异（用于调试）- 只要不一致就打印
-            if (
-                actual_upload_batches != planned_upload_batches
-                or planned_upload_batches == 0
-            ):
-                status = (
-                    "不一致"
-                    if actual_upload_batches != planned_upload_batches
-                    else "计划不上传"
-                )
-                print(
-                    f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | {status}"
-                )
-            else:
-                print(
-                    f"车辆 {vehicle_id:2d} | {planned_upload_batches:6d}   | {available_batches:8d}   | {actual_upload_batches:6d}   | 一致"
-                )
-
-            corrected_upload_decisions.append((vehicle_id, actual_upload_batches))
-
-        # 计算统计信息
-        total_planned = sum([ud[1] for ud in upload_decisions])
-        total_actual = sum([cd[1] for cd in corrected_upload_decisions])
-        print("-" * 50)
-        print(f"总计     | {total_planned:6d}   | {'N/A':8s}   | {total_actual:6d}   |")
-        print(
-            f"实际上传率: {total_actual/total_planned*100:.1f}% ({total_actual}/{total_planned})"
+    def _integrated_decision(self, state, available_batches, session):
+        """集成决策：DRL选择批次 + 带宽分配优化"""
+        # 1. DRL选择批次
+        action_vector, batch_choices = self.drl_agent.select_action(
+            state, available_batches=available_batches, training=True
         )
 
-        return {
-            "uploaded_data": uploaded_data,
-            "corrected_upload_decisions": corrected_upload_decisions,  # 返回修正后的决策
+        # 2. 带宽分配优化
+        allocator = BandwidthAllocator(
+            batch_choices,
+            communication_system=self.communication_system,
+            vehicle_env=self.vehicle_env
+        )
+
+        # 使用优化分配方法
+        bandwidth_ratios, min_max_delay = allocator.allocate_minmaxdelay_bandwidth(session)
+
+        # 3. 更新动作向量中的带宽部分
+        for i in range(len(batch_choices)):
+            action_vector[i * 2 + 1] = bandwidth_ratios[i]
+
+        allocation_info = {
+            'method': 'optimized',
+            'bandwidth_ratios': bandwidth_ratios,
+            'min_max_delay': min_max_delay
         }
+
+        print(f"决策结果 - 总上传批次: {sum(batch_choices)}, 带宽分配: {bandwidth_ratios}")
+
+        return action_vector, batch_choices, allocation_info
+
+    def _upload_datas(self, batch_choices):
+        """执行通信和数据收集 - 最小化版本"""
+        uploaded_data = {}
+
+        for vehicle_id, planned_batches in enumerate(batch_choices):
+            if planned_batches > 0:
+                vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
+                if vehicle and vehicle.data_batches:
+                    # 直接提取计划数量的批次
+                    uploaded_data[vehicle_id] = vehicle.data_batches[:planned_batches]
+                    vehicle.set_uploaded_data(uploaded_data[vehicle_id])
+
+        return uploaded_data
 
     def _manage_cache_and_data_selection(self):
         """缓存管理和数据选择"""
@@ -287,46 +251,48 @@ class BaselineComparison:
 
         return cache_updates
 
-    def _calculate_communication_delay(
-        self, action, session, corrected_upload_decisions
-    ):
-        """计算通信时延 - 在数据更新后调用"""
-        bandwidth_allocations = action["bandwidth_allocations"]
+    def _calculate_communication_delay(self, batch_choices, allocation_info, session):
+        """计算通信时延 - 使用分配器的计算方法"""
+        # 构建带宽分配字典
+        bandwidth_allocations = {}
+        for i, ratio in enumerate(allocation_info['bandwidth_ratios']):
+            if ratio > 0:
+                bandwidth_allocations[i] = ratio
 
-        global_data_batches = []
-        total_samples = 0  # 包含多少个样本数
-        for vehicle_id in range(Config.NUM_VEHICLES):
-            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
-            total_samples += (
-                len(cache["old_data"]) + len(cache["new_data"])
-            ) * Config.BATCH_SIZE
+        # 构建上传决策列表
+        upload_decisions = []
+        for i, batches in enumerate(batch_choices):
+            if batches > 0:
+                upload_decisions.append((i, batches))
 
-        # 使用修正后的upload_decisions计算通信时延
+        # 计算总样本数
+        total_samples = self._get_total_samples()
+
+        # 计算时延
         delay_breakdown = self.communication_system.calculate_total_training_delay(
-            corrected_upload_decisions, bandwidth_allocations, session, total_samples
+            upload_decisions, bandwidth_allocations, session, total_samples
         )
 
-        print(
-            f"""
-        通信时延详情:
-        ├─ 传输时延: {delay_breakdown['transmission_delay']:>8.2f} s
-        ├─ 标注时延: {delay_breakdown['labeling_delay']:>8.2f} s
-        ├─ 训练时延: {delay_breakdown['retraining_delay']:>8.2f} s
-        ├─ 广播时延: {delay_breakdown['broadcast_delay']:>8.2f} s
-        ╰─ 总时延:   {delay_breakdown['total_delay']:>8.2f} s
-        训练样本数：{total_samples} samples
-        """
-        )
+        print(f"传输时延: {delay_breakdown['transmission_delay']:.2f}s")
+        print(f"通信时延: {delay_breakdown['total_delay']:.2f}s")
+
         return {
             "total_delay": delay_breakdown["total_delay"],
             "total_samples": total_samples,
         }
 
+    def _get_total_samples(self):
+        """获取总样本数"""
+        total_samples = 0
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            cache = self.cache_manager.get_vehicle_cache(vehicle_id)
+            total_samples += (len(cache["old_data"]) + len(cache["new_data"])) * Config.BATCH_SIZE
+        return total_samples
+
     def _train_and_update_global_model(self, session):
         """训练和更新全局模型"""
         # 收集所有缓存数据构建全局数据集
         global_data_batches = []
-        global_dataset_size = 0  # 包含多少个样本数
         batch_mapping = {}  # 记录全局批次索引到车辆缓存的映射
         batch_counter = 0
 
@@ -352,9 +318,6 @@ class BaselineComparison:
                     "local_batch_idx": batch_idx,
                 }
                 batch_counter += 1
-            global_dataset_size += (
-                len(cache["old_data"]) + len(cache["new_data"])
-            ) * Config.BATCH_SIZE
 
         if not global_data_batches:
             print("警告: 全局数据集为空，跳过训练")
@@ -362,7 +325,7 @@ class BaselineComparison:
                 "loss_before": 1.0,
                 "loss_after": 1.0,
                 "training_loss": float("inf"),
-                "global_dataset_size": 0,
+                # "global_dataset_size": 0,
             }
 
         current_val_data = self.data_simulator.get_val_dataset(self.current_domain)
@@ -387,7 +350,6 @@ class BaselineComparison:
             "loss_before": loss_before,
             "loss_after": loss_after,
             "training_loss": training_loss,
-            "global_dataset_size": global_dataset_size,
         }
 
     def _update_cache_with_mab_scores(self, batch_mapping):
@@ -495,7 +457,7 @@ class BaselineComparison:
 
         return loss.item()
 
-    def _evaluate_model_performance(self, session):
+    def _evaluate_model_performance(self):
         """评估模型性能"""
         # 评估当前域性能
         current_test_data = self.data_simulator.get_test_dataset(self.current_domain)
@@ -521,62 +483,38 @@ class BaselineComparison:
         return eval_results
 
     def _calculate_reward_and_optimize(
-        self, state, action, eval_results, comm_results, training_results
+        self, state, batch_choices, eval_results, comm_results, training_results
     ):
         """根据原始建模重新设计奖励计算函数"""
         # 获取必要的参数
         total_delay = comm_results["total_delay"]
-        global_dataset_size = training_results.get("global_dataset_size", 1)
+        global_dataset_size = comm_results["total_samples"]
+        # accuracy = eval_results["current_accuracy"]
+
         print(f"total_delay:{total_delay}")
         print(f"global_dataset_size:{global_dataset_size}")
-
-        # 计算损失降幅
-        # total_loss_reduction = 0
-        # # total_upload_samples = 0
 
         loss_before = training_results.get("loss_before", 1.0)
         loss_after = training_results.get("loss_after", 1.0)
         total_loss_reduction = loss_before - loss_after
-
-        # for vehicle in self.vehicle_env.vehicles:
-        #     if vehicle.uploaded_data:
-        #         # 计算该车辆上传的样本数
-        #         vehicle_upload_samples = len(vehicle.uploaded_data) * Config.BATCH_SIZE
-        #         total_upload_samples += vehicle_upload_samples
-
-        #         # 这里需要计算模型在上传数据上的损失变化
-        #         # 由于我们实际训练前后没有分别记录每个车辆上传数据的损失
-        #         # 我们使用训练前后的整体损失变化作为近似
-        #         loss_before = training_results.get("loss_before", 1.0)
-        #         loss_after = training_results.get("loss_after", 1.0)
-        #         loss_reduction = loss_before - loss_after
-
-        #         total_loss_reduction += vehicle_upload_samples * loss_reduction
 
         # 计算奖励
         if total_delay > 0 and global_dataset_size > 0:
             reward = total_loss_reduction / (global_dataset_size * total_delay)
         else:
             reward = 0.0
-        print(f"reward:{reward}")
         # 获取下一个状态
         next_state = self._get_environment_state()
-
-        # 将动作转换为向量形式
-        vector = []
-        for i in range(Config.NUM_VEHICLES):
-            upload_batches = action["upload_decisions"][i][1]
-            bandwidth_ratio = action["bandwidth_allocations"][i]
-            vector.extend([upload_batches, bandwidth_ratio])
-        action_vector = np.array(vector, dtype=np.float32)
+        action_vector = np.array(batch_choices, dtype=np.float32)
 
         # 存储经验并优化DRL模型
-        self.drl_agent.memory.push(state, action_vector, reward, next_state, False)
+        self.drl_agent.store_experience(state, action_vector, reward, next_state, False)
+
         if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
             self.drl_agent.optimize_model()
 
         print(
-            f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 时延: {total_delay:.2f}s, 奖励: {reward:.4f}"
+            f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 奖励: {reward:.4f}"
         )
 
         return reward

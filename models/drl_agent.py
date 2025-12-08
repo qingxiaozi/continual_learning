@@ -212,9 +212,13 @@ class DRLAgent:
 
         return action_vector, batch_choices
 
-    def store_experience(self, state, batch_choices, reward, next_state, done, td_error=None):
-        """存储经验到优先回放缓冲区"""
-        self.memory.push(state, batch_choices, reward, next_state, done, td_error)
+    def store_experience(self, state, action_vector, reward, next_state, done):
+        """存储经验"""
+        # 将动作向量转换为批次选择列表
+        batch_choices = action_vector.astype(np.int32).tolist()
+
+        # 存储到优先回放缓冲区（不提供初始TD误差）
+        self.memory.push(state, batch_choices, reward, next_state, done, td_error=None)
 
     def optimize_model(self):
         """优化模型（使用Double DQN和优先经验回放）"""
@@ -316,87 +320,3 @@ class DRLAgent:
         self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
         self.steps_done = checkpoint.get("steps_done", 0)
-
-
-# class IntegratedController:
-#     """集成控制器：结合DQN决策和带宽分配"""
-
-#     def __init__(self, state_dim):
-#         self.agent = DRLAgent(state_dim)
-
-#     def make_decision(self, state, available_batches=None,vehicle_states=None):
-#         """
-#         做出完整决策
-#         Returns:
-#             complete_action: 完整动作向量 [批次1, 带宽1, 批次2, 带宽2, ...]
-#             batch_choices: 批次选择列表
-#         """
-#         # 1. DQN选择批次
-#         action_vector, batch_choices = self.agent.select_action(state, available_batches=available_batches)
-
-#         # 2. 分配带宽
-#         bandwidth_ratios = allocate_bandwidth(batch_choices, vehicle_states)
-
-#         # 3. 更新动作向量中的带宽部分
-#         for i in range(len(batch_choices)):
-#             action_vector[i * 2 + 1] = bandwidth_ratios[i]
-
-#         return action_vector, batch_choices
-
-#     def train_step(self, state, batch_choices, reward, next_state, done, td_error_estimate=None):
-#         """训练一步"""
-#         # 存储经验
-#         self.agent.store_experience(state, batch_choices, reward, next_state, done, td_error_estimate)
-
-#         # 优化模型
-#         loss = self.agent.optimize_model()
-#         return loss
-
-
-# if __name__ == "__main__":
-#     # 状态维度：每个车辆有3个状态特征（置信度、测试损失、加权奖励）
-#     state_dim = 3 * Config.NUM_VEHICLES
-
-#     # 创建集成控制器
-#     controller = IntegratedController(state_dim)
-
-#     # 模拟状态（3个特征 × 车辆数）
-#     test_state = np.random.randn(state_dim)
-
-#     # 模拟车辆可用批次（每辆车的实际可上传批次数量）
-#     test_available_batches = np.random.randint(0, Config.MAX_UPLOAD_BATCHES+1, Config.NUM_VEHICLES)
-
-#     # 模拟车辆状态（可选，用于带宽分配）
-#     test_vehicle_states = []
-#     for i in range(Config.NUM_VEHICLES):
-#         # 每个车辆的状态：[数据质量, 信道条件, 优先级]
-#         quality = np.random.rand()  # 数据质量 0-1
-#         channel = np.random.rand()  # 信道条件 0-1
-#         priority = np.random.rand()  # 优先级 0-1
-#         test_vehicle_states.append([quality, channel, priority])
-
-#     # 做出决策（考虑可用批次限制）
-#     action, batches = controller.make_decision(
-#         test_state,
-#         available_batches=test_available_batches,
-#         vehicle_states=test_vehicle_states
-#     )
-
-#     # 打印结果
-#     print(f"车辆数: {Config.NUM_VEHICLES}")
-#     print(f"最大上传批次: {Config.MAX_UPLOAD_BATCHES}")
-#     print(f"可用批次: {test_available_batches}")
-#     print(f"选择的批次: {batches}")
-#     print(f"选择的批次是否超出可用: {any(b > a for b, a in zip(batches, test_available_batches))}")
-#     print(f"带宽比例: {action[1::2]}")
-#     print(f"总带宽和: {sum(action[1::2]):.4f}")
-
-#     # 模拟训练一步
-#     next_state = np.random.randn(state_dim)
-#     reward = np.random.randn()
-#     done = False
-
-#     # 训练
-#     loss = controller.train_step(test_state, batches, reward, next_state, done)
-#     if loss is not None:
-#         print(f"训练损失: {loss:.4f}")
