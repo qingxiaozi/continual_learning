@@ -390,6 +390,11 @@ class BaselineComparison:
         print(f"调试信息：经训练后，根据mab选择器结果，所获得的quality_scores为：")
         print(quality_scores)
 
+        # # ✅ 新增调试信息
+        # print(f"=== 调试信息 ===")
+        # print(f"quality_scores长度: {len(quality_scores)}")
+        # print(f"batch_mapping大小: {len(batch_mapping)}")
+
         # 按车辆分组质量评分
         vehicle_scores = {}
         for global_batch_idx, quality_score in enumerate(quality_scores):
@@ -405,6 +410,15 @@ class BaselineComparison:
                         "quality_score": quality_score,
                     }
                 )
+
+        #  # ✅ 新增：检查哪些车辆有评分
+        # print(f"有质量评分的车辆数: {len(vehicle_scores)}")
+        # for vehicle_id in vehicle_scores:
+        #     old_count = len(vehicle_scores[vehicle_id]["old"])
+        #     new_count = len(vehicle_scores[vehicle_id]["new"])
+        #     print(f"  车辆{vehicle_id}: {old_count}个旧批次, {new_count}个新批次")
+
+
         # 更新每个车辆缓存的质量评分
         for vehicle_id, scores_by_type in vehicle_scores.items():
             cache = self.cache_manager.get_vehicle_cache(vehicle_id)
@@ -437,21 +451,21 @@ class BaselineComparison:
                 )
 
             # 统计信息
-            total_batches = len(old_scores_info) + len(new_scores_info)
-            all_scores = [
-                info["quality_score"] for info in old_scores_info + new_scores_info
-            ]
+            # total_batches = len(old_scores_info) + len(new_scores_info)
+            # all_scores = [
+            #     info["quality_score"] for info in old_scores_info + new_scores_info
+            # ]
 
-            print(
-                f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
-                f"平均质量 {np.mean(all_scores):.4f}"
-            )
+            # print(
+            #     f"车辆 {vehicle_id} 质量评分更新: {total_batches} 个批次参与训练, "
+            #     f"平均质量 {np.mean(all_scores):.4f}"
+            # )
 
-        # import json
-        # cache_stats = self.cache_manager.get_cache_stats()
-        # formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
-        # print("缓存更新后车辆的缓存信息:")
-        # print(formatted_stats)
+        import json
+        cache_stats = self.cache_manager.get_cache_stats()
+        formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
+        print("缓存更新后车辆的缓存信息:")
+        print(formatted_stats)
 
     def _compute_weighted_loss_on_uploaded_data(self, model):
         """计算模型在上传数据上的损失"""

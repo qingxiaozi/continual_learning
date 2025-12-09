@@ -85,7 +85,9 @@ class ContinualLearner:
                 loss_before, inputs, targets = self._compute_batch_loss(batch)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
+                # loss = self.criterion(outputs, targets)  # 原始损失
+                loss = self._elastic_net_loss(outputs, targets, self.model)  # 弹性正则损失
+
                 loss.backward()
                 self.optimizer.step()
 
@@ -249,3 +251,4 @@ class ContinualLearner:
     def get_batch_rankings(self):
         """获取批次排序（基于UCB选择次数）"""
         return self.mab_selector.get_batch_rankings()
+

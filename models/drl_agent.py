@@ -187,19 +187,22 @@ class DRLAgent:
 
         batch_choices = []
         for v in range(self.num_vehicles):
-            # 获取该车辆的最大可用批次
-            max_available = available_batches[v]
-            if max_available <= 0:
-                # 没有可用数据，只能选择0
+            # ✅ 新增：获取最大上传批次限制
+            max_upload_limit = Config.MAX_UPLOAD_BATCHES if hasattr(Config, 'MAX_UPLOAD_BATCHES') else self.num_batch_choices - 1
+
+            # 获取该车辆的实际可用批次和上传限制中的较小值
+            max_allowed = min(available_batches[v], max_upload_limit)
+
+            if max_allowed <= 0:
+                # 没有可用数据或超过限制，只能选择0
                 batch = 0
             else:
                 if random.random() < epsilon:
-                    # 随机探索：在可用范围内随机选择
-                    batch = random.randint(0, max_available)
+                    # 随机探索：在允许范围内随机选择
+                    batch = random.randint(0, max_allowed)
                 else:
-                    # 利用：选择最大Q值的批次，但不超过可用数量
-                    # 只考虑前max_available+1个动作（从0到max_available）
-                    valid_q_values = q_values[v, :max_available+1]
+                    # 利用：选择最大Q值的批次，但不超过允许数量
+                    valid_q_values = q_values[v, :max_allowed+1]
                     batch = valid_q_values.argmax().item()
 
             batch_choices.append(batch)

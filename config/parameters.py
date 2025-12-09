@@ -4,8 +4,8 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 3  # train session
-    NUM_EPOCH = 30  # 训练epoch数
+    NUM_TRAINING_SESSIONS = 30  # train session
+    NUM_EPOCH = 60  # 训练epoch数
     BATCH_SIZE = 16  # batch size
     INIT_EPOCHS = 5  # MAB初始探索轮次
 
@@ -34,7 +34,7 @@ class Config:
     DRL_LEARNING_RATE = 0.001  # 优化器的学习率
     DRL_GAMMA = 0.99  # 折扣因子
     DRL_BUFFER_SIZE = 10000  # 经验回放缓冲区大小
-    DRL_BATCH_SIZE = 32  # batch size
+    DRL_BATCH_SIZE = 8  # batch size
 
     # 缓存参数
     MAX_CACHE_SIZE = 1000  # 边缘服务器的最大缓存批次
