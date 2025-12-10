@@ -401,35 +401,113 @@ class DomainIncrementalDataSimulator:
 
         results = {}
 
-        if strategy == "current":
-            # 仅评估当前域
-            current_domain = self.get_current_domain()
-            current_results = self._evaluate_on_domain(model, current_domain)
-            results["current_domain"] = current_results
-            results["current_domain_name"] = current_domain
+        # 计算当前域的性能
+        current_domain = self.get_current_domain()
+        current_results = self._evaluate_on_domain(model, current_domain)
+        results["current_domain"] = current_results
+        results["current_domain_name"] = current_domain
 
-        elif strategy == "cumulative":
-            # 评估所有已见域
-            cumulative_results = {}
+        # 保存当前评估结果到历史
+        if not hasattr(self, 'accuracy_history'):
+            self.accuracy_history = {}  # 存储格式: {domain: [a1, a2, ..., ak]}
+        if not hasattr(self, 'aa_history'):
+            self.aa_history = []
 
-            for domain in self.seen_domains:
-                domain_key = f"{self.current_dataset}_{domain}"
-                if domain_key in self.seen_domains_test_sets:
-                    domain_results = self._evaluate_on_domain(model, domain)
-                    cumulative_results[domain] = domain_results
+        # 获取当前任务/域索引
+        current_task_idx = self.seen_domains.index(current_domain) if current_domain in self.seen_domains else -1
+        k = current_task_idx + 1  # k: 当前已学习的任务数量
 
-            # 计算平均性能
-            if cumulative_results:
-                accuracies = [
-                    result["accuracy"] for result in cumulative_results.values()
-                ]
-                losses = [result["loss"] for result in cumulative_results.values()]
+        # 评估所有已见域的性能
+        cumulative_results = {}
+        for domain in self.seen_domains:
+            if domain == current_domain:
+                cumulative_results[domain] = current_results
+            else:
+                domain_results = self._evaluate_on_domain(model, domain)
+                cumulative_results[domain] = domain_results
 
-                results["cumulative"] = {
-                    "average_accuracy": np.mean(accuracies),
-                    "average_loss": np.mean(losses),
-                    "domain_results": cumulative_results,
-                }
+        # 更新历史记录
+        for domain, result in cumulative_results.items():
+            if domain not in self.accuracy_history:
+                self.accuracy_history[domain] = []
+            self.accuracy_history[domain].append(result["accuracy"])
+
+        # 提取准确率矩阵的当前行
+        current_accuracies = {}
+        for domain in self.seen_domains:
+            if domain in self.accuracy_history:
+                history = self.accuracy_history[domain]
+                # 当前性能是历史记录的最后一个值
+                current_accuracies[domain] = history[-1] if history else 0.0
+
+        aa_k = 0.0
+        aia_k = 0.0
+        fm_k = 0.0
+        bwt_k = 0.0
+
+        # 计算四种指标
+        if k > 0:  # 至少学习了一个任务
+            # 1. 平均准确率 AA_k
+            aa_k = np.mean(list(current_accuracies.values()))
+
+            # 2. 平均增量准确率 AIA_k
+            if not hasattr(self, 'aa_history'):
+                self.aa_history = []
+            self.aa_history.append(aa_k)
+            aia_k = np.mean(self.aa_history)
+
+            # 3. 遗忘度量 FM_k (仅当k>1时计算)
+            if k > 1:
+                forgetting_values = []
+                for j, domain in enumerate(self.seen_domains[:k-1], 1):
+                    if domain in self.accuracy_history:
+                        history = self.accuracy_history[domain][:k-1]  # 历史最佳只考虑前k-1次
+                        if history:  # 确保有历史数据
+                            max_historical = max(history)
+                            current_acc = current_accuracies.get(domain, 0.0)
+                            forgetting = max_historical - current_acc
+                            forgetting_values.append(forgetting)
+
+                fm_k = np.mean(forgetting_values) if forgetting_values else 0.0
+            else:
+                fm_k = 0.0
+
+            # 将指标添加到结果中
+            results["metrics"] = {
+                "AA": aa_k,          # 平均准确率
+                "AIA": aia_k,        # 平均增量准确率
+                "FM": fm_k,          # 遗忘度量
+                "BWT": bwt_k,        # 反向迁移
+                "k": k               # 当前任务数
+            }
+
+            # 4. 反向迁移 BWT_k (仅当k>1时计算)
+            if k > 1:
+                bwt_values = []
+                for j, domain in enumerate(self.seen_domains[:k-1], 1):
+                    if domain in self.accuracy_history:
+                        history = self.accuracy_history[domain]
+                        if len(history) >= j:  # 确保有初始性能记录
+                            initial_acc = history[j-1]  # a_{j,j}
+                            current_acc = current_accuracies.get(domain, 0.0)
+                            bwt = current_acc - initial_acc
+                            bwt_values.append(bwt)
+
+                bwt_k = np.mean(bwt_values) if bwt_values else 0.0
+            else:
+                bwt_k = 0.0
+
+
+        # 保持原有的累积评估结果
+        if cumulative_results:
+            accuracies = [result["accuracy"] for result in cumulative_results.values()]
+            losses = [result["loss"] for result in cumulative_results.values()]
+
+            results["cumulative"] = {
+                "average_accuracy": np.mean(accuracies),
+                "average_loss": np.mean(losses),
+                "domain_results": cumulative_results,
+            }
 
         return results
 

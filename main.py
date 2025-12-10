@@ -126,9 +126,9 @@ class BaselineComparison:
             # 步骤11: 模型广播和更新
             self._broadcast_and_update_models()
 
-            print(
-                f"会话 {session + 1} 完成 - 准确率: {evaluation_results['current_accuracy']:.4f}"
-            )
+            # print(
+            #     f"会话 {session + 1} 完成 - 准确率: {evaluation_results['current_accuracy']:.4f}"
+            # )
 
         # 最终评估和结果汇总
         self._final_evaluation_and_summary()
@@ -504,28 +504,59 @@ class BaselineComparison:
 
     def _evaluate_model_performance(self):
         """评估模型性能"""
-        # 评估当前域性能
-        current_test_data = self.data_simulator.get_test_dataset(self.current_domain)
-        if current_test_data:
-            accuracy, loss = self.evaluator.evaluate_model(
-                self.global_model, current_test_data
-            )
-        else:
-            accuracy, loss = 0.0, float("inf")
+        # # 评估当前域性能
+        # current_test_data = self.data_simulator.get_test_dataset(self.current_domain)
+        # if current_test_data:
+        #     accuracy, loss = self.evaluator.evaluate_model(
+        #         self.global_model, current_test_data
+        #     )
+        # else:
+        #     accuracy, loss = 0.0, float("inf")
 
-        # 累积评估（所有已见域）
-        cumulative_results = self.data_simulator.evaluate_model(
+        # # 累积评估（所有已见域）
+        # cumulative_results = self.data_simulator.evaluate_model(
+        #     self.global_model, strategy="cumulative"
+        # )
+
+        # eval_results = {
+        #     "current_accuracy": accuracy,
+        #     "current_loss": loss,
+        #     "cumulative_results": cumulative_results,
+        #     "current_domain": self.current_domain,
+        # }
+        # print(f"eval_results:{eval_results}")
+        # return eval_results
+        evaluation_results = self.data_simulator.evaluate_model(
             self.global_model, strategy="cumulative"
         )
-
-        eval_results = {
-            "current_accuracy": accuracy,
-            "current_loss": loss,
-            "cumulative_results": cumulative_results,
-            "current_domain": self.current_domain,
-        }
-        print(f"eval_results:{eval_results}")
-        return eval_results
+        # 提取核心指标
+        if "metrics" in evaluation_results:
+            metrics = evaluation_results["metrics"]
+            # 构建简洁的指标字典
+            eval_results = {
+                # 四个核心连续学习指标
+                "AA": metrics["AA"],      # 平均准确率
+                "AIA": metrics["AIA"],    # 平均增量准确率
+                "FM": metrics["FM"],      # 遗忘度量
+                "BWT": metrics["BWT"],    # 反向迁移
+                "current_task": metrics["k"],  # 当前任务数
+                "current_domain": self.current_domain,
+            }
+            # 保留当前域的详细结果
+            if "current_domain" in evaluation_results:
+                current_domain_results = evaluation_results["current_domain"]
+                eval_results["current_domain_accuracy"] = current_domain_results.get("accuracy", 0.0)
+                eval_results["current_domain_loss"] = current_domain_results.get("loss", 0.0)
+        else:
+            print("无指标信息")
+        # 打印简洁的核心指标
+        print(f"连续学习指标 (任务 {eval_results.get('current_task', 0)}):")
+        print(f"  AA: {eval_results.get('AA', 0.0):.4f}   - 当前模型平均准确率")
+        print(f"  AIA: {eval_results.get('AIA', 0.0):.4f}  - 平均增量准确率")
+        print(f"  FM: {eval_results.get('FM', 0.0):.4f}   - 遗忘度量 (越小越好)")
+        print(f"  BWT: {eval_results.get('BWT', 0.0):.4f}  - 反向迁移 (正为好)")
+        print(f"  current_domain_accuracy: {eval_results.get('current_domain_accuracy', 0.0):.4f}")
+        print(f"  current_domain_loss: {eval_results.get('current_domain_loss', 0.0):.4f}")
 
     def _calculate_reward_and_optimize(
         self, state, batch_choices, eval_results, comm_results, training_results
@@ -568,27 +599,46 @@ class BaselineComparison:
         self, session, eval_results, comm_results, training_results
     ):
         """记录会话结果"""
-        self.results["session_accuracies"].append(eval_results["current_accuracy"])
-        self.results["session_losses"].append(eval_results["current_loss"])
-        self.results["communication_delays"].append(comm_results["total_delay"])
+        # # 1. 记录核心连续学习指标
+        # if "AA" in eval_results:  # 确保有连续学习指标
+        #     self.results.setdefault("continual_learning_metrics", []).append({
+        #         "session": session,
+        #         "AA": eval_results.get("AA", 0.0),
+        #         "AIA": eval_results.get("AIA", 0.0),
+        #         "FM": eval_results.get("FM", 0.0),
+        #         "BWT": eval_results.get("BWT", 0.0),
+        #         "task": eval_results.get("current_task", 0),
+        #         "domain": eval_results.get("current_domain", "unknown")
+        #     })
 
-        # 记录域性能
-        current_domain = eval_results["current_domain"]
-        self.results["domain_performance"][current_domain].append(
-            eval_results["current_accuracy"]
-        )
+        # # 2. 记录当前域性能
+        # current_domain = eval_results.get("current_domain", "unknown")
+        # current_accuracy = eval_results.get("current_domain_accuracy", 0.0)
+        # current_loss = eval_results.get("current_domain_loss", 0.0)
 
-        # 记录缓存利用率
-        cache_stats = self.cache_manager.get_cache_stats()
-        avg_utilization = np.mean(
-            [
-                stats["total_size"] / Config.MAX_LOCAL_BATCHES
-                for stats in cache_stats.values()
-            ]
-        )
-        self.results["cache_utilization"].append(avg_utilization)
-        # 添加数据异质性可视化
-        if session % Config.DOMAIN_CHANGE_INTERVAL == 0:  # 每次域切换时绘制
+        # self.results["session_accuracies"].append(current_accuracy)
+        # self.results["session_losses"].append(current_loss)
+
+        # # 3. 记录域性能历史
+        # if current_domain not in self.results["domain_performance"]:
+        #     self.results["domain_performance"][current_domain] = []
+        # self.results["domain_performance"][current_domain].append(current_accuracy)
+
+        # # 4. 记录通信延迟
+        # self.results["communication_delays"].append(comm_results.get("total_delay", 0.0))
+
+        # # 5. 记录缓存利用率（可选）
+        # if hasattr(self, 'cache_manager'):
+        #     cache_stats = self.cache_manager.get_cache_stats()
+        #     if cache_stats:
+        #         avg_utilization = np.mean([
+        #             stats.get("total_size", 0) / Config.MAX_LOCAL_BATCHES
+        #             for stats in cache_stats.values()
+        #         ])
+        #         self.results.setdefault("cache_utilization", []).append(avg_utilization)
+
+        # 6. 数据异质性可视化（按需）
+        if session % Config.DOMAIN_CHANGE_INTERVAL == 0 and hasattr(self, 'visualize'):
             self.visualize.plot_data_heterogeneity(
                 self.data_simulator,
                 session,

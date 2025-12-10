@@ -532,3 +532,172 @@ class ResultVisualizer:
             f"类别覆盖情况: 平均每个类别被 {np.mean(list(class_coverage.values())):.1f} 辆车覆盖"
         )
         print("====================================\n")
+
+    def plot_continual_learning_metrics(self, results, save_path=None, show_plot=True):
+        """
+        绘制连续学习指标随域切换的变化趋势
+
+        参数:
+            results: 包含记录结果的字典
+            save_path: 保存图片的路径（可选）
+            show_plot: 是否显示图片
+        """
+        if "continual_learning_metrics" not in results or not results["continual_learning_metrics"]:
+            print("没有找到连续学习指标数据")
+            return
+
+        metrics_data = results["continual_learning_metrics"]
+
+        # 提取数据
+        sessions = [m["session"] for m in metrics_data]
+        tasks = [m["task"] for m in metrics_data]
+        domains = [m["domain"] for m in metrics_data]
+
+        # 四个核心指标
+        aa_values = [m["AA"] for m in metrics_data]
+        aia_values = [m["AIA"] for m in metrics_data]
+        fm_values = [m["FM"] for m in metrics_data]
+        bwt_values = [m["BWT"] for m in metrics_data]
+
+        # 创建图形
+        fig, axes = plt.subplots(3, 2, figsize=(14, 12))
+        fig.suptitle('Continual Learning Metrics Evolution', fontsize=16, fontweight='bold')
+
+        # 设置白色背景
+        fig.patch.set_facecolor('white')
+        for ax in axes.flat:
+            ax.set_facecolor('white')
+
+        # 1. 平均准确率 (AA) 趋势
+        ax1 = axes[0, 0]
+        ax1.plot(sessions, aa_values, 'b-', linewidth=2, marker='o', markersize=4)
+        ax1.set_xlabel('Session', fontsize=10)
+        ax1.set_ylabel('AA (Average Accuracy)', fontsize=10)
+        ax1.set_title('Average Accuracy Trend', fontsize=12, fontweight='bold')
+        ax1.grid(True, alpha=0.3, linestyle='--')
+        ax1.set_ylim(0, 1.05)
+
+        # 标记域切换点
+        self._mark_domain_changes(ax1, sessions, tasks, domains)
+
+        # 2. 平均增量准确率 (AIA) 趋势
+        ax2 = axes[0, 1]
+        ax2.plot(sessions, aia_values, 'g-', linewidth=2, marker='s', markersize=4)
+        ax2.set_xlabel('Session', fontsize=10)
+        ax2.set_ylabel('AIA (Average Incremental Accuracy)', fontsize=10)
+        ax2.set_title('Average Incremental Accuracy Trend', fontsize=12, fontweight='bold')
+        ax2.grid(True, alpha=0.3, linestyle='--')
+        ax2.set_ylim(0, 1.05)
+
+        # 3. 遗忘度量 (FM) 趋势
+        ax3 = axes[1, 0]
+        ax3.plot(sessions, fm_values, 'r-', linewidth=2, marker='^', markersize=4)
+        ax3.set_xlabel('Session', fontsize=10)
+        ax3.set_ylabel('FM (Forgetting Measure)', fontsize=10)
+        ax3.set_title('Forgetting Measure Trend (lower is better)', fontsize=12, fontweight='bold')
+        ax3.grid(True, alpha=0.3, linestyle='--')
+        ax3.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+
+        # 4. 反向迁移 (BWT) 趋势
+        ax4 = axes[1, 1]
+        ax4.plot(sessions, bwt_values, 'purple', linewidth=2, marker='d', markersize=4)
+        ax4.set_xlabel('Session', fontsize=10)
+        ax4.set_ylabel('BWT (Backward Transfer)', fontsize=10)
+        ax4.set_title('Backward Transfer Trend (positive is good)', fontsize=12, fontweight='bold')
+        ax4.grid(True, alpha=0.3, linestyle='--')
+        ax4.axhline(y=0, color='gray', linestyle='--', alpha=0.5)
+
+        # 5. 任务/域切换信息
+        ax5 = axes[2, 0]
+        self._plot_task_domain_info(ax5, sessions, tasks, domains)
+
+        # 6. 指标对比图
+        ax6 = axes[2, 1]
+        self._plot_metrics_comparison(ax6, sessions, aa_values, aia_values, fm_values, bwt_values)
+
+        plt.tight_layout()
+
+        # 保存图片
+        if save_path:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
+            print(f"图片已保存到: {save_path}")
+
+        # 显示图片
+        if show_plot:
+            plt.show()
+        else:
+            plt.close()
+
+    def _mark_domain_changes(self, ax, sessions, tasks, domains):
+        """在图上标记域切换点"""
+        current_domain = None
+        change_points = []
+
+        for i, domain in enumerate(domains):
+            if domain != current_domain:
+                change_points.append((sessions[i], domain))
+                current_domain = domain
+
+        for session, domain in change_points:
+            ax.axvline(x=session, color='orange', linestyle=':', alpha=0.5, linewidth=1)
+            ax.text(session, ax.get_ylim()[1]*0.95, domain,
+                   rotation=90, fontsize=8, alpha=0.7,
+                   verticalalignment='top')
+
+    def _plot_task_domain_info(self, ax, sessions, tasks, domains):
+        """绘制任务和域信息"""
+        ax.set_title('Task/Domain Progression', fontsize=12, fontweight='bold')
+        ax.set_xlabel('Session', fontsize=10)
+
+        # 创建颜色映射
+        unique_domains = list(dict.fromkeys(domains))  # 保持顺序去重
+        colors = plt.cm.Set3(np.linspace(0, 1, len(unique_domains)))
+        domain_to_color = {domain: colors[i] for i, domain in enumerate(unique_domains)}
+
+        # 绘制任务条形图
+        for i, (session, task, domain) in enumerate(zip(sessions, tasks, domains)):
+            color = domain_to_color.get(domain, 'gray')
+            ax.barh(task, 1, left=session-0.5, height=0.8,
+                   color=color, alpha=0.7, edgecolor='black', linewidth=0.5)
+            if i == 0 or domains[i] != domains[i-1]:
+                ax.text(session, task, f"{domain}\n(T{task})",
+                       fontsize=7, ha='center', va='center')
+
+        ax.set_yticks(sorted(set(tasks)))
+        ax.set_ylabel('Task Number', fontsize=10)
+        ax.grid(True, alpha=0.3, axis='x')
+
+    def _plot_metrics_comparison(self, ax, sessions, aa, aia, fm, bwt):
+        """绘制指标对比图（归一化后）"""
+        ax.set_title('Normalized Metrics Comparison', fontsize=12, fontweight='bold')
+        ax.set_xlabel('Session', fontsize=10)
+        ax.set_ylabel('Normalized Value', fontsize=10)
+
+        # 归一化处理（FM和BWT需要特殊处理）
+        aa_norm = aa  # AA已经在0-1范围内
+        aia_norm = aia  # AIA也在0-1范围内
+
+        # FM归一化到0-1（越小越好）
+        if max(fm) > 0:
+            fm_norm = [1 - f/max(fm) for f in fm]  # 反转，越高越好
+        else:
+            fm_norm = [0] * len(fm)
+
+        # BWT归一化到0-1（处理负值）
+        bwt_min = min(bwt)
+        bwt_max = max(bwt)
+        if bwt_max > bwt_min:
+            bwt_norm = [(b - bwt_min) / (bwt_max - bwt_min) for b in bwt]
+        else:
+            bwt_norm = [0.5] * len(bwt)
+
+        # 绘制归一化后的指标
+        ax.plot(sessions, aa_norm, 'b-', label='AA', linewidth=2)
+        ax.plot(sessions, aia_norm, 'g--', label='AIA', linewidth=2)
+        ax.plot(sessions, fm_norm, 'r-.', label='FM (inverted)', linewidth=2)
+        ax.plot(sessions, bwt_norm, 'purple:', label='BWT (normalized)', linewidth=2)
+
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.set_ylim(-0.1, 1.1)
