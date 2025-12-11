@@ -121,7 +121,7 @@ class ResultVisualizer:
         if not sample_counts:
             return
 
-        fig, ax = plt.subplots(figsize=(7, 4))
+        fig, ax = plt.subplots(figsize=(9, 6))
         fig.patch.set_facecolor('white')
         ax.set_facecolor('white')
 
@@ -139,10 +139,11 @@ class ResultVisualizer:
         # 图表设置
         ax.set_title(f"Data Distribution - Session {session}", fontsize=11, pad=8)
         ax.set_xlabel("Vehicle ID", fontsize=9)
-        ax.set_ylabel("Class", fontsize=7)
+        ax.set_ylabel("Class", fontsize=9)
         ax.set_xticks(range(data_simulator.num_vehicles))
         ax.set_yticks(range(num_classes))
         ax.set_yticklabels([f"C{i}" for i in range(num_classes)])
+        ax.tick_params(axis='y', labelsize=8)
 
         cbar = fig.colorbar(scatter, ax=ax)
         cbar.set_label("Samples", fontsize=8)
