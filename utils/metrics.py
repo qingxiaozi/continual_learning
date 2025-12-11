@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import defaultdict
 import os
+import time
+from datetime import datetime
 
 
 class ResultVisualizer:
@@ -558,6 +560,7 @@ class ResultVisualizer:
 
             # 创建保存目录
             os.makedirs(self.save_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             # 生成所有图表并保存
             plots = [
@@ -572,7 +575,7 @@ class ResultVisualizer:
             for plot_func, name in plots:
                 fig = plot_func(session_history)
                 if fig is not None:
-                    filename = f"{prefix}{name}_session{session_history[-1]['session']}.png"
+                    filename = f"{prefix}{name}_session{session_history[-1]['session']}_{timestamp}.png"
                     filepath = os.path.join(self.save_dir, filename)
                     fig.savefig(filepath, dpi=150, bbox_inches='tight')
                     plt.close(fig)
