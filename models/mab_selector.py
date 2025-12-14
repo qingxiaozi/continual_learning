@@ -23,9 +23,9 @@ class MABDataSelector:
                 ucb_values[arm] = float("inf")
             else:
                 exploitation = self.avg_rewards[arm]  # 利用项为该臂的平均奖励
-                exploration = self.exploration_factor * np.sqrt(
-                    2 * np.log(total_steps) / self.counts[arm]
-                )  # 探索项基于选择次数
+                exploration = np.sqrt(
+                    self.exploration_factor * np.log(np.sum(self.ucb_counts)+1) / (self.ucb_counts[arm] + 1e-6)
+                )  # 探索项基于UCB选择次数
                 ucb_values[arm] = exploitation + exploration
 
         return np.argmax(ucb_values)
@@ -47,15 +47,23 @@ class MABDataSelector:
         self.ucb_counts[arm] += 1
 
     def get_batch_quality_scores(self):
-        """获取所有批次的归一化质量评分"""
+        """获取所有批次的UCB质量评分（利用项 + 探索项）"""
+        # 确保至少有被选择的臂
         if np.sum(self.ucb_counts) == 0:
             return np.zeros(self.num_arms)
-        # 质量评分 = MAB选择次数 * 平均奖励
-        quality_scores = self.ucb_counts * self.avg_rewards / self.num_arms
-        # if np.sum(quality_scores) > 0:
-        #     quality_scores = quality_scores / self.num_arms
 
-        return quality_scores
+        total_ucb_selections = np.sum(self.ucb_counts)
+        scores = np.zeros(self.num_arms)
+
+        for arm in range(self.num_arms):
+            if self.ucb_counts[arm] > 0:
+                exploitation = self.avg_rewards[arm]
+                exploration = np.sqrt(
+                    self.exploration_factor * np.log(total_ucb_selections) / self.ucb_counts[arm]
+                )
+                scores[arm] = exploitation + exploration
+
+        return scores
 
     def get_batch_statistics(self):
         """获取所有批次的详细统计信息"""
@@ -67,43 +75,14 @@ class MABDataSelector:
                 "avg_reward": self.avg_rewards[arm],
                 "ucb_count": self.ucb_counts[arm],
                 "quality_score": (
-                    self.ucb_counts[arm] * self.avg_rewards[arm] / self.num_arms
+                    self.avg_rewards[arm] + np.sqrt(
+                        self.exploration_factor * np.log(np.sum(self.ucb_counts)) / (self.ucb_counts[arm])
+                    )
                     if self.ucb_counts[arm] > 0
                     else 0
                 ),
             }
         return stats
-
-    # def calculate_batch_reward(self, model, batch, criterion):
-    #     """计算使用批次更新后的奖励（损失下降）"""
-    #     if batch is None:
-    #         return 0.0
-
-    #     # 获取当前损失
-    #     model.eval()
-    #     current_loss = 0.0
-    #     count = 0
-
-    #     with torch.no_grad():
-    #         for data in batch:
-    #             if isinstance(data, (list, tuple)):
-    #                 inputs, targets = data
-    #             else:
-    #                 inputs = data
-    #                 # 对于无标签数据，使用模型预测作为伪标签
-    #                 with torch.no_grad():
-    #                     targets = torch.argmax(model(inputs), dim=1)
-
-    #             outputs = model(inputs)
-    #             loss = criterion(outputs, targets)
-    #             current_loss += loss.item()
-    #             count += 1
-
-    #     avg_current_loss = current_loss / count if count > 0 else 0.0
-
-    #     # 这里简化：实际应该比较更新前后的损失
-    #     # 返回负损失作为奖励（损失越小越好）
-    #     return -avg_current_loss
 
     def reset(self):
         """重置MAB状态"""
