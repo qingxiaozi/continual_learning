@@ -456,21 +456,40 @@ class DomainIncrementalDataSimulator:
             self.aa_history.append(aa_k)
             aia_k = np.mean(self.aa_history)
 
-            # 3. 遗忘度量 FM_k (仅当k>1时计算)
+            # 3. 遗忘度量 FM_k (需要修正)
             if k > 1:
                 forgetting_values = []
-                for j, domain in enumerate(self.seen_domains[:k-1], 1):
+                for domain in self.seen_domains[:k-1]:  # 遍历前k-1个任务
                     if domain in self.accuracy_history:
-                        history = self.accuracy_history[domain][:k-1]  # 历史最佳只考虑前k-1次
-                        if history:  # 确保有历史数据
+                        history = self.accuracy_history[domain]
+                        if history:
+                            # 历史最佳：该任务所有历史评估中的最大值
                             max_historical = max(history)
                             current_acc = current_accuracies.get(domain, 0.0)
                             forgetting = max_historical - current_acc
                             forgetting_values.append(forgetting)
 
                 fm_k = np.mean(forgetting_values) if forgetting_values else 0.0
-            else:
-                fm_k = 0.0
+
+            # 4. 反向迁移 BWT_k (需要重大修正)
+            if k > 1:
+                bwt_values = []
+                for j, domain in enumerate(self.seen_domains[:k-1], 1):  # j从1到k-1
+                    if domain in self.accuracy_history:
+                        history = self.accuracy_history[domain]
+                        if len(history) > 0:
+                            # 关键修正：a_{j,j}是任务j首次出现时的准确率
+                            # 任务j在第j次评估时首次出现，所以应该是history[0]
+                            # 因为每个任务的历史列表从它首次出现开始记录
+                            initial_acc = history[0]  # 修正：用history[0]而不是history[j-1]
+                            current_acc = current_accuracies.get(domain, 0.0)
+                            bwt = current_acc - initial_acc
+                            bwt_values.append(bwt)
+                            # 调试输出
+                            print(f"BWT计算: 任务{domain}(j={j}), history={history}, "
+                                f"初始={initial_acc:.4f}, 当前={current_acc:.4f}, BWT={bwt:.4f}")
+
+                bwt_k = np.mean(bwt_values) if bwt_values else 0.0
 
             # 将指标添加到结果中
             results["metrics"] = {
@@ -480,23 +499,6 @@ class DomainIncrementalDataSimulator:
                 "BWT": bwt_k,        # 反向迁移
                 "k": k               # 当前任务数
             }
-
-            # 4. 反向迁移 BWT_k (仅当k>1时计算)
-            if k > 1:
-                bwt_values = []
-                for j, domain in enumerate(self.seen_domains[:k-1], 1):
-                    if domain in self.accuracy_history:
-                        history = self.accuracy_history[domain]
-                        if len(history) >= j:  # 确保有初始性能记录
-                            initial_acc = history[j-1]  # a_{j,j}
-                            current_acc = current_accuracies.get(domain, 0.0)
-                            bwt = current_acc - initial_acc
-                            bwt_values.append(bwt)
-
-                bwt_k = np.mean(bwt_values) if bwt_values else 0.0
-            else:
-                bwt_k = 0.0
-
 
         # 保持原有的累积评估结果
         if cumulative_results:
