@@ -501,7 +501,7 @@ class iCaRLReproducer:
             }, path)
             print(f"模型已保存到: {path}")
 
-    def run(self):
+    def run_iCaRL(self):
         """运行完整的iCaRL复现实验"""
         try:
             # 1. 设置数据
@@ -582,7 +582,7 @@ def test_quick():
 def main():
     """主函数"""
     print("iCaRL算法复现 - CIFAR-100数据集")
-    print("基于Avalanche框架实现 (修正版)")
+    print("基于Avalanche框架实现")
     print("="*60)
 
     # 检查Avalanche版本
