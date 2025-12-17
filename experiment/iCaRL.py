@@ -169,7 +169,7 @@ class iCaRLReproducer:
             total_classes = self.config['total_classes']
             self.classifier = nn.Linear(self.feature_dim, total_classes).to(self.device)
 
-            print(f"✅ 特征维度: {self.feature_dim}, 分类器输出: {total_classes}")
+            print(f"特征维度: {self.feature_dim}, 分类器输出: {total_classes}")
 
         else:
             raise ValueError(f"不支持模型: {self.config['model_name']}")
@@ -236,8 +236,10 @@ class iCaRLReproducer:
         print("设置iCaRL训练策略")
         print("="*60)
 
+        model_params = list(self.feature_extractor.parameters()) + list(self.classifier.parameters())
+
         optimizer = optim.SGD(
-            self.feature_extractor.parameters(),
+            model_params,
             lr=self.config['learning_rate'],
             momentum=self.config['momentum'],
             weight_decay=self.config['weight_decay']
@@ -618,11 +620,11 @@ def main():
             'log_tensorboard': True,
         }
         reproducer = iCaRLReproducer(config)
-        results = reproducer.run()
+        results = reproducer.run_iCaRL()
     else:
         # 默认完整实验模式
         reproducer = iCaRLReproducer()
-        results = reproducer.run()
+        results = reproducer.run_iCaRL()
 
     # 打印最终总结
     if results:
