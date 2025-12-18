@@ -81,7 +81,8 @@ class iCaRLReproducer:
             'buffer_transform': transforms.Compose([
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
-                # 注意：没有 ToTensor！没有 Normalize！
+                transforms.Normalize((0.5071, 0.4867, 0.4408),
+                                   (0.2675, 0.2565, 0.2761))
             ]),
 
             # 模型配置
@@ -178,6 +179,7 @@ class iCaRLReproducer:
         print(f"模型: {self.config['model_name']}")
         print(f"特征维度: {self.feature_dim}")
         print(f"参数量: {total_params:,}")
+        self.model = nn.Sequential(self.feature_extractor, self.classifier).to(self.device)
         return self.feature_extractor
 
 
@@ -281,178 +283,153 @@ class iCaRLReproducer:
         print("="*60)
 
         self.results = []
+        self.accuracy_matrix = []  # R[i][j]: 训练完任务 i 后，在任务 j 上的准确率
+        n_exps = self.config['n_experiences']
 
         # 遍历所有增量任务
         for exp_id, experience in enumerate(self.scenario.train_stream):
             print(f"\n{'='*50}")
-            print(f"任务 {exp_id+1}/{self.config['n_experiences']}")
+            print(f"任务 {exp_id+1}/{n_exps}")
             print(f"{'='*50}")
 
             # 显示当前任务的类别
             current_classes = sorted(experience.classes_in_this_experience)
             print(f"学习类别: {current_classes}")
-            print(f"类别数量: {len(current_classes)}")
 
             # 训练当前任务
             print(f"\n训练任务 {exp_id+1}...")
             self.strategy.train(experience)
 
-            # 评估当前模型在所有已见任务上的性能
-            print(f"评估任务 {exp_id+1}...")
-            eval_result = self.strategy.eval(self.scenario.test_stream)
-            self.results.append(eval_result)
+            # 评估：对每个已见任务（0 到 exp_id）单独测试
+            task_accuracies = []
+            for j in range(exp_id + 1):
+                test_exp = self.scenario.test_stream[j]
+                eval_res = self.strategy.eval([test_exp])
 
-            # 显示当前性能
-            # 尝试不同的键名
-            acc_keys = [
-                'Top1_Acc_Stream/eval_phase/test_stream',
-                'Top1_Acc_Stream_Phase_eval_Stream_test',
-                'Top1_Acc_Stream'
-            ]
+                # 尝试匹配 Avalanche 的准确率键名
+                acc = 0.0
+                # 标准键名（Avalanche >= 0.5）
+                key = f'Top1_Acc_Exp/eval_phase/test_stream/Task00{j}'
+                if key in eval_res:
+                    acc = eval_res[key]
+                else:
+                    # 兼容旧版或变体
+                    for k, v in eval_res.items():
+                        if f'Task00{j}' in k and 'Acc_Exp' in k and isinstance(v, (int, float)):
+                            acc = v
+                            break
+                task_accuracies.append(acc)
 
-            for key in acc_keys:
-                if key in eval_result:
-                    print(f"当前累计准确率: {eval_result[key]:.2%}")
-                    break
+            # 补零至总任务数（便于后续处理）
+            while len(task_accuracies) < n_exps:
+                task_accuracies.append(0.0)
+
+            self.accuracy_matrix.append(task_accuracies)
+
+            # 全局评估（用于日志）
+            global_eval = self.strategy.eval(self.scenario.test_stream[:exp_id+1])
+            self.results.append(global_eval)
+
+            # 打印当前累计准确率（stream accuracy）
+            seen_accs = task_accuracies[:exp_id+1]
+            stream_acc = np.mean(seen_accs) if seen_accs else 0.0
+            print(f"当前累计准确率 (Stream Acc): {stream_acc:.2%}")
 
         return self.results
 
-    def compute_custom_metrics(self):
-        """计算自定义的持续学习指标"""
-        if not self.results or len(self.results) < 2:
-            return {}
+    def extract_stream_accuracies_from_matrix(self):
+        """从 accuracy_matrix 计算每一步的 stream accuracy"""
+        if not hasattr(self, 'accuracy_matrix') or len(self.accuracy_matrix) == 0:
+            return []
 
-        # 计算任务准确率矩阵（用于计算BWT等）
-        task_acc_matrix = []
+        stream_accs = []
+        for i, row in enumerate(self.accuracy_matrix):
+            seen = [acc for acc in row[:i+1] if acc > 0]
+            if seen:
+                stream_accs.append(np.mean(seen))
+            else:
+                stream_accs.append(0.0)
+        return stream_accs
 
-        # 首先收集每个任务在每个评估点的准确率
-        # 注意：这需要从详细日志中提取，这里简化处理
-        for result in self.results:
-            # 这里假设我们可以从结果中提取任务级别的准确率
-            # 实际实现可能需要修改日志配置
-            pass
+    def compute_cl_metrics(self, stream_accuracies, R=None):
+        """
+        计算 AA, AIA, FM, BWT
+        """
+        n = len(stream_accuracies)
+        if n == 0:
+            return {'AA': 0, 'AIA': 0, 'FM': 0, 'BWT': 0}
 
-        # 简化计算：使用累计准确率的变化估计BWT
-        if len(self.results) >= 2:
-            final_acc = self.results[-1].get('Top1_Acc_Stream/eval_phase/test_stream', 0)
-            penultimate_acc = self.results[-2].get('Top1_Acc_Stream/eval_phase/test_stream', 0)
+        AA = stream_accuracies[-1]
+        AIA = np.mean(stream_accuracies)
 
-            # 简单的反向迁移估计
-            bwt_estimate = final_acc - penultimate_acc if final_acc > 0 else 0
+        if R is not None:
+            R = np.array(R)
+            # 每个任务 j 的历史最高准确率
+            R_max = np.max(R, axis=0)
 
-            return {
-                'estimated_backward_transfer': bwt_estimate,
-                'final_accuracy': final_acc,
-            }
+            # Forgetting Measure (FM)
+            forgetting = []
+            for j in range(R.shape[1]):
+                if R[-1, j] > 0:  # 只考虑已见任务
+                    f = max(0, R_max[j] - R[-1, j])
+                    forgetting.append(f)
+            FM = np.mean(forgetting) if forgetting else 0.0
 
-        return {}
+            # Backward Transfer (BWT)
+            bwt_list = []
+            for j in range(R.shape[1] - 1):  # 最后一个任务无 BWT
+                if R[j, j] > 0 and R[-1, j] > 0:
+                    bwt = R[-1, j] - R[j, j]
+                    bwt_list.append(bwt)
+            BWT = np.mean(bwt_list) if bwt_list else 0.0
+        else:
+            # 简化估计（不推荐，仅备用）
+            FM = max(0, max(stream_accuracies) - stream_accuracies[-1])
+            BWT = -FM
 
-    def analyze_results(self):
-        """分析训练结果"""
-        if not self.results:
-            print("没有可分析的结果")
-            return None
-
-        print("\n" + "="*60)
-        print("结果分析")
-        print("="*60)
-
-        # 提取关键指标
-        accuracies = []
-        forgetting_scores = []
-
-        for i, result in enumerate(self.results):
-            # 累计准确率
-            acc_keys = ['Top1_Acc_Stream/eval_phase/test_stream', 'Top1_Acc_Stream']
-            acc_found = False
-            for key in acc_keys:
-                if key in result:
-                    accuracies.append(result[key])
-                    acc_found = True
-                    break
-
-            if not acc_found:
-                # 如果没有找到标准键，尝试其他可能性
-                for k, v in result.items():
-                    if 'Acc' in k and 'Stream' in k:
-                        accuracies.append(v)
-                        break
-                else:
-                    accuracies.append(0)
-
-            # 遗忘度量
-            forget_keys = ['Forgotten_Means_Stream/eval_phase/test_stream', 'Forgetting']
-            forget_found = False
-            for key in forget_keys:
-                if key in result:
-                    forgetting_scores.append(result[key])
-                    forget_found = True
-                    break
-
-        # 计算核心指标
-        analysis = {
-            # 准确率相关
-            'final_accuracy': accuracies[-1] if accuracies else 0,
-            'average_accuracy': np.mean(accuracies) if accuracies else 0,
-            'accuracy_std': np.std(accuracies) if accuracies else 0,
-
-            # 持续学习指标
-            'average_forgetting': np.mean(forgetting_scores) if forgetting_scores else 0,
-
-            # 任务性能
-            'task_accuracies': accuracies,
-            'task_forgetting': forgetting_scores,
+        return {
+            'AA': AA,
+            'AIA': AIA,
+            'FM': FM,
+            'BWT': BWT
         }
 
-        # 计算自定义指标
-        custom_metrics = self.compute_custom_metrics()
-        analysis.update(custom_metrics)
+    def analyze_results(self):
+        """分析并输出四个核心持续学习指标"""
+        if not hasattr(self, 'accuracy_matrix') or len(self.accuracy_matrix) == 0:
+            print("警告：未找到准确率矩阵，尝试从 results 提取（可能不准确）")
+            # stream_accs = self.extract_stream_accuracies_from_results()
+            # metrics = self.compute_cl_metrics(stream_accs)
+        else:
+            stream_accs = self.extract_stream_accuracies_from_matrix()
+            metrics = self.compute_cl_metrics(stream_accs, self.accuracy_matrix)
 
-        # 打印分析结果
-        print(f"\n性能指标:")
-        print(f"  最终准确率 (AA): {analysis['final_accuracy']:.2%}")
-        print(f"  平均准确率: {analysis['average_accuracy']:.2%} (±{analysis['accuracy_std']:.4f})")
-        print(f"  平均遗忘度量: {analysis['average_forgetting']:.4f}")
+        print("\n" + "="*60)
+        print("持续学习核心指标分析")
+        print("="*60)
+        print(f"  最终平均准确率 (AA):      {metrics['AA']:.2%}")
+        print(f"  增量平均准确率 (AIA):     {metrics['AIA']:.2%}")
+        print(f"  平均遗忘度量 (FM):        {metrics['FM']:.4f}")
+        print(f"  反向迁移 (BWT):           {metrics['BWT']:+.4f}")
 
-        if 'estimated_backward_transfer' in analysis:
-            print(f"  估计反向迁移: {analysis['estimated_backward_transfer']:.4f}")
+        # 与论文对比（可选）
+        n_exp = self.config['n_experiences']
+        if n_exp == 10:
+            print(f"\n参考 (iCaRL 原文, CIFAR-100, 10 tasks): AA ≈ 64.1%")
+        elif n_exp == 5:
+            print(f"\n参考 (典型值, CIFAR-100, 5 tasks): AA ≈ 50–55%")
 
-        # 与iCaRL论文结果对比（参考值）
-        print(f"\n与iCaRL论文对比 (CIFAR-100):")
-        print(f"  论文报告准确率 (10任务): ~64.10%")
-        print(f"  本实验准确率 ({self.config['n_experiences']}任务): {analysis['final_accuracy']:.2%}")
-
-        return analysis
+        return metrics
 
     def visualize_results(self, save_path='icarl_results.png'):
         """可视化结果"""
-        if not self.results:
-            print("没有可可视化的结果")
+        stream_accs = self.extract_stream_accuracies_from_matrix()
+        if not stream_accs:
+            print("无有效准确率数据")
             return
 
-        # 提取数据
-        tasks = list(range(1, len(self.results) + 1))
-        accuracies = []
-
-        for result in self.results:
-            # 尝试多个可能的键
-            acc_keys = ['Top1_Acc_Stream/eval_phase/test_stream', 'Top1_Acc_Stream']
-            for key in acc_keys:
-                if key in result:
-                    accuracies.append(result[key])
-                    break
-            else:
-                # 如果没有找到，尝试搜索
-                for k, v in result.items():
-                    if 'Acc' in k and isinstance(v, (int, float)):
-                        accuracies.append(v)
-                        break
-                else:
-                    accuracies.append(0)
-
-        if not accuracies or all(a == 0 for a in accuracies):
-            print("没有有效的准确率数据可可视化")
-            return
+        tasks = list(range(1, len(stream_accs) + 1))
+        accuracies = stream_accs  # 直接使用，避免键名问题
 
         # 创建图形
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
@@ -495,13 +472,16 @@ class iCaRLReproducer:
 
     def save_model(self, path='icarl_model.pth'):
         """保存模型"""
-        if self.model:
+        if hasattr(self, 'feature_extractor') and hasattr(self, 'classifier'):
             torch.save({
-                'model_state_dict': self.model.state_dict(),
+                'feature_extractor_state_dict': self.feature_extractor.state_dict(),
+                'classifier_state_dict': self.classifier.state_dict(),
                 'config': self.config,
-                'results': self.results,
+                'accuracy_matrix': getattr(self, 'accuracy_matrix', None),
             }, path)
             print(f"模型已保存到: {path}")
+        else:
+            print("警告：模型组件未初始化，无法保存")
 
     def run_iCaRL(self):
         """运行完整的iCaRL复现实验"""
@@ -626,6 +606,7 @@ def main():
         reproducer = iCaRLReproducer()
         results = reproducer.run_iCaRL()
 
+
     # 打印最终总结
     if results:
         print("\n" + "="*60)
@@ -633,8 +614,8 @@ def main():
         print("="*60)
         print(f"数据集: CIFAR-100")
         print(f"增量任务: {reproducer.config['n_experiences']}")
-        print(f"最终准确率: {results['final_accuracy']:.2%}")
-        print(f"平均遗忘: {results['average_forgetting']:.4f}")
+        print(f"最终准确率 (AA): {results['AA']:.2%}")
+        print(f"平均遗忘 (FM): {results['FM']:.4f}")
         print("="*60)
 
 
