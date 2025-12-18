@@ -2,7 +2,7 @@
 iCaRL复现代码 - 基于Avalanche框架 (修正版)
 在CIFAR-100数据集上实现类增量学习
 """
-
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import warnings
+import datetime
 warnings.filterwarnings('ignore')
 
 # Avalanche库导入
@@ -39,7 +40,9 @@ class iCaRLReproducer:
         Args:
             config: 配置字典，如果为None则使用默认配置
         """
-        self.config = config or self.get_default_config()
+        self.config = self.get_default_config()
+        if config:
+            self.config.update(config)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"使用设备: {self.device}")
 
@@ -50,10 +53,11 @@ class iCaRLReproducer:
         self.results = []
 
         # 设置随机种子确保可复现性
-        torch.manual_seed(self.config['seed'])
-        np.random.seed(self.config['seed'])
+        seed = self.config['seed']
+        torch.manual_seed(seed)
+        np.random.seed(seed)
         if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(self.config['seed'])
+            torch.cuda.manual_seed_all(seed)
 
     @staticmethod
     def get_default_config():
@@ -395,11 +399,11 @@ class iCaRLReproducer:
         }
 
     def analyze_results(self):
-        """分析并输出四个核心持续学习指标"""
+        """分析并输出四个核心持续学习指标，并写入日志"""
         if not hasattr(self, 'accuracy_matrix') or len(self.accuracy_matrix) == 0:
             print("警告：未找到准确率矩阵，尝试从 results 提取（可能不准确）")
-            # stream_accs = self.extract_stream_accuracies_from_results()
-            # metrics = self.compute_cl_metrics(stream_accs)
+            stream_accs = []
+            metrics = {'AA': 0, 'AIA': 0, 'FM': 0, 'BWT': 0}
         else:
             stream_accs = self.extract_stream_accuracies_from_matrix()
             metrics = self.compute_cl_metrics(stream_accs, self.accuracy_matrix)
@@ -418,6 +422,46 @@ class iCaRLReproducer:
             print(f"\n参考 (iCaRL 原文, CIFAR-100, 10 tasks): AA ≈ 64.1%")
         elif n_exp == 5:
             print(f"\n参考 (典型值, CIFAR-100, 5 tasks): AA ≈ 50–55%")
+
+        # ✅ 新增：将指标写入单独的 summary CSV 文件
+        if self.config.get('log_csv', False):
+            log_dir = self.config['log_dir']
+            os.makedirs(log_dir, exist_ok=True)
+            summary_path = os.path.join(log_dir, 'cl_metrics_summary.csv')
+
+            file_exists = os.path.isfile(summary_path)
+            with open(summary_path, mode='a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                if not file_exists:
+                    # 写入表头
+                    writer.writerow([
+                        'timestamp',
+                        'dataset',
+                        'n_experiences',
+                        'seed',
+                        'model',
+                        'memory_size',
+                        'epochs',
+                        'AA',
+                        'AIA',
+                        'FM',
+                        'BWT'
+                    ])
+                # 写入当前实验结果
+                writer.writerow([
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    self.config['dataset'],
+                    self.config['n_experiences'],
+                    self.config['seed'],
+                    self.config['model_name'],
+                    self.config['memory_size'],
+                    self.config['epochs'],
+                    f"{metrics['AA']:.4f}",
+                    f"{metrics['AIA']:.4f}",
+                    f"{metrics['FM']:.4f}",
+                    f"{metrics['BWT']:+.4f}"
+                ])
+            print(f"\n✅ CL 指标已追加写入: {summary_path}")
 
         return metrics
 

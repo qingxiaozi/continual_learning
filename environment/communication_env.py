@@ -31,20 +31,20 @@ class CommunicationSystem:
 
         # 数据参数
         self.sample_size = (
-            Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 32
-        )  # b0，单个样本的大小（bits），1
+            Config.IMAGE_SIZE * Config.IMAGE_SIZE * 3 * 8
+        )  # b0，单个样本的大小（bits），RGB 图像每个通道8位
         self.samples_of_per_batch = Config.BATCH_SIZE  # |b_v^s|，每个批次包含的样本数
 
         # 计算参数
         self.golden_model_computation = 2e6  # 黄金模型处理一个样本的计算周期数，1
-        self.global_model_computation = 6e6  # 全局模型处理一个样本的计算周期数，1
-        self.edge_server_computation = 10e10  # C，边缘服务器计算能力（Cycles/s），20GHZ
+        self.global_model_computation = 5e6  # 全局模型处理一个样本的计算周期数，1
+        self.edge_server_computation = 2e10  # C，边缘服务器计算能力（Cycles/s），20GHZ
 
         # 训练参数
         self.training_epochs = Config.NUM_EPOCH  # E，训练轮次
 
         # 模型参数
-        self.model_parameter_size = 3.578e8  # P_m，模型参数量的大小（bit），resnet18
+        self.model_parameter_size = 3.578e8 / 4  # P_m，模型参数量的大小（bit），传输量化后的resnet18
 
         # 缓存阴影衰落值，避免重复计算
         self._shadowing_cache = {}
