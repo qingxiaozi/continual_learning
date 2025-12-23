@@ -59,10 +59,6 @@ class GoldModel:
         """加载模型"""
         checkpoint = torch.load(self.model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
-        print(
-            f"黄金模型加载成功，数据集: {checkpoint['dataset_name']}, "
-            f"类别数: {checkpoint['num_classes']}"
-        )
 
     def label_data(self, dataloader):
         """

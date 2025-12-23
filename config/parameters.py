@@ -4,7 +4,7 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 60  # train session
+    NUM_TRAINING_SESSIONS = 3  # train session
     NUM_EPOCH = 60  # 训练epoch数
     BATCH_SIZE = 16  # batch size
     INIT_EPOCHS = 5  # MAB初始探索轮次
@@ -67,7 +67,7 @@ class Config:
     DIGIT10_CLASSES = 10
     DOMAINNET_CLASSES = 345
     # 域切换参数
-    DOMAIN_CHANGE_INTERVAL = 20  # 每1个session切换一个域
+    DOMAIN_CHANGE_INTERVAL = 1  # 每1个session切换一个域
     # 数据加载参数
     IMAGE_SIZE = 32  # 统一调整到相同尺寸
     # 测试策略参数
