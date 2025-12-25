@@ -535,6 +535,9 @@ class DomainIncrementalDataSimulator:
 
         with torch.no_grad():
             for inputs, targets in test_loader:
+                device = next(model.parameters()).device
+                inputs = inputs.to(device)
+                targets = targets.to(device)
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
                 total_loss += loss.item()

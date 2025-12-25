@@ -222,13 +222,19 @@ class BandwidthAllocator:
             t_opt = result.x[0]
             bandwidth_ratios = result.x[1:1+num_vehicles]
 
-            # 确保数值稳定性
-            bandwidth_ratios = np.clip(bandwidth_ratios, 0, 1)
-            total = np.sum(bandwidth_ratios)
-            if total > 0:
-                bandwidth_ratios = bandwidth_ratios / total
-            else:
-                bandwidth_ratios = self.allocate_average_bandwidth()
+            # # 确保数值稳定性
+            # bandwidth_ratios = np.clip(bandwidth_ratios, 0, 1)
+            # total = np.sum(bandwidth_ratios)
+            # if total > 0:
+            #     bandwidth_ratios = bandwidth_ratios / total
+            # else:
+            #     bandwidth_ratios = self.allocate_average_bandwidth()
+            bandwidth_ratios = np.clip(result.x[1:1+num_vehicles], 0, 1)
+            # 显式强制满足个体上限（防止SLSQP轻微越界）
+            if M_max != float('inf') and M_max > 0:
+                for v in range(num_vehicles):
+                    max_ratio = self.batch_choices[v] / M_max
+                    bandwidth_ratios[v] = min(bandwidth_ratios[v], max_ratio)
 
             return bandwidth_ratios, t_opt
         else:

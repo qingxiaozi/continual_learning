@@ -55,6 +55,7 @@ class Vehicle:
         global_model.eval()
         total_confidence = 0.0
         count = 0
+        device = next(global_model.parameters()).device
         # 禁用梯度计算以提升效率
         with torch.no_grad():
             for batch in self.data_batches:
@@ -62,6 +63,10 @@ class Vehicle:
                     inputs, _ = batch  # 忽略标签，只使用输入
                 else:
                     inputs = batch
+
+                if not isinstance(inputs, torch.Tensor):
+                    inputs = torch.tensor(inputs, dtype=torch.float32)
+                inputs = inputs.to(device)
 
                 outputs = global_model(inputs)
                 if hasattr(outputs, "logits"):

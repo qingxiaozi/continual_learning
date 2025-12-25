@@ -17,6 +17,8 @@ class GlobalModel(nn.Module):
         self.model = models.resnet18(pretrained=False)
         num_features = self.model.fc.in_features
         self.model.fc = nn.Linear(num_features, self.num_classes)
+        self.to(self.device)
+
         self.model_path = os.path.join(
             Paths.RESULTS_DIR, f"global_model_{dataset_name}.pth"
         )
@@ -63,6 +65,7 @@ class GlobalModel(nn.Module):
         """加载模型"""
         checkpoint = torch.load(self.model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
+        self.to(self.device)
 
     def fine_tune(self, train_dataset, val_dataset=None, epochs=10, lr=0.001, batch_size=32):
         device = Config.DEVICE

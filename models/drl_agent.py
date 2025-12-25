@@ -136,8 +136,11 @@ class DRLAgent:
         self.num_vehicles = Config.NUM_VEHICLES
         self.num_batch_choices = Config.MAX_UPLOAD_BATCHES + 1
         # 网络
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
         self.target_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
+        self.policy_net.to(self.device)
+        self.target_net.to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         # 优化器
         self.optimizer = optim.Adam(
@@ -177,7 +180,8 @@ class DRLAgent:
             training: 是否处于训练模式
         """
         epsilon = self._get_epsilon() if training else 0.0
-        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        # state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
         with torch.no_grad():
             q_values = self.policy_net(state_tensor)  # [1, num_vehicles, num_batch_choices]
             q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
@@ -232,14 +236,14 @@ class DRLAgent:
         states, batch_actions, rewards, next_states, dones, indices, weights = batch_data
 
         # 转换为张量
-        states = torch.FloatTensor(states)
-        next_states = torch.FloatTensor(next_states)
-        rewards = torch.FloatTensor(rewards)
-        dones = torch.BoolTensor(dones)
-        weights = torch.FloatTensor(weights)
+        states = torch.tensor(states, dtype=torch.float32, device=self.device)
+        next_states = torch.tensor(next_states, dtype=torch.float32, device=self.device)
+        rewards = torch.tensor(rewards, dtype=torch.float32, device=self.device)
+        dones = torch.tensor(dones, dtype=torch.bool, device=self.device)
+        weights = torch.tensor(weights, dtype=torch.float32, device=self.device)
 
         # 批次动作转换为张量 [batch_size, num_vehicles]
-        batch_actions = torch.LongTensor(batch_actions)
+        batch_actions = torch.tensor(batch_actions, dtype=torch.long, device=self.device)
 
         # 收集所有车辆的TD误差
         batch_td_errors = []
@@ -268,7 +272,7 @@ class DRLAgent:
 
             # 计算TD误差和损失
             td_errors = target_q - chosen_q
-            batch_td_errors.append(td_errors.detach().numpy())
+            batch_td_errors.append(td_errors.detach().cpu().numpy())
 
             # 使用重要性采样权重
             loss = (td_errors ** 2 * weights).mean()

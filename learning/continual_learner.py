@@ -187,6 +187,9 @@ class ContinualLearner:
                 inputs, targets = batch[0], batch[1]
                 if targets.dim() == 0:
                     targets = targets.unsqueeze(0)
+                device = next(self.model.parameters()).device
+                inputs = inputs.to(device)
+                targets = targets.to(device)
                 outputs = self.model(inputs)
                 loss = self.criterion(outputs, targets)
                 total_loss += loss.item()
@@ -242,6 +245,9 @@ class ContinualLearner:
                 inputs = batch
                 # 使用黄金模型生成标签
                 targets = self.gold_model(inputs).argmax(dim=1)
+            device = next(self.model.parameters()).device
+            inputs = inputs.to(device)
+            targets = targets.to(device)
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
 

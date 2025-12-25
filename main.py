@@ -28,7 +28,7 @@ class BaselineComparison:
 
         # 初始化模型
         self.gold_model = GoldModel(self.data_simulator.current_dataset)
-        self.global_model = GlobalModel(self.data_simulator.current_dataset, auto_load=False)
+        self.global_model = GlobalModel(self.data_simulator.current_dataset, auto_load=True)
 
         # 初始化学习组件
         self.cache_manager = CacheManager()
@@ -48,10 +48,7 @@ class BaselineComparison:
 
         # 初始化DRL智能体
         state_dim = 3 * Config.NUM_VEHICLES  # 置信度、测试损失、质量评分
-        # action_dim = 2 * Config.NUM_VEHICLES  # 上传批次、带宽分配
         self.drl_agent = DRLAgent(state_dim)
-        # 新增：初始化集成控制器
-        # self.integrated_controller = self.drl_agent  # DRLAgent现在包含了集成控制功能
 
         self.current_domain = self.data_simulator.get_current_domain()
         self.session_history = []
@@ -84,8 +81,6 @@ class BaselineComparison:
 
             # 步骤5: 执行通信和数据收集
             upload_results = self._upload_datas(batch_choices)
-            # for vec in self.vehicle_env.vehicles:
-            #     print(f"车辆 {vec.id} 上传数据批次数量: {len(vec.uploaded_data)}")
 
             # 步骤6: 缓存管理和数据选择
             cache_updates = self._manage_cache_and_data_selection()
@@ -460,6 +455,9 @@ class BaselineComparison:
                 with torch.no_grad():
                     targets = self.gold_model.model(inputs).argmax(dim=1)
 
+            device = next(model.parameters()).device  # 获取模型所在设备
+            inputs = inputs.to(device)
+            targets = targets.to(device)
             outputs = model(inputs)
             loss = criterion(outputs, targets)
 
