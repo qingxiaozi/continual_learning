@@ -28,7 +28,7 @@ class BaselineComparison:
 
         # 初始化模型
         self.gold_model = GoldModel(self.data_simulator.current_dataset)
-        self.global_model = GlobalModel(self.data_simulator.current_dataset, auto_load=True)
+        self.global_model = GlobalModel(self.data_simulator.current_dataset, auto_load=False)
 
         # 初始化学习组件
         self.cache_manager = CacheManager()

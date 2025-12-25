@@ -9,7 +9,7 @@ from environment.dataSimu_env import DomainIncrementalDataSimulator
 
 
 class GlobalModel(nn.Module):
-    def __init__(self, dataset_name, auto_load=True):
+    def __init__(self, dataset_name, auto_load=False):
         super().__init__()
         self.dataset_name = dataset_name
         self.num_classes = self._get_num_classes(dataset_name)
@@ -62,12 +62,19 @@ class GlobalModel(nn.Module):
         )
 
     def load_model(self):
-        """加载模型"""
-        checkpoint = torch.load(self.model_path, map_location=self.device)
-        self.model.load_state_dict(checkpoint["model_state_dict"])
-        self.to(self.device)
+        """加载模型，如果文件存在则加载并返回 True，否则返回 False"""
+        if not os.path.exists(self.model_path):
+            return False
+        try:
+            checkpoint = torch.load(self.model_path, map_location=self.device)
+            self.model.load_state_dict(checkpoint["model_state_dict"])
+            self.to(self.device)
+            return True
+        except Exception as e:
+            print(f"⚠️ 模型加载失败: {e}")
+            return False
 
-    def fine_tune(self, train_dataset, val_dataset=None, epochs=10, lr=0.001, batch_size=32):
+    def fine_tune(self, train_dataset, val_dataset=None, epochs=100, lr=0.001, batch_size=32):
         device = Config.DEVICE
         self.to(device)
 
