@@ -107,7 +107,7 @@ class GoldModel:
         print(f"训练集样本数：{len(train_dataset)}")
         print(f"测试集样本数：{len(val_dataset)}")
 
-        self.fine_tune_epochs = 10
+        self.fine_tune_epochs = 45
         self.learning_rate = 0.001
         self.batch_size = 32
 
@@ -243,5 +243,13 @@ if __name__ == "__main__":
     )
     print(data_simulator.current_dataset)
     golden_model = GoldModel(data_simulator.current_dataset)
-    print(golden_model.num_classes)
-    # golden_model.fine_tune(train_dataset, val_dataset)
+        # 如果模型未加载（即文件不存在），则自动进行微调
+    if not os.path.exists(golden_model.model_path):
+        print("开始自动微调黄金模型...")
+        golden_model.fine_tune(train_dataset, val_dataset)
+    else:
+        print("黄金模型已存在，跳过训练。")
+        # # 可选：验证一下加载的模型性能
+        # val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
+        # final_val_acc = golden_model.evaluate(val_loader)
+        # print(f"已加载模型的验证准确率: {final_val_acc:.2f}%")
