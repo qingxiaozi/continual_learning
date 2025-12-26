@@ -44,7 +44,7 @@ class Config:
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
-    CURRENT_DATASET = "digit10"
+    CURRENT_DATASET = "office31"
     # 域增量学习参数
     DOMAIN_SEQUENCES = {
         "office31": ["amazon", "webcam", "dslr"],

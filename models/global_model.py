@@ -171,3 +171,6 @@ if __name__ == "__main__":
         model.fine_tune(train_dataset, val_dataset)
     else:
         print("模型已存在，无需训练。")
+        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
+        final_val_acc = model.evaluate(val_loader)
+        print(f"已加载模型的验证准确率: {final_val_acc:.2f}%")
