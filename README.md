@@ -8,18 +8,19 @@ continual_learning/
 ├── environment/
 │   ├── vehicle_env.py
 │   ├── communication_env.py
-│   └── data_simulator.py
+│   └── dataSimu_env.py
 ├── models/
 │   ├── global_model.py
 │   ├── gold_model.py
 │   ├── mab_selector.py
-│   └── drl_agent.py
+│   ├── drl_agent.py
+│   └── bandwidth_allocator.py
 ├── learning/
 │   ├── continual_learner.py
 │   ├── cache_manager.py
 │   └── evaluator.py
+├── results/
 ├── utils/
-│   ├── data_loader.py
 │   └── metrics.py
 └── experiments/
     ├── __init__.py
@@ -32,14 +33,18 @@ continual_learning/
 ```python
 Initialize all components
 
+get training sessions
+get current dataset
+get vehicle numbers
+
 for each session:
 
     _update_session_environment(session)
-        更新当前的session，将对应域加入已见域中，预加载域数据集，保存到 train_data_cache 和 test_data_cache 中；
-        当域发生变化，将新数据缓存提升为旧数据缓存，删除新数据缓存，基于缓存中所有数据批次的质量维护固定缓存大小；
+        更新当前的session，将新域加入到已见域中，预加载新域的数据集，保存到 train_data_cache、test_data_cache和val_data_cache中；
+        当域发生变化，将新数据缓存提升为旧数据缓存；
         清空所有车辆的上传数据，即 vehicle.uploaded_data = [];
         更新车辆位置，time_delata = 1；
-        采用狄利克雷分布为每辆车生成数据批次，该数据批次即为车辆在环境中实时采集到的数据批次。
+        采用狄利克雷分布为每辆车生成数据批次，保存至vehicle.data_batches，该数据批次即为车辆在环境中实时采集到的数据批次。
 
     _get_environment_state()
         for each vehicle in vehicles:
@@ -177,11 +182,8 @@ xx.gz是上述文件的压缩版本
 
 
 #### 接下来要做的
-1. 根据mab进行数据质量评分，估计需要修改逻辑架构 50%，待检查 √
-2. 通信参数找其他论文确认
-3. 深度学习buffer为32，说明至少得32个session，花时间
-4. 修改模型训练，划分出验证集 2days，模型训练的时候，loss为0，需要早停，问阳哥
-5. 遗忘指标计算，其他计算指标添加 1day
-6. 修改main.py，进行基线对比实验 10days
-7. 消融实验 5days
-8. 完善digit和dominNet数据集训练 10days
+1. 通信参数找其他论文确认
+2. 深度学习buffer为32，说明至少得32个session，花时间
+3. 修改main.py，进行基线对比实验 10days
+4. 消融实验 5days
+5. 完善digit和dominNet数据集训练 10days

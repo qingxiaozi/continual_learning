@@ -28,9 +28,6 @@ class DomainIncrementalDataSimulator:
         self.current_domain_idx = 0
         self.current_session = 0
 
-        # # 初始化黄金模型
-        # self.golden_model = GoldenModelManager(self.current_dataset)
-
         # 域序列
         self.domain_sequences = Config.DOMAIN_SEQUENCES
         self.current_domains = self.domain_sequences[self.current_dataset]
@@ -137,47 +134,55 @@ class DomainIncrementalDataSimulator:
         """
         更新训练会话
         """
-        old_session = self.current_session
         old_domain = self.get_current_domain()  # 在更新前获取旧域
-
         self.current_session = session_id
-        current_domain = self.get_current_domain()  # 在更新后获取新域
+        new_domain = self.get_current_domain()  # 在更新后获取新域
 
-        # 确保当前域被记录到已见域中
-        if current_domain not in self.seen_domains:
-            self.seen_domains.append(current_domain)
-            print(f"新域 {current_domain} 已加入已见域")
+        # 自动管理seen_domains
+        if new_domain not in self.seen_domains:
+            self.seen_domains.append(new_domain)
+            print(f"新域 {new_domain} 已加入已见域")
 
-        # 只有在域实际发生变化时才打印切换信息
-        if old_domain != current_domain:
-            old_domain_display = old_domain if old_session > 0 else "初始域"
-            print(
-                f"Session {session_id}: 域切换 {old_domain_display} -> {current_domain}"
-            )
+        # 域发生变化时打印切换信息
+        domain_changed = (old_domain != new_domain)
+        if domain_changed:
+            old_display = old_domain if self.current_session > 0 else "初始域"
+            print(f"Session {session_id}: 域切换 {old_display} -> {new_domain}")
 
-        # 预加载当前域的数据集
-        self._preload_domain_test_set(current_domain)
+        # 预加载新域的数据集
+        self._preload_domain_dataset(new_domain)
 
-    def _preload_domain_test_set(self, domain):
+        return domain_changed, old_domain, new_domain
+
+    def _preload_domain_dataset(self, domain):
         """预加载域的训练集、验证集和测试集"""
         domain_key = f"{self.current_dataset}_{domain}"
 
         if domain_key not in self.test_data_cache:
             # 加载完整数据集并分割
-            full_dataset = self._load_domain_data(domain)
-            if len(full_dataset) == 0:
+            original_dataset = self._load_domain_data(domain)
+            if len(original_dataset) == 0:
                 print(f"警告: 域 {domain} 的数据集为空")
                 return
 
-            total_size = len(full_dataset)
+            total_size = len(original_dataset)
             test_size = int(Config.TEST_RATIO * total_size)
             val_size = int(Config.VAL_RATIO * total_size)
             train_size = total_size - test_size - val_size
 
-            original_dataset = self._load_domain_data(domain)
+            # 设置随机种子以确保可重复性
+            generator = torch.Generator()
+            seed = hash(domain) % (2**32)
+            generator.manual_seed(seed)
+
+            indices = list(range(len(original_dataset)))
             train_indices, val_indices, test_indices = random_split(
-                range(len(original_dataset)), [train_size, val_size, test_size]
+                indices,
+                [train_size, val_size, test_size],
+                generator=generator
             )
+
+            # 创建应用变换的子集
             train_dataset = self._create_subset_with_transform(
                 original_dataset, train_indices, self.train_transform
             )
@@ -187,16 +192,13 @@ class DomainIncrementalDataSimulator:
             test_dataset = self._create_subset_with_transform(
                 original_dataset, test_indices, self.test_transform
             )
-            # train_dataset, val_dataset, test_dataset = random_split(
-            #     full_dataset, [train_size, val_size, test_size]
-            # )
 
-            # 缓存
+            # 将数据保存到缓存
             self.train_data_cache[domain_key] = train_dataset
             self.test_data_cache[domain_key] = test_dataset
             self.val_data_cache[domain_key] = val_dataset
 
-        # 保存到已见域测试集
+        # 保存到已见域测试集，仅首次
         if domain_key not in self.seen_domains_test_sets:
             self.seen_domains_test_sets[domain_key] = self.test_data_cache[domain_key]
             print(
@@ -232,34 +234,41 @@ class DomainIncrementalDataSimulator:
         为指定车辆生成数据批次
         输入：
             vehicle_id：车辆id
-            num_batches：车辆的数据批次数量
+            num_batches：请求的批次数。若为 None，则返回所有完整批次
         输出：
             batches：指定车辆的数据批次
         """
         current_domain = self.get_current_domain()
         domain_key = f"{self.current_dataset}_{current_domain}"
-        # 由于在切换域后，训练集和测试集已经分别放至train_data_cache和test_data_cache，因此此处可直接取用
+
         train_dataset = self.train_data_cache[domain_key]
-        # 获取该车辆的训练数据子集索引
         vehicle_indices = self._get_vehicle_data_indices(vehicle_id, train_dataset)
 
         if not vehicle_indices:
             print(
-                f"警告: 车辆 {vehicle_id} 在当前域 {current_domain} 中没有分配到训练数据"
+                f"警告: 车辆 {vehicle_id} 在域 {current_domain} 中无训练数据"
             )
             return []
 
-        # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
-        vehicle_dataset = Subset(train_dataset, vehicle_indices)
         # 计算实际可用的最大批次数量
         max_batches = len(vehicle_indices) // Config.BATCH_SIZE
+
+        # 用完所有可用数据批次
         if num_batches is None:
             num_batches = max_batches
+        # 取外部要求与可用数据批次之间的最小值
         else:
             num_batches = min(num_batches, max_batches)
+
+        # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
+        vehicle_dataset = Subset(train_dataset, vehicle_indices)
+
         # 创建数据批次
         dataloader = DataLoader(
-            vehicle_dataset, batch_size=Config.BATCH_SIZE, shuffle=True, drop_last=True
+            vehicle_dataset,
+            batch_size=Config.BATCH_SIZE,
+            shuffle=False,
+            drop_last=True
         )
 
         # 收集所有批次
@@ -281,7 +290,6 @@ class DomainIncrementalDataSimulator:
         输出：
 
         """
-        num_vehicles = self.num_vehicles
         vehicle_idx = vehicle_id
 
         # 如果还没有为该域分配数据，则进行分配
@@ -308,7 +316,10 @@ class DomainIncrementalDataSimulator:
         vehicle_assignments = {i: [] for i in range(num_vehicles)}
 
         for class_idx, indices in class_indices.items():
+
+            #为每个类别生成一个狄利克雷分布
             if class_idx not in self.class_distributions:
+
                 # 如果类别不在初始分布中，创建新的分布
                 alpha = np.full(num_vehicles, Config.DIRICHLET_ALPHA)
                 self.class_distributions[class_idx] = np.random.dirichlet(alpha)

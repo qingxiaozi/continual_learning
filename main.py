@@ -35,7 +35,7 @@ class BaselineComparison:
         self.evaluator = ModelEvaluator(self.gold_model)
         self.continual_learner = ContinualLearner(self.global_model, self.gold_model)
 
-        # 初始化环境
+        # 初始化车辆环境
         self.vehicle_env = VehicleEnvironment(
             self.global_model, self.gold_model, self.cache_manager, self.data_simulator
         )
@@ -120,28 +120,29 @@ class BaselineComparison:
 
     def _update_session_environment(self, session):
         """更新会话和环境状态"""
-        # 更新数据模拟器会话
-        previous_domain = self.current_domain
-        self.data_simulator.update_session(session)
-        self.current_domain = self.data_simulator.get_current_domain()
+        domain_changed, previous_domain, current_domain = self.data_simulator.update_session(session)
 
-        # 如果域发生变化，提升所有车辆的缓存
-        if previous_domain != self.current_domain:
+        # 域发生变化，提升所有车辆的缓存
+        if domain_changed:
             for vehicle_id in range(Config.NUM_VEHICLES):
                 self.cache_manager.promote_new_to_old(vehicle_id)
             print(
-                f"域从 {previous_domain} 切换到 {self.current_domain}，已提升缓存中的数据。"
+                f"已提升缓存中的数据。"
             )
 
         # 清空所有车辆的上传数据
         for vehicle in self.vehicle_env.vehicles:
             vehicle.set_uploaded_data([])
 
-        # 更新车辆位置（模拟移动）
+        # 更新车辆位置
         self.vehicle_env.update_vehicle_positions(time_delta=1.0)
+
         # 为车辆生成新数据
         self._refresh_vehicle_data()
-        print(f"\n 环境更新完成 - 当前域: {self.data_simulator.get_current_domain()}")
+
+        self.current_domain = current_domain
+
+        print(f"\n 环境更新完成 - 当前域: {current_domain}")
 
     def _refresh_vehicle_data(self):
         """为所有车辆刷新数据"""
