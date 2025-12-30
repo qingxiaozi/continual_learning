@@ -51,7 +51,8 @@ class ContinualLearner:
     def train_with_mab_selection(self, train_loader, val_loader, num_epochs=1):
         """在数据集上训练模型，集成MAB算法进行批次选择"""
         self.model.train()
-        epoch_losses = []
+        epoch_elastic_losses = []  # 带正则的总损失（用于优化）
+        epoch_ce_losses = []  # 纯CE损失（用于监控/对比）
         val_losses = []
         batch_list = list(train_loader)
         num_batches = len(batch_list)
@@ -69,8 +70,11 @@ class ContinualLearner:
         for epoch in range(num_epochs):
             self.epoch_count += 1
             actual_epochs += 1  # 每开始一个epoch就计数
-            epoch_loss = 0.0
-            ucb_selections = []
+            # epoch_loss = 0.0
+            # ucb_selections = []
+            total_elastic_loss = 0.0
+            total_ce_loss = 0.0
+
 
             for step in range(num_batches):
                 self.total_steps += 1
@@ -82,25 +86,31 @@ class ContinualLearner:
                 batch_idx = step % num_batches
                 batch = batch_list[batch_idx]
 
-                loss_before, inputs, targets = self._compute_batch_loss(batch)
+                ce_loss_before, inputs, targets = self._compute_batch_loss(batch)
                 self.optimizer.zero_grad()
                 outputs = self.model(inputs)
-                # loss = self.criterion(outputs, targets)  # 原始损失
-                loss = self._elastic_net_loss(outputs, targets, self.model)  # 弹性正则损失
+                ce_loss = self.criterion(outputs, targets)  # 原始损失
+                elastic_loss = self._elastic_net_loss(outputs, targets, self.model)  # 弹性正则损失
 
-                loss.backward()
+                elastic_loss.backward()
                 self.optimizer.step()
 
-                loss_after, _, _ = self._compute_batch_loss(batch)
-                reward = loss_before - loss_after
+                ce_loss_after, _, _ = self._compute_batch_loss(batch)
+                reward = ce_loss_before - ce_loss_after
 
                 if self.epoch_count >= self.init_epochs:
                     self.mab_selector.update_arm(batch_idx, reward)
 
-                epoch_loss += loss.item()
+                # epoch_loss += loss.item()
+                total_elastic_loss += elastic_loss.item()
+                total_ce_loss += ce_loss.item()
 
-            avg_loss = epoch_loss / num_batches
-            epoch_losses.append(avg_loss)
+            # avg_loss = epoch_loss / num_batches
+            avg_elastic_loss = total_elastic_loss / num_batches
+            avg_ce_loss = total_ce_loss / num_batches
+
+            epoch_elastic_losses.append(avg_elastic_loss)
+            epoch_ce_losses.append(avg_ce_loss)
 
             if val_loader is not None:
                 patience = 5
@@ -113,12 +123,19 @@ class ContinualLearner:
                     patience_counter = 0
                     best_model_state = copy.deepcopy(self.model.state_dict())
                     print(
-                        f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f} *"
+                        f"Epoch {self.epoch_count}, "
+                        f"train_elastic: {avg_elastic_loss:.4f}, "
+                        f"train_CE: {avg_ce_loss:.4f}, "
+                        f"val_CE: {val_loss:.4f} *"
                     )
                 else:
                     patience_counter += 1
                     print(
-                        f"Epoch {self.epoch_count}, train_loss: {avg_loss:.4f}, val_loss: {val_loss:.4f}, patience_counter/patience: {patience_counter}/{patience}"
+                        f"Epoch {self.epoch_count}, "
+                        f"train_elastic: {avg_elastic_loss:.4f}, "
+                        f"train_CE: {avg_ce_loss:.4f}, "
+                        f"val_CE: {val_loss:.4f}, "
+                        f"patience: {patience_counter}/{patience}"
                     )
 
                 # 早停检查
@@ -127,13 +144,15 @@ class ContinualLearner:
                     self.model.load_state_dict(best_model_state)  # 恢复最佳模型
                     break
             else:
-                print("验证集不存在")
+                print(f"Epoch {self.epoch_count}, train_elastic: {avg_elastic_loss:.4f}, train_CE: {avg_ce_loss:.4f}")
 
         return {
-            "training_loss": avg_loss,
-            "epoch_losses": epoch_losses,
+            "training_elastic_loss": avg_elastic_loss,
+            "training_ce_loss": avg_ce_loss,
+            "epoch_elastic_losses": epoch_elastic_losses,
+            "epoch_ce_losses": epoch_ce_losses,
             "val_losses": val_losses,
-            "actual_epochs": actual_epochs,  # 关键：返回实际训练epoch数
+            "actual_epochs": actual_epochs,
             "config_epochs": num_epochs,
         }
 

@@ -342,9 +342,9 @@ class BaselineComparison:
         actual_epochs = Config.NUM_EPOCH  # 默认使用配置值
 
         if training_result is not None:
-            training_loss = training_result.get("training_loss", float("inf"))
+            training_ce_loss = training_result.get("training_ce_loss", float("inf"))
             val_losses = training_result.get("val_losses", [])
-            epoch_losses = training_result.get("epoch_losses", [])
+            epoch_losses = training_result.get("epoch_ce_losses", [])
             actual_epochs = training_result.get("actual_epochs", len(epoch_losses))
 
         loss_after = self._compute_weighted_loss_on_uploaded_data(self.global_model)
@@ -362,7 +362,7 @@ class BaselineComparison:
         return {
             "loss_before": loss_before,
             "loss_after": loss_after,
-            "training_loss": training_loss,
+            "training_loss": training_ce_loss,
             "actual_epochs": actual_epochs,  # 关键：返回实际训练epoch数
         }
 
