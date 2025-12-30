@@ -70,11 +70,8 @@ class ContinualLearner:
         for epoch in range(num_epochs):
             self.epoch_count += 1
             actual_epochs += 1  # 每开始一个epoch就计数
-            # epoch_loss = 0.0
-            # ucb_selections = []
             total_elastic_loss = 0.0
             total_ce_loss = 0.0
-
 
             for step in range(num_batches):
                 self.total_steps += 1
@@ -101,11 +98,9 @@ class ContinualLearner:
                 if self.epoch_count >= self.init_epochs:
                     self.mab_selector.update_arm(batch_idx, reward)
 
-                # epoch_loss += loss.item()
                 total_elastic_loss += elastic_loss.item()
                 total_ce_loss += ce_loss.item()
 
-            # avg_loss = epoch_loss / num_batches
             avg_elastic_loss = total_elastic_loss / num_batches
             avg_ce_loss = total_ce_loss / num_batches
 

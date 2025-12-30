@@ -160,10 +160,10 @@ class DRLAgent:
         self.tau = 0.005  # 软更新参数
 
         # epsilon-greedy参数
-        self.epsilon_start = Config.DRL_EPSILON_START if hasattr(Config, 'DRL_EPSILON_START') else 0.9
-        self.epsilon_end = Config.DRL_EPSILON_END if hasattr(Config, 'DRL_EPSILON_END') else 0.05
-        self.epsilon_decay = Config.DRL_EPSILON_DECAY if hasattr(Config, 'DRL_EPSILON_DECAY') else 800
-        self.steps_done = 0
+        self.epsilon_start = Config.DRL_EPSILON_START
+        self.epsilon_end = Config.DRL_EPSILON_END
+        self.epsilon_decay = Config.DRL_EPSILON_DECAY
+        self.steps_done = 0  # 已完成的训练更新次数
 
     def _get_epsilon(self):
         """计算当前epsilon值（指数衰减）"""
@@ -180,23 +180,20 @@ class DRLAgent:
             training: 是否处于训练模式
         """
         epsilon = self._get_epsilon() if training else 0.0
-        # state_tensor = torch.FloatTensor(state).unsqueeze(0)
+
         state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
+
         with torch.no_grad():
             q_values = self.policy_net(state_tensor)  # [1, num_vehicles, num_batch_choices]
             q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
-        # 如果未提供可用批次，假设可以上传最大数量
-        if available_batches is None:
-            available_batches = [self.num_batch_choices - 1] * self.num_vehicles
+
+        # # 如果未提供可用批次，假设可以上传最大数量
+        # if available_batches is None:
+        #     available_batches = [self.num_batch_choices - 1] * self.num_vehicles
 
         batch_choices = []
         for v in range(self.num_vehicles):
-            # ✅ 新增：获取最大上传批次限制
-            max_upload_limit = Config.MAX_UPLOAD_BATCHES if hasattr(Config, 'MAX_UPLOAD_BATCHES') else self.num_batch_choices - 1
-
-            # 获取该车辆的实际可用批次和上传限制中的较小值
-            max_allowed = min(available_batches[v], max_upload_limit)
-
+            max_allowed = min(available_batches[v], Config.MAX_UPLOAD_BATCHES)
             if max_allowed <= 0:
                 # 没有可用数据或超过限制，只能选择0
                 batch = 0
@@ -206,7 +203,7 @@ class DRLAgent:
                     batch = random.randint(0, max_allowed)
                 else:
                     # 利用：选择最大Q值的批次，但不超过允许数量
-                    valid_q_values = q_values[v, :max_allowed+1]
+                    valid_q_values = q_values[v, :max_allowed + 1]
                     batch = valid_q_values.argmax().item()
 
             batch_choices.append(batch)

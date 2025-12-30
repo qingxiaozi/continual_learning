@@ -41,42 +41,53 @@ class ResultVisualizer:
         }
 
     def plot_training_loss(
-        self, epoch_losses, val_losses=None, save_plot=True, plot_name="training_loss.png"
+        self,
+        epoch_losses,
+        val_losses=None,
+        epoch_elastic_losses=None,
+        save_plot=True,
+        plot_name="training_loss.png"
     ):
-        """绘制训练损失和验证损失曲线"""
+        """绘制训练损失、验证损失和弹性损失曲线"""
         plt.figure(figsize=(10, 6))
 
-        # 绘制训练损失曲线
         epochs = range(1, len(epoch_losses) + 1)
         plt.plot(epochs, epoch_losses, "b-", linewidth=2, label="Training Loss", marker='o', markersize=4)
 
-        # 如果提供了验证损失，绘制验证损失曲线
         if val_losses and len(val_losses) > 0:
             val_epochs = range(1, len(val_losses) + 1)
             plt.plot(val_epochs, val_losses, "r-", linewidth=2, label="Validation Loss", marker='s', markersize=4)
 
-        # 设置图表属性
-        title = "Training Loss vs Epochs" if not val_losses else "Training and Validation Loss"
+        if epoch_elastic_losses and len(epoch_elastic_losses) > 0:
+            elastic_epochs = range(1, len(epoch_elastic_losses) + 1)
+            plt.plot(elastic_epochs, epoch_elastic_losses, "g-", linewidth=2, label="Elastic Loss", marker='^', markersize=4)
+
+        # 动态设置标题
+        labels = ["Training"]
+        if val_losses and len(val_losses) > 0:
+            labels.append("Validation")
+        if epoch_elastic_losses and len(epoch_elastic_losses) > 0:
+            labels.append("Elastic")
+        title = " vs ".join(labels) + " Loss"
         plt.title(title, fontsize=14, fontweight="bold")
+
         plt.xlabel("Epoch", fontsize=12)
         plt.ylabel("Loss", fontsize=12)
         plt.legend(fontsize=10)
-
-        # 设置x轴为整数
         plt.xticks(epochs)
 
-        # 自动调整y轴范围
-        if len(epoch_losses) > 1:
-            all_losses = epoch_losses
-            if val_losses:
-                all_losses = epoch_losses + val_losses[:len(epoch_losses)]  # 只取与训练损失对应长度的验证损失
-            loss_range = max(all_losses) - min(all_losses)
-            plt.ylim(
-                min(all_losses) - 0.1 * loss_range,
-                max(all_losses) + 0.1 * loss_range,
-            )
+        # 自动调整 y 轴范围
+        all_losses = list(epoch_losses)
+        if val_losses and len(val_losses) > 0:
+            all_losses.extend(val_losses[:len(epoch_losses)])
+        if epoch_elastic_losses and len(epoch_elastic_losses) > 0:
+            all_losses.extend(epoch_elastic_losses[:len(epoch_losses)])
 
-        # 保存或显示图表
+        if len(all_losses) > 1:
+            loss_min, loss_max = min(all_losses), max(all_losses)
+            margin = (loss_max - loss_min) * 0.1 or 0.1  # 避免除零
+            plt.ylim(loss_min - margin, loss_max + margin)
+
         if save_plot:
             plot_path = os.path.join(self.save_dir, plot_name)
             plt.savefig(plot_path, dpi=300, bbox_inches="tight")

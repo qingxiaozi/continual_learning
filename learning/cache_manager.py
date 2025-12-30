@@ -150,7 +150,6 @@ class CacheManager:
         cache = self.caches[vehicle_id]
         cache["old_data"].extend(cache["new_data"])
         cache["new_data"] = []
-        # self._maintain_cache_size(vehicle_id)
 
     def get_cache_stats(self):
         """获取缓存统计信息"""

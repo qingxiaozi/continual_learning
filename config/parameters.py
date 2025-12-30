@@ -35,6 +35,9 @@ class Config:
     DRL_GAMMA = 0.99  # 折扣因子
     DRL_BUFFER_SIZE = 10000  # 经验回放缓冲区大小
     DRL_BATCH_SIZE = 8  # batch size
+    DRL_EPSILON_START = 0.9
+    DRL_EPSILON_END = 0.05
+    DRL_EPSILON_DECAY = 80  # epsilon衰减速率
 
     # 缓存参数
     MAX_CACHE_SIZE = 1000  # 边缘服务器的最大缓存批次

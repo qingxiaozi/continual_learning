@@ -26,8 +26,7 @@ class BandwidthAllocator:
             bandwidth_ratios: 每辆车的带宽比例列表
         """
         # 简单平均分配：每辆车分配 1/车辆数 的带宽
-        bandwidth_ratios = np.ones(self.num_vehicles) / self.num_vehicles
-        return bandwidth_ratios
+        return np.ones(self.num_vehicles) / self.num_vehicles
 
     # 按照批次比例进行带宽分配
     def allocate_proportional_bandwidth(self) -> np.ndarray:
@@ -39,8 +38,7 @@ class BandwidthAllocator:
         if total_batches == 0:
             return self.allocate_average_bandwidth()
 
-        bandwidth_ratios = np.array(self.batch_choices) / total_batches
-        return bandwidth_ratios
+        return np.array(self.batch_choices) / total_batches
 
     # 按照最小化最大传输时延分配带宽
     def allocate_minmaxdelay_bandwidth(self, session_id: int = 0) -> Tuple[np.ndarray, float]:

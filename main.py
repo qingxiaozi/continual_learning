@@ -1,5 +1,6 @@
 import torch
 import time
+import random
 from collections import defaultdict
 import numpy as np
 from config.parameters import Config
@@ -79,11 +80,11 @@ class BaselineComparison:
             # 步骤4：集成决策（上传批次 + 带宽分配）
             action_vector, batch_choices, allocation_info = self._integrated_decision(state, available_batches, session)
 
-            # 步骤5: 执行通信和数据收集
+            # 步骤5: 执行数据上传
             upload_results = self._upload_datas(batch_choices)
 
             # 步骤6: 缓存管理和数据选择
-            cache_updates = self._manage_cache_and_data_selection()
+            self._manage_cache_and_data_selection()
 
             # 步骤7: 模型训练和更新
             training_results = self._train_and_update_global_model(session)
@@ -130,10 +131,6 @@ class BaselineComparison:
                 f"已提升缓存中的数据。"
             )
 
-        # 清空所有车辆的上传数据
-        for vehicle in self.vehicle_env.vehicles:
-            vehicle.set_uploaded_data([])
-
         # 更新车辆位置
         self.vehicle_env.update_vehicle_positions(time_delta=1.0)
 
@@ -153,7 +150,8 @@ class BaselineComparison:
 
     def _get_environment_state(self):
         """获取环境状态用于DRL决策"""
-        return self.vehicle_env.get_environment_state()
+        state = self.vehicle_env.get_environment_state()
+        return state
 
     def _get_available_batches(self):
         """获取每辆车实际可用的批次数量"""
@@ -199,47 +197,42 @@ class BaselineComparison:
         return action_vector, batch_choices, allocation_info
 
     def _upload_datas(self, batch_choices):
-        """执行通信和数据收集 - 最小化版本"""
+        """执行通信和数据收集 - 随机选择上传批次"""
         uploaded_data = {}
-
         for vehicle_id, planned_batches in enumerate(batch_choices):
-            if planned_batches > 0:
-                vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-                if vehicle and vehicle.data_batches:
-                    # 直接提取计划数量的批次
-                    uploaded_data[vehicle_id] = vehicle.data_batches[:planned_batches]
-                    vehicle.set_uploaded_data(uploaded_data[vehicle_id])
+            vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
+            if planned_batches > 0 and vehicle.data_batches:
+                # DRL 已保证 planned_batches <= len(vehicle.data_batches)
+                selected = random.sample(vehicle.data_batches, planned_batches)
+                uploaded_data[vehicle_id] = selected
+                vehicle.set_uploaded_data(selected)
+            else:
+                vehicle.set_uploaded_data([])
 
         return uploaded_data
 
     def _manage_cache_and_data_selection(self):
         """缓存管理和数据选择"""
-        cache_updates = {}
-
         for vehicle in self.vehicle_env.vehicles:
-            if vehicle.uploaded_data:
-                # 使用MAB选择器评估数据质量
-                quality_scores = []
-                # 更新缓存
-                self.cache_manager.update_cache(
-                    vehicle.id, vehicle.uploaded_data, quality_scores
-                )
+            # 如果没有uploaded_data，则不进行缓存操作
+            if not vehicle.uploaded_data:
+                continue
 
-                cache_updates[vehicle.id] = {
-                    "new_batches": len(vehicle.uploaded_data),
-                    "avg_quality": np.mean(quality_scores) if quality_scores else 0,
-                }
-        # 打印缓存统计
+            # 更新缓存
+            self.cache_manager.update_cache(
+                vehicle.id, vehicle.uploaded_data, quality_scores=None
+            )
+
+        # 缓存统计
         cache_stats = self.cache_manager.get_cache_stats()
         new_batches = sum([stats["new_data_size"] for stats in cache_stats.values()])
         old_batches = sum([stats["old_data_size"] for stats in cache_stats.values()])
         total_batches = sum([stats["total_size"] for stats in cache_stats.values()])
+
         print(f"\n缓存管理")
         print(f"当前缓存总批次: {total_batches}")
         print(f"缓存中新数据批次：{new_batches}")
         print(f"缓存中旧数据批次：{old_batches}")
-
-        return cache_updates
 
     def _calculate_communication_delay(self, batch_choices, allocation_info, session, training_results=None):
         """计算通信时延 - 使用分配器的计算方法"""
@@ -333,20 +326,19 @@ class BaselineComparison:
         training_result = self.continual_learner.train_with_mab_selection(
             global_data_batches, current_val_data, num_epochs=Config.NUM_EPOCH
         )
-        print(f"调试信息：")
-        print(training_result)
 
         # 初始化默认值
-        training_loss = float("inf")
-        epoch_losses = []
+        epoch_ce_losses = []
         val_losses = []
-        actual_epochs = Config.NUM_EPOCH  # 默认使用配置值
+        epoch_elastic_losses = []
+        actual_epochs = 0  # 默认使用配置值
 
         if training_result is not None:
-            training_ce_loss = training_result.get("training_ce_loss", float("inf"))
-            val_losses = training_result.get("val_losses", [])
-            epoch_losses = training_result.get("epoch_ce_losses", [])
-            actual_epochs = training_result.get("actual_epochs", len(epoch_losses))
+            epoch_elastic_losses = training_result.get("epoch_elastic_losses")
+            training_ce_loss = training_result.get("training_ce_loss")
+            val_losses = training_result.get("val_losses")
+            epoch_ce_losses = training_result.get("epoch_ce_losses")
+            actual_epochs = training_result.get("actual_epochs")
 
         loss_after = self._compute_weighted_loss_on_uploaded_data(self.global_model)
 
@@ -354,8 +346,9 @@ class BaselineComparison:
         self._update_cache_with_mab_scores(batch_mapping)
 
         self.visualize.plot_training_loss(
-            epoch_losses,
+            epoch_ce_losses,
             val_losses,
+            epoch_elastic_losses,
             save_plot=True,
             plot_name=f"training_loss_session_{session}.png",
         )
@@ -364,7 +357,7 @@ class BaselineComparison:
             "loss_before": loss_before,
             "loss_after": loss_after,
             "training_loss": training_ce_loss,
-            "actual_epochs": actual_epochs,  # 关键：返回实际训练epoch数
+            "actual_epochs": actual_epochs,
         }
 
     def _update_cache_with_mab_scores(self, batch_mapping):
@@ -421,15 +414,9 @@ class BaselineComparison:
                     f"预期: {total_expected_batches}, 实际: {len(all_quality_scores)}"
                 )
 
-        # cache_stats = self.cache_manager.get_cache_stats()
-        # formatted_stats = json.dumps(cache_stats, indent=2, ensure_ascii=False, default=str)
-        # print("缓存更新后车辆的缓存信息:")
-        # print(formatted_stats)
-
     def _compute_weighted_loss_on_uploaded_data(self, model):
-        """计算模型在上传数据上的损失"""
+        """计算模型在所有车辆上传数据上的损失和"""
         total_loss = 0.0
-        # batch_count = 0
 
         for vehicle in self.vehicle_env.vehicles:
             if vehicle.uploaded_data:
@@ -437,13 +424,11 @@ class BaselineComparison:
                 for batch in vehicle.uploaded_data:
                     loss = self._compute_batch_loss(model, batch)
                     total_loss += loss * Config.BATCH_SIZE
-                    # batch_count += 1
 
-        # return total_loss / batch_count if batch_count > 0 else 1.0
         return total_loss if total_loss > 0 else 1.0
 
     def _compute_batch_loss(self, model, batch):
-        """计算单个批次的损失"""
+        """计算单个批次所有样本损失的平均值"""
         model.eval()
         criterion = torch.nn.CrossEntropyLoss()
 
@@ -475,7 +460,6 @@ class BaselineComparison:
             eval_results = self._get_default_eval_results()
         elif "metrics" in evaluation_results:
             metrics = evaluation_results["metrics"]
-            # 构建简洁的指标字典
             eval_results = {
                 # 四个核心连续学习指标
                 "AA": metrics["AA"],      # 平均准确率
@@ -510,7 +494,6 @@ class BaselineComparison:
         # 获取必要的参数
         total_delay = comm_results["total_delay"]
         global_dataset_size = comm_results["total_samples"]
-        # accuracy = eval_results["current_accuracy"]
 
         print(f"total_delay:{total_delay}")
         print(f"global_dataset_size:{global_dataset_size}")

@@ -50,7 +50,7 @@ class Vehicle:
         dataloader:为车辆新采集的数据
         """
         if not self.data_batches or len(self.data_batches) == 0:
-            return 0.0
+            return None
 
         global_model.eval()
         total_confidence = 0.0
@@ -83,7 +83,6 @@ class Vehicle:
                 count += 1
 
         avg_confidence = total_confidence / count if count > 0 else 0.0
-        self.confidence_history.append(avg_confidence)
 
         return avg_confidence
 
@@ -94,7 +93,7 @@ class Vehicle:
         dataloader:为经过计算后车辆上传的数据
         """
         if not self.uploaded_data or len(self.uploaded_data) == 0:
-            return 1.0
+            return None
 
         global_model.eval()
         gold_model.eval()
@@ -121,7 +120,7 @@ class Vehicle:
                 loss = criterion(outputs, targets)
                 losses.append(loss.item())
 
-        return np.mean(losses) if losses else 1.0
+        return np.mean(losses)
 
     def update_quality_scores(self, cache_manager):
         """从缓存管理器更新质量评分"""
@@ -383,18 +382,20 @@ class VehicleEnvironment:
                 # 获取当前置信度，从全局模型推理中得到
                 if vehicle.data_batches:
                     confidence = vehicle.get_inference_confidence(self.global_model)
-                    vehicle.confidence_history.append(confidence)
                 else:
                     confidence = 0.5
+                vehicle.confidence_history.append(confidence)
 
                 # 2. 获取测试损失 - 从实际模型评估中获取
                 if vehicle.uploaded_data:
-                    test_loss = vehicle.calculate_test_loss(
+                    raw_loss = vehicle.calculate_test_loss(
                         self.global_model, self.gold_model
                     )
-                    vehicle.test_loss_history.append(test_loss)
+                    test_loss = 1.0 / (1.0 + raw_loss)
                 else:
                     test_loss = 1.0
+                vehicle.test_loss_history.append(test_loss)
+
                 # 3. 获取质量评分 - 从缓存管理器中获取
                 quality_score = vehicle.update_quality_scores(self.cache_manager)
 
@@ -404,16 +405,7 @@ class VehicleEnvironment:
             except Exception as e:
                 print(f"Error getting state for vehicle {vehicle.id}: {e}")
                 # 发生错误时使用默认值
-                state.extend([0.5, 1.0, 0.5])
-
-        # 确保状态向量长度正确
-        expected_length = 3 * Config.NUM_VEHICLES
-        if len(state) < expected_length:
-            # 填充缺失的值
-            state.extend([0.5, 1.0, 0.5] * (Config.NUM_VEHICLES - len(state) // 3))
-        elif len(state) > expected_length:
-            # 截断多余的值
-            state = state[:expected_length]
+                state.extend([0.5, 1.0, 0])
 
         return np.array(state, dtype=np.float32)
 
