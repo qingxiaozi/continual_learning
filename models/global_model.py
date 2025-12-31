@@ -74,7 +74,7 @@ class GlobalModel(nn.Module):
             print(f"⚠️ 模型加载失败: {e}")
             return False
 
-    def fine_tune(self, train_dataset, val_dataset=None, epochs=30, lr=0.001, batch_size=32):
+    def fine_tune(self, train_dataset, val_dataset=None, epochs=60, lr=0.001, batch_size=32):
         device = Config.DEVICE
         self.to(device)
 

@@ -82,7 +82,15 @@ for each session:
         统计缓存总批次和缓存中新旧数据的批次
 
     _train_and_update_global_model(session)
-        收集所有缓存数据构建为全局训练集，并维护全局训练集批次索引到车辆缓存的映射batch_mapping。
+        收集所有缓存数据构建为全局训练集，并维护全局训练集批次索引到车辆缓存的映射batch_mapping。如下：
+        for vehicle in vehicles:
+            获取车辆的缓存
+            for batch_idx, batch in cache["old_data"]:
+                将batch添加到全局训练集中
+                记录旧数据的映射
+            for batch_idx, batch in cache["new_data"]:
+                将batch添加到全局训练集中
+                记录新数据的映射
         获取验证集。
         计算当前阶段上传的数据集在全局模型上的测试损失和，由于全局模型尚未更新，因此当前的全局模型仍旧是上一阶段训练后的全局模型。
         训练模型得到新模型。该阶段集成MAB选择对数据批次进行质量评分。
@@ -92,24 +100,6 @@ for each session:
         计算通信时延
 
     _train_and_update_global_model(session)
-        for vehicle in vehicles:
-            获取车辆的缓存
-            for batch_idx, batch in cache["old_data"]:
-                将batch添加到全局训练集中
-                记录旧数据的映射
-            for batch_idx, batch in cache["new_data"]:
-                将batch添加到全局训练集中
-                记录新数据的映射
-        计算所有车辆上传数据在模型上的平均损失；
-        利用全局训练集对模型进行训练。
-            for each epoch:
-                if epoch_count > init_epochs:
-                    根据mab算法选择arm
-                拿出一个batch
-                计算该batch在当前模型上的损失
-                训练模型
-                计算该batch在训练后模型上的损失
-                以损失变化作为计算奖励值
 
 
         计算所有车辆上传数据在模型上的平均损失，并同时运行MAB算法更新arm的counts、reward、avg_reward和ucb_counts

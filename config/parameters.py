@@ -4,7 +4,7 @@ import torch
 class Config:
     # 实验参数
     NUM_VEHICLES = 20  # 车辆数
-    NUM_TRAINING_SESSIONS = 6  # train session
+    NUM_TRAINING_SESSIONS = 60  # train session
     NUM_EPOCH = 60  # 训练epoch数
     BATCH_SIZE = 16  # batch size
     INIT_EPOCHS = 5  # MAB初始探索轮次
@@ -13,7 +13,7 @@ class Config:
     BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
     BS_TRANSMIT_POWER = 20  # W，基站发射功率，影响通信距离和质量（W）
-    VEHICLE_TRANSMIT_POWER = 2e-1  # 车辆发射功率（W）
+    VEHICLE_TRANSMIT_POWER = 1  # 车辆发射功率（W）
     NOISE_POWER = 3.981e-14  # W，噪声功率，决定通信质量的下限
     PATH_LOSS_EXPONENT = 2.7  # 路径损耗指数
     SHADOWING_STD = 8  # 阴影衰落标准差

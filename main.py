@@ -55,16 +55,16 @@ class BaselineComparison:
         self.session_history = []
         self.visualize = ResultVisualizer()
 
-    def run_joint_optimization(self, num_sessions=None):
-        """运行完整的联合优化过程"""
+    def run_single_episode(self, num_sessions=None):
+        """执行一个 RL episode：包含多个 steps（sessions）"""
         if num_sessions is None:
             num_sessions = Config.NUM_TRAINING_SESSIONS
-        print("=" * 60)
-        print("开始车路协同持续学习联合优化")
-        print(f"数据集: {self.data_simulator.current_dataset}")
-        print(f"车辆数量: {Config.NUM_VEHICLES}")
-        print(f"训练会话数: {num_sessions}")
-        print("=" * 60)
+        # print("=" * 60)
+        # print("开始车路协同持续学习联合优化")
+        # print(f"数据集: {self.data_simulator.current_dataset}")
+        # print(f"车辆数量: {Config.NUM_VEHICLES}")
+        # print(f"训练会话数: {num_sessions}")
+        # print("=" * 60)
 
         for session in range(num_sessions):
             print(f"\n=== 训练会话 {session + 1}/{num_sessions} ===")
@@ -719,4 +719,4 @@ class BaselineComparison:
 
 if __name__ == "__main__":
     a = BaselineComparison()
-    a.run_joint_optimization()
+    a.run_single_episode()
