@@ -165,13 +165,27 @@ class DRLAgent:
         self.epsilon_decay = Config.DRL_EPSILON_DECAY
         self.steps_done = 0  # 已完成的训练更新次数
 
+        self.episodes_done = 0  # 已完成的episode数
+        self.training_mode = True  # 训练/预测模式标志
+
+    def set_train_mode(self):
+        """设置为训练模式"""
+        self.training_mode = True
+        self.policy_net.train()
+
+    def set_eval_mode(self):
+        """设置为评估/预测模式"""
+        self.training_mode = False
+        self.policy_net.eval()
+        self.target_net.eval()
+
     def _get_epsilon(self):
         """计算当前epsilon值（指数衰减）"""
         epsilon = self.epsilon_end + (self.epsilon_start - self.epsilon_end) * \
                   math.exp(-1. * self.steps_done / self.epsilon_decay)
         return epsilon
 
-    def select_action(self, state, available_batches=None, training=True):
+    def select_action(self, state, available_batches=None):
         """选择动作 - 考虑车辆实际可用批次数量限制
         Args:
             state: 状态向量
@@ -179,17 +193,18 @@ class DRLAgent:
                             如果为None，则假设无限可用
             training: 是否处于训练模式
         """
-        epsilon = self._get_epsilon() if training else 0.0
+        should_explore = self.training_mode
+
+        if should_explore:
+            epsilon = self._get_epsilon()
+        else:
+            epsilon = 0.0  # 预测模式不探索
 
         state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
         with torch.no_grad():
             q_values = self.policy_net(state_tensor)  # [1, num_vehicles, num_batch_choices]
             q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
-
-        # # 如果未提供可用批次，假设可以上传最大数量
-        # if available_batches is None:
-        #     available_batches = [self.num_batch_choices - 1] * self.num_vehicles
 
         batch_choices = []
         for v in range(self.num_vehicles):
@@ -305,8 +320,11 @@ class DRLAgent:
 
     def hard_update_target_network(self):
         """硬更新目标网络（定期更新）"""
-        if self.steps_done % self.update_target_every == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
+    def increment_episode(self):
+        """增加episode计数"""
+        self.episodes_done += 1
 
     def save_model(self, path):
         """保存模型"""

@@ -55,16 +55,12 @@ class BaselineComparison:
         self.session_history = []
         self.visualize = ResultVisualizer()
 
-    def run_single_episode(self, num_sessions=None):
+    def run_single_episode(self, episode_id):
         """执行一个 RL episode：包含多个 steps（sessions）"""
-        if num_sessions is None:
-            num_sessions = Config.NUM_TRAINING_SESSIONS
-        # print("=" * 60)
-        # print("开始车路协同持续学习联合优化")
-        # print(f"数据集: {self.data_simulator.current_dataset}")
-        # print(f"车辆数量: {Config.NUM_VEHICLES}")
-        # print(f"训练会话数: {num_sessions}")
-        # print("=" * 60)
+        num_sessions = Config.NUM_TRAINING_SESSIONS
+
+        self._reset_for_new_episode(episode_id)
+        episode_reward = 0
 
         for session in range(num_sessions):
             print(f"\n=== 训练会话 {session + 1}/{num_sessions} ===")
@@ -97,27 +93,65 @@ class BaselineComparison:
             # 步骤9: 性能评估
             evaluation_results = self._evaluate_model_performance()
 
-            # 步骤10: 计算奖励和优化
-            reward = self._calculate_reward_and_optimize(
-                state,
-                batch_choices,
-                evaluation_results,
+            # 步骤10: 计算奖励
+            reward = self._calculate_reward(
                 communication_results,
                 training_results
             )
 
-            # 步骤10: 记录结果
+            episode_reward += reward
+
+            # 步骤11: 获取下一个状态（执行动作后的状态）
+            next_state = self._get_environment_state()
+
+            # 步骤12: 判断episode是否结束
+            done = self._check_episode_done(session, num_sessions, evaluation_results)
+
+            # 步骤13: 存储经验（关键修改：传入正确的done值）
+            self.drl_agent.store_experience(
+                state,
+                action_vector,
+                reward,
+                next_state,
+                done  # 不再是固定的False
+            )
+
+            # 步骤14: 优化DRL模型
+            if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
+                self.drl_agent.optimize_model()
+
+            # 步骤15: 记录结果
             self._record_session_results(
                 session, evaluation_results, communication_results, training_results
             )
 
-            # 步骤11: 模型广播和更新
+            # 步骤16: 模型广播和更新
             self._broadcast_and_update_models()
+
+            # 如果episode结束，跳出循环
+            if done:
+                print(f"Episode {episode_id+1} 在第{session+1}步结束")
+                break
+
+            self.drl_agent.increment_episode()
 
         # 最终评估和结果汇总
         self._final_evaluation_and_summary()
+        print(f"Episode {episode_id+1} 总奖励: {episode_reward:.4f}")
 
         return self.session_history
+
+    def _reset_for_new_episode(self, episode_id):
+        """为新episode重置环境（简化版本）"""
+        print(f"\n{'='*60}")
+        print(f"开始新 Episode {episode_id+1}")
+        print(f"{'='*60}")
+
+    def _check_episode_done(self, session, total_sessions, eval_results):
+        """检查episode是否应该结束"""
+        # 条件1: 达到最大步数
+        if session >= total_sessions - 1:
+            return True
 
     def _update_session_environment(self, session):
         """更新会话和环境状态"""
@@ -168,7 +202,7 @@ class BaselineComparison:
         """集成决策：DRL选择批次 + 带宽分配优化"""
         # 1. DRL选择批次
         action_vector, batch_choices = self.drl_agent.select_action(
-            state, available_batches=available_batches, training=True
+            state, available_batches=available_batches
         )
 
         # 2. 带宽分配优化
@@ -487,16 +521,13 @@ class BaselineComparison:
 
         return eval_results
 
-    def _calculate_reward_and_optimize(
-        self, state, batch_choices, eval_results, comm_results, training_results
+    def _calculate_reward(
+        self, comm_results, training_results
     ):
         """根据原始建模重新设计奖励计算函数"""
         # 获取必要的参数
         total_delay = comm_results["total_delay"]
         global_dataset_size = comm_results["total_samples"]
-
-        print(f"total_delay:{total_delay}")
-        print(f"global_dataset_size:{global_dataset_size}")
 
         loss_before = training_results.get("loss_before", 1.0)
         loss_after = training_results.get("loss_after", 1.0)
@@ -507,19 +538,6 @@ class BaselineComparison:
             reward = total_loss_reduction / (global_dataset_size * total_delay)
         else:
             reward = 0.0
-        # 获取下一个状态
-        next_state = self._get_environment_state()
-        action_vector = np.array(batch_choices, dtype=np.float32)
-
-        # 存储经验并优化DRL模型
-        self.drl_agent.store_experience(state, action_vector, reward, next_state, False)
-
-        if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
-            self.drl_agent.optimize_model()
-
-        print(
-            f"奖励计算 - 损失降幅: {total_loss_reduction:.4f}, 奖励: {reward:.4f}"
-        )
 
         return reward
 
@@ -716,7 +734,47 @@ class BaselineComparison:
 
         print("\n" + "=" * 60)
 
+    def train_rl_agent(self):
+        """完整的强化学习训练循环"""
+
+        num_episodes = Config.NUM_EPISODES
+        print(f"\n{'='*60}")
+        print(f"开始强化学习训练，共{num_episodes}个episodes")
+        print(f"{'='*60}")
+
+        self.drl_agent.set_train_mode()
+        # 初始化记录
+        self.episode_rewards = []
+
+        for episode in range(num_episodes):
+            # 执行一个episode
+            episode_data = self.run_single_episode(episode_id=episode)
+
+            # 记录episode结果
+            self.episode_rewards.append(episode_data.get('total_reward', 0))
+
+            # 定期更新目标网络（可选，但建议）
+            if episode % Config.TARGET_UPDATE_INTERVAL == 0:
+                self.drl_agent.hard_update_target_network()
+                print(f"已更新目标网络")
+
+            # 打印训练进度
+            if episode % 10 == 0:
+                recent_rewards = self.episode_rewards[-10:] if len(self.episode_rewards) >= 10 else self.episode_rewards
+                avg_reward = np.mean(recent_rewards) if recent_rewards else 0
+                print(f"\n[训练进度] Episode {episode+1}/{num_episodes}")
+                print(f"  最近10个episode平均奖励: {avg_reward:.4f}")
+                print(f"  经验回放缓冲区大小: {len(self.drl_agent.memory)}")
+
+        print(f"\n训练完成！")
+        print(f"最终平均奖励: {np.mean(self.episode_rewards):.4f}")
+
+        # 保存训练好的模型
+        self.drl_agent.save_model("trained_drl_model.pth")
+
+        return self.episode_rewards
+
 
 if __name__ == "__main__":
     a = BaselineComparison()
-    a.run_single_episode()
+    a.train_rl_agent()

@@ -200,3 +200,36 @@ xx.gz是上述文件的压缩版本
 3. 修改main.py，进行基线对比实验 10days
 4. 消融实验 5days
 5. 完善digit和dominNet数据集训练 10days
+
+
+完整的强化学习流程
+```python
+for episode in range(num_episodes):
+    episode_reward = 0
+    # 车辆与数据都处于初始状态
+    state = self._reset_environment_for_new_episode()
+
+    for step in range(Config.MAX_STEPS_PER_EPISODE):
+        # 选择动作（包含探索）
+        action = self._selection_action_with_exploration(state, episode)
+        # 执行动作，获取结果
+        next_state, reward, done = self._execute_step(state, action, step)
+        # 存储经验
+        self.drl_agent.store_experience(state, action, reward, next_state, done)
+        # 优化模型
+        if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
+            loss = self.drl_agent.optimize_model()
+        # 更新状态和累积奖励
+        state = next_state
+        episode_reward += reward
+        # 如果episode结束，跳出循环
+        if done:
+            print(f"Episode {episode+1} 在第{step+1}步结束")
+            break
+    # 记录episode结果
+    self.episode_rewards.append(episode_reward)
+    # 定期更新目标网络
+    if episode % Config.TARGET_UPDATE_INTERVAL == 0:
+        self.drl_agent.update_target_network()
+return self.episode_rewards
+```

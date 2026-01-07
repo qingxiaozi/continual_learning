@@ -3,8 +3,11 @@ import torch
 
 class Config:
     # 实验参数
-    NUM_VEHICLES = 20  # 车辆数
+    NUM_EPISODES = 100
     NUM_TRAINING_SESSIONS = 60  # train session
+    TARGET_UPDATE_INTERVAL = 10  # 每10个episode硬更新目标网络
+
+    NUM_VEHICLES = 20  # 车辆数
     NUM_EPOCH = 60  # 训练epoch数
     BATCH_SIZE = 16  # batch size
     INIT_EPOCHS = 5  # MAB初始探索轮次
