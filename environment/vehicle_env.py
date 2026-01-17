@@ -5,6 +5,7 @@ from config.paths import Paths
 from collections import defaultdict
 from pyproj import Transformer, CRS
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import pandas as pd
 import random
 import os
@@ -177,7 +178,7 @@ class VehicleEnvironment:
 
         # 初始化物理环境
         self._initialize_environment()
-        self.plot_trajectory("./results/trajectory.png")
+        #self.plot_trajectory("./results/trajectory.png")
 
     def plot_trajectory(self, save_path=None):
         """
@@ -226,10 +227,113 @@ class VehicleEnvironment:
             inset_ax.tick_params(labelsize=8)
             inset_ax.grid(True, linestyle='--', alpha=0.5)
 
+        # 添加新子图：显示主车辆前后各2.5km轨迹和连接的基站
+        if self.vehicles and len(self.vehicles) > 0:
+            main_vehicle = self.vehicles[0]  # 主车辆（ID=0）
+            main_pos = main_vehicle.position
+            distance_each_direction = 2500  # 前后各2.5km = 2500米
+            current_idx = self.trajectory_index
+            
+            # 创建新子图（在当前子图下方，增大y轴方向距离）
+            local_ax = fig.add_axes([0.2, 0.25, 0.25, 0.25])  # 位于第一个小图下方，距离更大
+            
+            # 沿轨迹向前（索引减小方向）查找2.5km的起始索引
+            forward_distance = 0.0
+            start_idx = current_idx
+            for i in range(current_idx - 1, -1, -1):
+                segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
+                forward_distance += segment_dist
+                if forward_distance > distance_each_direction:
+                    start_idx = i + 1  # i+1是最后一个不超过距离的点
+                    break
+                start_idx = i
+            
+            # 沿轨迹向后（索引增大方向）查找2.5km的结束索引
+            backward_distance = 0.0
+            end_idx = current_idx
+            for i in range(current_idx, self.trajectory_length - 1):
+                segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
+                backward_distance += segment_dist
+                if backward_distance > distance_each_direction:
+                    end_idx = i + 1  # i+1是第一个超过距离的点
+                    break
+                end_idx = i + 1
+            
+            # 获取轨迹段
+            trajectory_segment = self.trajectory_points[start_idx:end_idx+1]
+            
+            # 绘制轨迹段
+            if len(trajectory_segment) > 0:
+                local_ax.plot(trajectory_segment[:, 0], trajectory_segment[:, 1], 
+                             '-', linewidth=2, color='tab:blue', alpha=0.7, label='Trajectory (±2.5km)')
+            
+            # 绘制主车辆位置
+            local_ax.scatter(main_pos[0], main_pos[1], color='orange', s=150, 
+                           marker='o', edgecolors='black', linewidth=2, label='Main Vehicle', zorder=5)
+            local_ax.text(main_pos[0], main_pos[1], ' Vehicle', fontsize=9, 
+                         verticalalignment='center', horizontalalignment='left', fontweight='bold')
+            
+            # 绘制连接的基站
+            if main_vehicle.bs_connection is not None:
+                connected_bs = self._get_base_station_by_id(main_vehicle.bs_connection)
+                if connected_bs:
+                    bs_pos = connected_bs['position']
+                    local_ax.scatter(bs_pos[0], bs_pos[1], color='red', s=150, 
+                                   marker='^', edgecolors='black', linewidth=2, label='Connected BS', zorder=5)
+                    local_ax.text(bs_pos[0], bs_pos[1], f' BS{connected_bs["id"]}', 
+                                 fontsize=9, verticalalignment='bottom', horizontalalignment='left', fontweight='bold')
+                    
+                    # 绘制连接线
+                    local_ax.plot([main_pos[0], bs_pos[0]], [main_pos[1], bs_pos[1]], 
+                                '--', color='gray', linewidth=1.5, alpha=0.6, label='Connection')
+            
+            # 计算轨迹段的边界来确定显示范围
+            if len(trajectory_segment) > 0:
+                min_x, max_x = trajectory_segment[:, 0].min(), trajectory_segment[:, 0].max()
+                min_y, max_y = trajectory_segment[:, 1].min(), trajectory_segment[:, 1].max()
+                # 添加一些边距
+                margin_ratio = 0.1
+                x_range = max_x - min_x
+                y_range = max_y - min_y
+                margin_x = max(x_range * margin_ratio, 500)  # 至少500米
+                margin_y = max(y_range * margin_ratio, 500)
+                
+                local_ax.set_xlim(min_x - margin_x, max_x + margin_x)
+                local_ax.set_ylim(min_y - margin_y, max_y + margin_y)
+            else:
+                # 如果没有轨迹段，使用车辆位置为中心
+                radius_5km = 5000
+                local_ax.set_xlim(main_pos[0] - radius_5km, main_pos[0] + radius_5km)
+                local_ax.set_ylim(main_pos[1] - radius_5km, main_pos[1] + radius_5km)
+            
+            # 子图样式
+            local_ax.set_title('Vehicle & connected BS', fontsize=10)
+            local_ax.set_xlabel("X (km)", fontsize=8)
+            local_ax.set_ylabel("Y (km)", fontsize=8)
+            
+            # 将坐标轴刻度转换为km（使用Formatter避免警告）
+            def format_km(x, pos):
+                return f'{x/1000:.2f}'
+            
+            local_ax.xaxis.set_major_formatter(FuncFormatter(format_km))
+            local_ax.yaxis.set_major_formatter(FuncFormatter(format_km))
+            
+            local_ax.axis('equal')
+            local_ax.tick_params(labelsize=7)
+            local_ax.grid(True, linestyle='--', alpha=0.5)
+            local_ax.legend(fontsize=7, loc='upper left')
+
         # 主图设置
         main_ax.set_title("Trajectory with Current Base Stations", fontsize=14)
-        main_ax.set_xlabel("X (meters)")
-        main_ax.set_ylabel("Y (meters)")
+        main_ax.set_xlabel("X (km)")
+        main_ax.set_ylabel("Y (km)")
+        
+        # 将主图坐标轴刻度转换为km（使用Formatter避免警告）
+        def format_km_main(x, pos):
+            return f'{x/1000:.1f}'
+        
+        main_ax.xaxis.set_major_formatter(FuncFormatter(format_km_main))
+        main_ax.yaxis.set_major_formatter(FuncFormatter(format_km_main))
         main_ax.axis('equal')
         main_ax.grid(True, linestyle='--', alpha=0.6)
         main_ax.legend()
@@ -487,3 +591,4 @@ if __name__ == "__main__":
     env = VehicleEnvironment(None, None, None, None)
     env.update_vehicle_positions(time_delta=750)
     env.update_vehicle_positions(time_delta=750)
+    env.plot_trajectory(save_path="./results/trajectory.png")
