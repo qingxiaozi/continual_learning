@@ -181,44 +181,63 @@ class VehicleEnvironment:
 
     def plot_trajectory(self, save_path=None):
         """
-        可视化转换后的轨迹（局部笛卡尔坐标系）以及基站位置
-
-        Args:
-            save_path (str, optional): 保存图像的路径（如 'trajectory_with_bs.png'），若为 None 则不保存
+        可视化轨迹，主图显示完整轨迹和当前基站，小图显示初始车辆和PPP车辆。
         """
-
         if len(self.trajectory_points) == 0:
             print("轨迹点为空，无法绘图")
             return
 
-        x = self.trajectory_points[:, 0]
-        y = self.trajectory_points[:, 1]
+        x, y = self.trajectory_points[:, 0], self.trajectory_points[:, 1]
 
         # 创建图形
-        plt.figure(figsize=(12, 8))
-        plt.plot(x, y, '-', linewidth=2, color='tab:blue', label='Vehicle Trajectory')
-        plt.scatter(x[0], y[0], color='green', s=100, zorder=5, label='Start')
-        plt.scatter(x[-1], y[-1], color='red', s=100, zorder=5, label='End')
+        fig, main_ax = plt.subplots(figsize=(12, 8))
 
-        # 绘制基站位置
+        # 绘制主图：完整轨迹
+        main_ax.plot(x, y, '-', linewidth=2, color='tab:blue', alpha=0.7, label='Vehicle Trajectory')
+        main_ax.scatter(x[0], y[0], color='green', s=100, label='Start')
+        main_ax.scatter(x[-1], y[-1], color='red', s=100, label='End')
+
+        # 绘制当前基站
         for bs in self.base_stations:
             bs_x, bs_y = bs['position']
-            plt.scatter(bs_x, bs_y, color='black', s=100, marker='^', zorder=6, label='Base Station' if bs == self.base_stations[0] else "")
-            circle = plt.Circle((bs_x, bs_y), bs['coverage'], color='gray', fill=False, linestyle='--', alpha=0.7)
-            plt.gca().add_artist(circle)
+            main_ax.scatter(bs_x, bs_y, color='black', s=100, marker='^', label='Base Station' if bs == self.base_stations[0] else "")
 
-        # 标注距离（可选）
-        total_distance = np.sum(np.sqrt(np.diff(x)**2 + np.diff(y)**2)) / 1000  # km
-        plt.title(f"Converted Trajectory with Base Stations (Total ≈ {total_distance:.1f} km)", fontsize=14)
-        plt.xlabel("X (meters)")
-        plt.ylabel("Y (meters)")
-        plt.axis('equal')  # 保持比例一致，避免轨迹变形
-        plt.grid(True, linestyle='--', alpha=0.6)
-        plt.legend()
+        # 添加小图：显示初始车辆和PPP车辆
+        if self.vehicles:
+            inset_ax = fig.add_axes([0.2, 0.6, 0.25, 0.25])  # 小图位置（大图右上角）
 
+            for vehicle in self.vehicles:
+                vx, vy = vehicle.position
+                color = 'orange' if vehicle.id == 0 else 'purple'
+                inset_ax.scatter(vx, vy, color=color, s=100 if vehicle.id == 0 else 80, marker='o', edgecolors='black', linewidth=1.5)
+                inset_ax.text(vx, vy, f' {vehicle.id}', fontsize=8, verticalalignment='bottom', horizontalalignment='right')
+
+            # 设置小图范围
+            vehicle_positions = np.array([v.position for v in self.vehicles])
+            min_x, max_x = vehicle_positions[:, 0].min(), vehicle_positions[:, 0].max()
+            min_y, max_y = vehicle_positions[:, 1].min(), vehicle_positions[:, 1].max()
+            margin = 50
+            inset_ax.set_xlim(min_x - margin, max_x + margin)
+            inset_ax.set_ylim(min_y - margin, max_y + margin)
+
+            # 小图样式
+            inset_ax.set_title('Vehicles', fontsize=10)
+            inset_ax.axis('equal')
+            inset_ax.tick_params(labelsize=8)
+            inset_ax.grid(True, linestyle='--', alpha=0.5)
+
+        # 主图设置
+        main_ax.set_title("Trajectory with Current Base Stations", fontsize=14)
+        main_ax.set_xlabel("X (meters)")
+        main_ax.set_ylabel("Y (meters)")
+        main_ax.axis('equal')
+        main_ax.grid(True, linestyle='--', alpha=0.6)
+        main_ax.legend()
+
+        # 保存或显示图像
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"轨迹与基站图已保存至: {save_path}")
+            print(f"轨迹图已保存至: {save_path}")
 
         plt.close()
 
@@ -264,10 +283,10 @@ class VehicleEnvironment:
 
         # 估算基站数量（基于 Y 跨度）
         num_bs = min(80, max(2, int(total_y_span / spacing) + 1))
-        print(f"Y轴跨度: {total_y_span / 1000:.1f} km → 部署 {num_bs} 个基站")
+        print(f"初始化 {num_bs} 个基站")
 
-        # 均匀划分 Y 轴
-        target_ys = np.linspace(y_min, y_max, num_bs)
+        # 均匀划分 Y 轴，并反转顺序
+        target_ys = np.linspace(y_min, y_max, num_bs)[::-1]
 
         for i, target_y in enumerate(target_ys):
             # 找到轨迹中 Y 最接近 target_y 的点的索引
@@ -275,7 +294,7 @@ class VehicleEnvironment:
 
             # 获取该点的 X，并向东偏移 50 米
             x_on_road = self.trajectory_points[idx, 0]
-            bs_position = np.array([x_on_road + 500.0, target_y])  # 注意：Y 用 target_y 或 y_coords[idx] 均可
+            bs_position = np.array([x_on_road + 500.0, target_y])
 
             self.base_stations.append({
                 "id": i,
@@ -293,7 +312,7 @@ class VehicleEnvironment:
         # 1. 主车辆（ID 0）在轨迹起点
         main_vehicle = Vehicle(
             vehicle_id=0,
-            position=self.trajectory_points[0].copy()
+            position=self.trajectory_points[0]
         )
         self.vehicles.append(main_vehicle)
 
@@ -302,30 +321,26 @@ class VehicleEnvironment:
 
     def _generate_ppp_vehicles(self, center_position):
         """泊松点过程生成车辆"""
-        area = np.pi * self.ppp_radius**2
-        expected_count = area * self.ppp_lambda
-        actual_count = np.random.poisson(expected_count)
+        ppp_count = Config.NUM_VEHICLES - 1
+        angles = np.random.uniform(0, 2 * np.pi, size=ppp_count)
+        radii = np.random.uniform(0, self.ppp_radius, size=ppp_count)
 
-        # PPP车辆数量（除了主车辆）
-        ppp_count = min(actual_count, Config.NUM_VEHICLES - 1)
+        # 转换为笛卡尔偏移
+        offsets = np.stack([
+            radii * np.cos(angles),
+            radii * np.sin(angles)
+        ], axis=1)  # shape: (ppp_count, 2)
 
-        for i in range(1, ppp_count + 1):
-            # 在半径内随机生成位置
-            angle = np.random.uniform(0, 2*np.pi)
-            radius = np.random.uniform(0, self.ppp_radius)
+        # 所有位置 = 中心 + 偏移
+        positions = center_position + offsets
 
-            # 相对于主车辆的位置
-            offset_x = radius * np.cos(angle)
-            offset_y = radius * np.sin(angle)
-
-            position = center_position + np.array([offset_x, offset_y])
-
+        # 批量创建车辆
+        for i in range(ppp_count):
             vehicle = Vehicle(
-                vehicle_id=i,
-                position=position
+                vehicle_id=i + 1,
+                position=positions[i]
             )
             self.vehicles.append(vehicle)
-
 
     def _establish_initial_connections(self):
         """建立车辆与基站的初始连接"""
@@ -333,7 +348,7 @@ class VehicleEnvironment:
 
         for vehicle in self.vehicles:
             nearest_bs = self._find_nearest_base_station(vehicle.position)
-            if nearest_bs and len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
+            if nearest_bs:
                 vehicle.set_bs_connection(nearest_bs["id"])
                 nearest_bs["connected_vehicles"].append(vehicle.id)
                 connection_success_count += 1
@@ -342,103 +357,85 @@ class VehicleEnvironment:
 
         print(f"初始连接: {connection_success_count}/{len(self.vehicles)} 车辆成功连接")
 
-    def _find_nearest_base_station(self, position, check_coverage=True):
+    def _find_nearest_base_station(self, position):
         """
         找到距离指定位置最近的可用基站
         input:
             position: 车辆位置坐标 [x, y]
-            check_coverage: 是否检查覆盖范围
-
         return:
             dict: 最近的基站信息，如果没有可用基站则返回None
         """
-        min_distance = float("inf")
-        nearest_bs = None
+        available_bs = [
+            bs for bs in self.base_stations
+            if np.linalg.norm(position - bs["position"]) <= bs["coverage"]
+            and len(bs["connected_vehicles"]) < bs["capacity"]
+        ]
+        if not available_bs:
+            return None
 
-        for bs in self.base_stations:
-            # 计算欧几里得距离
-            distance = np.linalg.norm(position - bs["position"])
-            # 检查是否在覆盖范围内
-            within_coverage = (not check_coverage) or (distance <= bs["coverage"])
-            # 检查基站容量
-            has_capacity = len(bs["connected_vehicles"]) < bs["capacity"]
-
-            if within_coverage and has_capacity and distance < min_distance:
-                min_distance = distance
-                nearest_bs = bs
-
-        return nearest_bs
+        return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["position"]))
 
     def update_vehicle_positions(self, time_delta=1.0):
-        """更新车辆位置"""
-        # 1. 更新主车辆位置（沿轨迹）
-        if self.vehicles and self.vehicles[0].id == 0:  # 主车辆
-            self._update_main_vehicle_position(time_delta)
+        """更新车辆位置：主车沿轨迹移动，PPP车辆在主车周围重新生成"""
+        # 更新主车位置
+        distance_moved = 15.0 * time_delta  # 速度15m/s
 
-        # 2. 更新PPP车辆位置（简单移动）
-        for vehicle in self.vehicles[1:]:  # 跳过主车辆
-            self._update_ppp_vehicle_position(vehicle, time_delta)
+        if distance_moved > 0:
+            self.trajectory_index = self._find_next_trajectory_index(distance_moved)
+            self.vehicles[0].position = self.trajectory_points[self.trajectory_index]
 
-        # 3. 更新连接
+        # 重新生成PPP车辆并更新连接
+        self.vehicles = [self.vehicles[0]]  # 保留主车
+        self._generate_ppp_vehicles(self.vehicles[0].position)
         self._update_vehicle_connections()
 
         self.environment_time += time_delta
 
-    def _update_main_vehicle_position(self, time_delta):
-        """更新主车辆位置（沿轨迹）"""
-        main_vehicle = self.vehicles[0]
-        old_position = main_vehicle.position.copy()
+    def _find_next_trajectory_index(self, distance):
+        """找到移动指定距离后的轨迹点索引"""
+        dist_accumulated = 0.0
+        for i in range(self.trajectory_index, self.trajectory_length - 1):
+            dist_accumulated += np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
+            if dist_accumulated >= distance:
+                return i + 1
+        return self.trajectory_length - 1  # 到达终点
 
-        # 根据速度推进轨迹索引（假设平均速度15m/s）
-        speed = 15.0  # m/s
-        distance_moved = speed * time_delta
+    def _update_vehicle_connections(self):
+        """更新所有车辆的基站连接"""
+        for vehicle in self.vehicles:
+            # 断开旧连接
+            old_bs = self._get_base_station_by_id(vehicle.bs_connection)
+            if old_bs and vehicle.id in old_bs["connected_vehicles"]:
+                old_bs["connected_vehicles"].remove(vehicle.id)
+                print(f"Vehicle {vehicle.id} disconnected from Base Station {old_bs['id']}")
 
-        # 找到下一个轨迹点（简化：按固定步长）
-        self.trajectory_index = min(
-            self.trajectory_index + int(distance_moved / 10),  # 假设每10米一个点
-            self.trajectory_length - 1
-        )
+            # 建立新连接
+            nearest_bs = self._find_nearest_base_station(vehicle.position)
+            if nearest_bs and len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
+                vehicle.set_bs_connection(nearest_bs["id"])
+                nearest_bs["connected_vehicles"].append(vehicle.id)
+                print(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
+            else:
+                vehicle.set_bs_connection(None)
+                print(f"Vehicle {vehicle.id} could not connect to any Base Station")
 
-        main_vehicle.position = self.trajectory_points[self.trajectory_index].copy()
+    def _get_base_station_by_id(self, bs_id):
+        """
+        根据ID获取基站对象
+        """
+        for bs in self.base_stations:
+            if bs["id"] == bs_id:
+                return bs
+        return None
 
-        # 更新PPP车辆区域（以主车辆为中心）
-        self._update_ppp_vehicles_region(main_vehicle.position, old_position)
-
-    def _update_ppp_vehicle_position(self, vehicle, time_delta):
-        """更新PPP车辆位置（简单随机移动）"""
-        speed = np.random.uniform(8, 20)
-        angle = np.random.uniform(0, 2*np.pi)
-
-        dx = speed * time_delta * np.cos(angle)
-        dy = speed * time_delta * np.sin(angle)
-
-        vehicle.position += np.array([dx, dy])
-
-        # 边界处理：如果离主车辆太远，重新生成位置
-        main_vehicle_pos = self.vehicles[0].position
-        distance = np.linalg.norm(vehicle.position - main_vehicle_pos)
-        if distance > self.ppp_radius * 1.5:
-            self._reposition_ppp_vehicle(vehicle)
-
-    def _update_ppp_vehicles_region(self, new_center, old_center):
-        """更新PPP车辆区域"""
-        # 当主车辆移动时，PPP车辆区域跟随移动
-        move_vector = new_center - old_center
-
-        # 更新所有PPP车辆位置（保持相对位置）
-        for vehicle in self.vehicles[1:]:
-            vehicle.position += move_vector
-
-    def _reposition_ppp_vehicle(self, vehicle):
-        """重新定位PPP车辆到主车辆附近"""
-        angle = np.random.uniform(0, 2*np.pi)
-        radius = np.random.uniform(0, self.ppp_radius)
-
-        offset_x = radius * np.cos(angle)
-        offset_y = radius * np.sin(angle)
-
-        main_vehicle_pos = self.vehicles[0].position
-        vehicle.position = main_vehicle_pos + np.array([offset_x, offset_y])
+    def _get_vehicle_by_id(self, vehicle_id):
+        """
+        根据ID获取车辆
+        """
+        for vehicle in self.vehicles:
+            if vehicle.id == vehicle_id:
+                return vehicle
+        return None
 
     def get_environment_state(self):
         """获取真实的环境状态用于DRL"""
@@ -475,49 +472,6 @@ class VehicleEnvironment:
 
         return np.array(state, dtype=np.float32)
 
-    def _update_vehicle_connections(self):
-        """更新所有车辆的基站连接"""
-        for vehicle in self.vehicles:
-            old_bs_id = vehicle.bs_connection
-
-            # 找到最近的可连接基站
-            nearest_bs = self._find_nearest_base_station(vehicle.position)
-
-            if nearest_bs:
-                # 从旧基站断开
-                if old_bs_id is not None:
-                    old_bs = self._get_base_station_by_id(old_bs_id)
-                    if old_bs and vehicle.id in old_bs["connected_vehicles"]:
-                        old_bs["connected_vehicles"].remove(vehicle.id)
-
-                # 连接到新基站
-                if len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
-                    vehicle.set_bs_connection(nearest_bs["id"])
-                    nearest_bs["connected_vehicles"].append(vehicle.id)
-                else:
-                    vehicle.set_bs_connection(None)
-            else:
-                vehicle.set_bs_connection(None)
-
-
-    def _get_base_station_by_id(self, bs_id):
-        """
-        根据ID获取基站对象
-        """
-        for bs in self.base_stations:
-            if bs["id"] == bs_id:
-                return bs
-        return None
-
-    def _get_vehicle_by_id(self, vehicle_id):
-        """
-        根据ID获取车辆
-        """
-        for vehicle in self.vehicles:
-            if vehicle.id == vehicle_id:
-                return vehicle
-        return None
-
     def reset(self):
         """重置环境"""
         print("重置车辆环境...")
@@ -528,61 +482,8 @@ class VehicleEnvironment:
         self._initialize_environment()
         print("环境重置完成")
 
-
-
 if __name__ == "__main__":
-    """测试轨迹和车辆生成的简单主函数"""
-    print("=== 测试车辆环境 ===")
-
-    try:
-        # 初始化环境（传入None作为占位符）
-        env = VehicleEnvironment(None, None, None, None)
-
-        print(f"\n轨迹信息:")
-        print(f"轨迹点数: {env.trajectory_length}")
-        print(f"轨迹范围: x[{env.trajectory_points[:, 0].min():.1f}, {env.trajectory_points[:, 0].max():.1f}]m")
-        print(f"轨迹范围: y[{env.trajectory_points[:, 1].min():.1f}, {env.trajectory_points[:, 1].max():.1f}]m")
-
-        print(f"\n车辆信息:")
-        print(f"车辆总数: {len(env.vehicles)}")
-        print(f"基站数量: {len(env.base_stations)}")
-
-        # 显示前几辆车的初始位置
-        print("\n前5辆车的初始位置:")
-        for i, vehicle in enumerate(env.vehicles[:5]):
-            print(f"车辆 {vehicle.id}: 位置({vehicle.position[0]:.1f}, {vehicle.position[1]:.1f})m, "
-                  f"连接基站: {vehicle.bs_connection}")
-
-        # 显示基站信息
-        print("\n基站信息:")
-        for bs in env.base_stations:
-            connected = len(bs['connected_vehicles'])
-            print(f"基站 {bs['id']}: 位置({bs['position'][0]:.1f}, {bs['position'][1]:.1f})m, "
-                  f"覆盖半径{bs['coverage']}m, 已连接{connected}/{bs['capacity']}车辆")
-
-        # 测试车辆移动
-        print("\n=== 测试车辆移动 ===")
-        for step in range(3):  # 测试3个时间步
-            print(f"\n时间步 {step + 1} (时间: {env.environment_time:.1f}s):")
-            env.update_vehicle_positions(time_delta=1.0)
-
-            # 显示主车辆位置
-            main_vehicle = env.vehicles[0]
-            print(f"主车辆位置: ({main_vehicle.position[0]:.1f}, {main_vehicle.position[1]:.1f})m")
-            print(f"轨迹索引: {env.trajectory_index}/{env.trajectory_length}")
-
-            # 显示连接状态
-            connected_count = sum(1 for v in env.vehicles if v.bs_connection is not None)
-            print(f"已连接车辆: {connected_count}/{len(env.vehicles)}")
-
-        print("\n✅ 测试完成！轨迹和车辆生成逻辑正常。")
-
-    except FileNotFoundError as e:
-        print(f"\n❌ 错误: {e}")
-        print("请确保轨迹文件存在，并且路径配置正确。")
-        print(f"查找路径: {os.path.join(Paths.TRAJECTORY_DIR, Config.TRAJECTORY_FILE)}")
-
-    except Exception as e:
-        print(f"\n❌ 发生错误: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
+    """测试车辆与基站的连接切换"""
+    env = VehicleEnvironment(None, None, None, None)
+    env.update_vehicle_positions(time_delta=750)
+    env.update_vehicle_positions(time_delta=750)

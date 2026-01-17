@@ -13,7 +13,7 @@ class Config:
     INIT_EPOCHS = 5  # MAB初始探索轮次
 
     # 通信参数
-    BASE_STATION_COVERAGE = 8000  # 米，基站覆盖范围
+    BASE_STATION_COVERAGE = 5000  # 米，基站覆盖范围
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
     BS_TRANSMIT_POWER = 20  # W，基站发射功率，影响通信距离和质量（W）
     VEHICLE_TRANSMIT_POWER = 1  # 车辆发射功率（W）
