@@ -58,8 +58,6 @@ class BaselineComparison:
     def run_single_episode(self, episode_id):
         """执行一个 RL episode：包含多个 steps（sessions）"""
         num_sessions = Config.NUM_TRAINING_SESSIONS
-
-        self._reset_for_new_episode(episode_id)
         episode_reward = 0
 
         for session in range(num_sessions):
@@ -105,7 +103,7 @@ class BaselineComparison:
             next_state = self._get_environment_state()
 
             # 步骤12: 判断episode是否结束
-            done = self._check_episode_done(session, num_sessions, evaluation_results)
+            done = (session == num_sessions - 1)
 
             # 步骤13: 存储经验（关键修改：传入正确的done值）
             self.drl_agent.store_experience(
@@ -133,25 +131,11 @@ class BaselineComparison:
                 print(f"Episode {episode_id+1} 在第{session+1}步结束")
                 break
 
-            self.drl_agent.increment_episode()
-
         # 最终评估和结果汇总
         self._final_evaluation_and_summary()
         print(f"Episode {episode_id+1} 总奖励: {episode_reward:.4f}")
 
-        return self.session_history
-
-    def _reset_for_new_episode(self, episode_id):
-        """为新episode重置环境（简化版本）"""
-        print(f"\n{'='*60}")
-        print(f"开始新 Episode {episode_id+1}")
-        print(f"{'='*60}")
-
-    def _check_episode_done(self, session, total_sessions, eval_results):
-        """检查episode是否应该结束"""
-        # 条件1: 达到最大步数
-        if session >= total_sessions - 1:
-            return True
+        return episode_reward
 
     def _update_session_environment(self, session):
         """更新会话和环境状态"""
@@ -231,18 +215,15 @@ class BaselineComparison:
         return action_vector, batch_choices, allocation_info
 
     def _upload_datas(self, batch_choices):
-        """执行通信和数据收集 - 随机选择上传批次"""
         uploaded_data = {}
-        for vehicle_id, planned_batches in enumerate(batch_choices):
+        for vehicle_id, n in enumerate(batch_choices):
             vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-            if planned_batches > 0 and vehicle.data_batches:
-                # DRL 已保证 planned_batches <= len(vehicle.data_batches)
-                selected = random.sample(vehicle.data_batches, planned_batches)
-                uploaded_data[vehicle_id] = selected
-                vehicle.set_uploaded_data(selected)
+            if n == 0:
+                selected = []
             else:
-                vehicle.set_uploaded_data([])
-
+                selected = random.sample(vehicle.data_batches, n)
+                uploaded_data[vehicle_id] = selected
+            vehicle.set_uploaded_data(selected)
         return uploaded_data
 
     def _manage_cache_and_data_selection(self):
@@ -529,9 +510,7 @@ class BaselineComparison:
         total_delay = comm_results["total_delay"]
         global_dataset_size = comm_results["total_samples"]
 
-        loss_before = training_results.get("loss_before", 1.0)
-        loss_after = training_results.get("loss_after", 1.0)
-        total_loss_reduction = loss_before - loss_after
+        total_loss_reduction = training_results.get("loss_before", 1.0) - training_results.get("loss_after", 1.0)
 
         # 计算奖励
         if total_delay > 0 and global_dataset_size > 0:
@@ -751,9 +730,9 @@ class BaselineComparison:
             episode_data = self.run_single_episode(episode_id=episode)
 
             # 记录episode结果
-            self.episode_rewards.append(episode_data.get('total_reward', 0))
+            self.episode_rewards.append(episode_data)
 
-            # 定期更新目标网络（可选，但建议）
+            # 定期更新目标网络
             if episode % Config.TARGET_UPDATE_INTERVAL == 0:
                 self.drl_agent.hard_update_target_network()
                 print(f"已更新目标网络")
@@ -767,7 +746,6 @@ class BaselineComparison:
                 print(f"  经验回放缓冲区大小: {len(self.drl_agent.memory)}")
 
         print(f"\n训练完成！")
-        print(f"最终平均奖励: {np.mean(self.episode_rewards):.4f}")
 
         # 保存训练好的模型
         self.drl_agent.save_model("trained_drl_model.pth")

@@ -165,7 +165,6 @@ class DRLAgent:
         self.epsilon_decay = Config.DRL_EPSILON_DECAY
         self.steps_done = 0  # 已完成的训练更新次数
 
-        self.episodes_done = 0  # 已完成的episode数
         self.training_mode = True  # 训练/预测模式标志
 
     def set_train_mode(self):
@@ -321,10 +320,6 @@ class DRLAgent:
     def hard_update_target_network(self):
         """硬更新目标网络（定期更新）"""
         self.target_net.load_state_dict(self.policy_net.state_dict())
-
-    def increment_episode(self):
-        """增加episode计数"""
-        self.episodes_done += 1
 
     def save_model(self, path):
         """保存模型"""

@@ -176,6 +176,7 @@ xx.gz是上述文件的压缩版本
 |digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST：70000；EMNIST：280000；USPS：7291；SVHN：99289|图像大小|通道数|数字识别|
 |DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|Real: 约 172,000 张；Clipart: 约 48,000 张；Painting: 约 72,000 张；Quickdraw: 约 172,000 张；Sketch: 约 72,000 张；Infograph: 约 48,000 张|图像大小|通道数|说明|
 <br>
+
 ### models
 #### 多臂老虎机（mab_selector）
 功能：<br>

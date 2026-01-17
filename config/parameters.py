@@ -13,7 +13,7 @@ class Config:
     INIT_EPOCHS = 5  # MAB初始探索轮次
 
     # 通信参数
-    BASE_STATION_COVERAGE = 1000  # 米，基站覆盖范围
+    BASE_STATION_COVERAGE = 8000  # 米，基站覆盖范围
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
     BS_TRANSMIT_POWER = 20  # W，基站发射功率，影响通信距离和质量（W）
     VEHICLE_TRANSMIT_POWER = 1  # 车辆发射功率（W）
@@ -22,6 +22,8 @@ class Config:
     SHADOWING_STD = 8  # 阴影衰落标准差
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
+
+    TRAJECTORY_FILE = "trajectory_12213.csv"
 
     # 模型参数
     NUM_CLASSES = 10  # 类别的数量
