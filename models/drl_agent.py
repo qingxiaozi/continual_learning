@@ -233,7 +233,10 @@ class DRLAgent:
     def store_experience(self, state, action_vector, reward, next_state, done):
         """存储经验"""
         # 将动作向量转换为批次选择列表
-        batch_choices = action_vector.astype(np.int32).tolist()
+        # action_vector格式: [batch0, bandwidth0, batch1, bandwidth1, ...]
+        # 只提取批次选择部分（偶数索引）
+        action_vector = np.array(action_vector)
+        batch_choices = action_vector[0::2].astype(np.int32).tolist()
 
         # 存储到优先回放缓冲区（不提供初始TD误差）
         self.memory.push(state, batch_choices, reward, next_state, done, td_error=None)
