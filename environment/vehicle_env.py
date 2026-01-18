@@ -165,6 +165,7 @@ class VehicleEnvironment:
         )
         self.trajectory_length = len(self.trajectory_points)
         self.trajectory_index = 0  # 当前轨迹点索引
+        self.direction = 1  # 移动方向：1前进，-1后退
 
         # PPP参数
         self.ppp_radius = 200  # PPP生成半径（米）
@@ -482,11 +483,17 @@ class VehicleEnvironment:
     def update_vehicle_positions(self, time_delta=1.0):
         """更新车辆位置：主车沿轨迹移动，PPP车辆在主车周围重新生成"""
         # 更新主车位置
-        distance_moved = 15.0 * time_delta  # 速度15m/s
+        distance_moved = 15.0 * time_delta * self.direction  # 根据方向调整距离
 
-        if distance_moved > 0:
+        if distance_moved != 0:
             self.trajectory_index = self._find_next_trajectory_index(distance_moved)
             self.vehicles[0].position = self.trajectory_points[self.trajectory_index]
+
+        # 检查是否到达边界并翻转方向
+        if self.trajectory_index == 0 and self.direction == -1:
+            self.direction = 1  # 到达起点，转为前进
+        elif self.trajectory_index == self.trajectory_length - 1 and self.direction == 1:
+            self.direction = -1  # 到达终点，转为后退
 
         # 重新生成PPP车辆并更新连接
         self.vehicles = [self.vehicles[0]]  # 保留主车
@@ -496,13 +503,26 @@ class VehicleEnvironment:
         self.environment_time += time_delta
 
     def _find_next_trajectory_index(self, distance):
-        """找到移动指定距离后的轨迹点索引"""
+        """找到移动指定距离后的轨迹点索引，支持前进和后退"""
         dist_accumulated = 0.0
-        for i in range(self.trajectory_index, self.trajectory_length - 1):
-            dist_accumulated += np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
-            if dist_accumulated >= distance:
-                return i + 1
-        return self.trajectory_length - 1  # 到达终点
+        
+        if distance > 0:  # 前进
+            for i in range(self.trajectory_index, self.trajectory_length - 1):
+                segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
+                dist_accumulated += segment_dist
+                if dist_accumulated >= distance:
+                    return i + 1
+            return self.trajectory_length - 1  # 到达终点
+        elif distance < 0:  # 后退
+            abs_distance = abs(distance)
+            for i in range(self.trajectory_index, 0, -1):
+                segment_dist = np.linalg.norm(self.trajectory_points[i] - self.trajectory_points[i-1])
+                dist_accumulated += segment_dist
+                if dist_accumulated >= abs_distance:
+                    return i - 1
+            return 0  # 到达起点
+        else:
+            return self.trajectory_index  # 距离为0，不移动
 
     def _update_vehicle_connections(self):
         """更新所有车辆的基站连接"""
@@ -520,8 +540,16 @@ class VehicleEnvironment:
                 nearest_bs["connected_vehicles"].append(vehicle.id)
                 print(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
             else:
+                # 调试信息：打印车辆位置和最近基站信息
+                print(f"Vehicle {vehicle.id} at position {vehicle.position} could not connect to any Base Station")
+                if nearest_bs:
+                    print(f"  Nearest BS {nearest_bs['id']} at {nearest_bs['position']}, distance: {np.linalg.norm(vehicle.position - nearest_bs['position'])}, capacity: {len(nearest_bs['connected_vehicles'])}/{nearest_bs['capacity']}")
+                else:
+                    # 计算到所有基站的距离
+                    distances = [np.linalg.norm(vehicle.position - bs["position"]) for bs in self.base_stations]
+                    min_dist = min(distances) if distances else float('inf')
+                    print(f"  No available BS within range. Min distance to any BS: {min_dist} meters")
                 vehicle.set_bs_connection(None)
-                print(f"Vehicle {vehicle.id} could not connect to any Base Station")
 
     def _get_base_station_by_id(self, bs_id):
         """
@@ -582,13 +610,51 @@ class VehicleEnvironment:
         self.vehicles = []
         self.base_stations = []
         self.trajectory_index = 0
+        self.direction = 1  # 重置为前进方向
         self.environment_time = 0.0
         self._initialize_environment()
         print("环境重置完成")
 
 if __name__ == "__main__":
-    """测试车辆与基站的连接切换"""
+    """测试车辆与基站的连接切换及来回移动"""
     env = VehicleEnvironment(None, None, None, None)
-    env.update_vehicle_positions(time_delta=750)
-    env.update_vehicle_positions(time_delta=750)
+    
+    # 测试多次位置更新，观察方向变化和连接
+    print("=== 初始状态 ===")
+    print(f"轨迹长度: {env.trajectory_length}")
+    print(f"初始轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
+    print(f"主车辆位置: {env.vehicles[0].position}")
+    print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
+    
+    # 多次更新位置
+    updates = [
+        (750, "第一次更新"),
+        (750, "第二次更新"),
+        (750, "第三次更新"),
+        (10750, "第四次更新"),
+        (750, "第五次更新"),
+        (750, "第六次更新"),
+        (750, "第七次更新"),
+        (10750, "第八次更新"),
+        (750, "第九次更新（应开始前进）"),
+        (750, "第十次更新（应开始后退）"),
+        (750, "第十一次更新（应开始后退）"),
+        (750, "第十二次更新（应开始后退）"),
+    ]
+    
+    for time_delta, description in updates:
+        print(f"\n=== {description} (time_delta={time_delta}) ===")
+        env.update_vehicle_positions(time_delta=time_delta)
+        print(f"轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
+        print(f"主车辆位置: {env.vehicles[0].position}")
+        print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
+        
+        # 检查边界
+        if env.trajectory_index == 0:
+            print("✓ 已到达起点")
+        elif env.trajectory_index == env.trajectory_length - 1:
+            print("✓ 已到达终点")
+    
+    # 最终绘图
     env.plot_trajectory(save_path="./results/trajectory.png")
+    print("\n轨迹图已保存至 ./results/trajectory.png")

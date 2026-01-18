@@ -3,9 +3,9 @@ import torch
 
 class Config:
     # 实验参数
-    NUM_EPISODES = 100
-    NUM_TRAINING_SESSIONS = 60  # train session
-    TARGET_UPDATE_INTERVAL = 10  # 每10个episode硬更新目标网络
+    NUM_EPISODES = 200
+    NUM_TRAINING_SESSIONS = 40  # train session
+    TARGET_UPDATE_INTERVAL = 5  # 每10个episode硬更新目标网络
 
     NUM_VEHICLES = 20  # 车辆数
     NUM_EPOCH = 60  # 训练epoch数
@@ -13,7 +13,7 @@ class Config:
     INIT_EPOCHS = 5  # MAB初始探索轮次
 
     # 通信参数
-    BASE_STATION_COVERAGE = 5000  # 米，基站覆盖范围
+    BASE_STATION_COVERAGE = 10000  # 米，基站覆盖范围（增加到10km以覆盖更多区域）
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
     BS_TRANSMIT_POWER = 20  # W，基站发射功率，影响通信距离和质量（W）
     VEHICLE_TRANSMIT_POWER = 1  # 车辆发射功率（W）

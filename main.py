@@ -150,7 +150,7 @@ class BaselineComparison:
             )
 
         # 更新车辆位置
-        self.vehicle_env.update_vehicle_positions(time_delta=1.0)
+        self.vehicle_env.update_vehicle_positions(time_delta=250)
 
         # 为车辆生成新数据
         self._refresh_vehicle_data()
