@@ -5,9 +5,11 @@ from torch.utils.data import Dataset, DataLoader, Subset, random_split
 from torchvision import transforms
 from PIL import Image
 import scipy.io as sio
+import logging
 from collections import defaultdict
 from config.parameters import Config
 import matplotlib.pyplot as plt
+logger = logging.getLogger(__name__)
 
 
 class DomainIncrementalDataSimulator:
@@ -229,12 +231,11 @@ class DomainIncrementalDataSimulator:
 
         return TransformSubset(original_dataset, indices, transform)
 
-    def generate_vehicle_data(self, vehicle_id, num_batches=None):
+    def generate_vehicle_data(self, vehicle_id):
         """
         为指定车辆生成数据批次
         输入：
             vehicle_id：车辆id
-            num_batches：请求的批次数。若为 None，则返回所有完整批次
         输出：
             batches：指定车辆的数据批次
         """
@@ -245,20 +246,8 @@ class DomainIncrementalDataSimulator:
         vehicle_indices = self._get_vehicle_data_indices(vehicle_id, train_dataset)
 
         if not vehicle_indices:
-            print(
-                f"警告: 车辆 {vehicle_id} 在域 {current_domain} 中无训练数据"
-            )
+            logger.warning(f"车辆 {vehicle_id} 在域 {current_domain} 中无训练数据")
             return []
-
-        # 计算实际可用的最大批次数量
-        max_batches = len(vehicle_indices) // Config.BATCH_SIZE
-
-        # 用完所有可用数据批次
-        if num_batches is None:
-            num_batches = max_batches
-        # 取外部要求与可用数据批次之间的最小值
-        else:
-            num_batches = min(num_batches, max_batches)
 
         # 创建车辆特定的训练数据集，Subset(original_dataset, indices)
         vehicle_dataset = Subset(train_dataset, vehicle_indices)
@@ -272,13 +261,8 @@ class DomainIncrementalDataSimulator:
         )
 
         # 收集所有批次
-        batches = []
-        for i, batch in enumerate(dataloader):
-            if i >= num_batches:
-                break
-            batches.append(batch)
-
-        print(f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个批次")
+        batches = list(dataloader)
+        logger.info(f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个数据批次")
         return batches
 
     def _get_vehicle_data_indices(self, vehicle_id, train_dataset):

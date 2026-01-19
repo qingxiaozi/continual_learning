@@ -190,56 +190,38 @@ class DRLAgent:
             state: 状态向量
             available_batches: 每辆车实际可用的批次数量列表 [num_vehicles]
                             如果为None，则假设无限可用
-            training: 是否处于训练模式
+        Return:
+            batch_choices: 每辆车选择的批次数列表 [num_vehicles]
         """
-        should_explore = self.training_mode
+        if available_batches is None:
+            available_batches = [Config.MAX_UPLOAD_BATCHES] * self.num_vehicles
 
-        if should_explore:
-            epsilon = self._get_epsilon()
-        else:
-            epsilon = 0.0  # 预测模式不探索
+        should_explore = self.training_mode
+        epsilon = self._get_epsilon() if should_explore else 0.0
 
         state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
         with torch.no_grad():
-            q_values = self.policy_net(state_tensor)  # [1, num_vehicles, num_batch_choices]
-            q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
+            q_values = self.policy_net(state_tensor).squeeze(0)  # [num_vehicles, num_batch_choices]
 
         batch_choices = []
         for v in range(self.num_vehicles):
             max_allowed = min(available_batches[v], Config.MAX_UPLOAD_BATCHES)
             if max_allowed <= 0:
-                # 没有可用数据或超过限制，只能选择0
-                batch = 0
+                batch_choices.append(0)
+            elif random.random() < epsilon:
+                # 随机探索：在允许范围内随机选择
+                batch_choices.append(random.randint(0, max_allowed))
             else:
-                if random.random() < epsilon:
-                    # 随机探索：在允许范围内随机选择
-                    batch = random.randint(0, max_allowed)
-                else:
-                    # 利用：选择最大Q值的批次，但不超过允许数量
-                    valid_q_values = q_values[v, :max_allowed + 1]
-                    batch = valid_q_values.argmax().item()
+                # 利用：选择最大Q值的批次，但不超过允许数量
+                valid_q = q_values[v, :max_allowed + 1]
+                batch_choices.append(valid_q.argmax().item())
 
-            batch_choices.append(batch)
+        return batch_choices
 
-        # 构建完整的动作向量
-        action_vector = np.zeros(2 * self.num_vehicles)
-        for i, batch in enumerate(batch_choices):
-            action_vector[i * 2] = batch  # 批次决策
-            action_vector[i * 2 + 1] = 0.0  # 带宽分配占位符
-
-        return action_vector, batch_choices
-
-    def store_experience(self, state, action_vector, reward, next_state, done):
+    def store_experience(self, state, action, reward, next_state, done):
         """存储经验"""
-        # 将动作向量转换为批次选择列表
-        # action_vector格式: [batch0, bandwidth0, batch1, bandwidth1, ...]
-        # 只提取批次选择部分（偶数索引）
-        action_vector = np.array(action_vector)
-        batch_choices = action_vector[0::2].astype(np.int32).tolist()
-
-        # 存储到优先回放缓冲区（不提供初始TD误差）
-        self.memory.push(state, batch_choices, reward, next_state, done, td_error=None)
+        self.memory.push(state, action, reward, next_state, done, td_error=None)
 
     def optimize_model(self):
         """优化模型（使用Double DQN和优先经验回放）"""

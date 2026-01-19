@@ -271,8 +271,9 @@ class CommunicationSystem:
         t_label = self.calculate_labeling_delay(upload_decisions)
         t_retrain = self.calculate_retraining_delay(total_samples, actual_epochs)
         t_broadcast = self.calculate_broadcast_delay(session_id)
+        total_delay = t_trans + t_label + t_retrain
 
-        total_delay = t_trans + t_label + t_retrain + t_broadcast
+        # total_delay = t_trans + t_label + t_retrain + t_broadcast
 
         delay_breakdown = {
             "transmission_delay": t_trans,

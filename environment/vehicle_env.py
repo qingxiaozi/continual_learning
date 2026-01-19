@@ -234,10 +234,10 @@ class VehicleEnvironment:
             main_pos = main_vehicle.position
             distance_each_direction = 2500  # 前后各2.5km = 2500米
             current_idx = self.trajectory_index
-            
+
             # 创建新子图（在当前子图下方，增大y轴方向距离）
             local_ax = fig.add_axes([0.2, 0.25, 0.25, 0.25])  # 位于第一个小图下方，距离更大
-            
+
             # 沿轨迹向前（索引减小方向）查找2.5km的起始索引
             forward_distance = 0.0
             start_idx = current_idx
@@ -248,7 +248,7 @@ class VehicleEnvironment:
                     start_idx = i + 1  # i+1是最后一个不超过距离的点
                     break
                 start_idx = i
-            
+
             # 沿轨迹向后（索引增大方向）查找2.5km的结束索引
             backward_distance = 0.0
             end_idx = current_idx
@@ -259,35 +259,35 @@ class VehicleEnvironment:
                     end_idx = i + 1  # i+1是第一个超过距离的点
                     break
                 end_idx = i + 1
-            
+
             # 获取轨迹段
             trajectory_segment = self.trajectory_points[start_idx:end_idx+1]
-            
+
             # 绘制轨迹段
             if len(trajectory_segment) > 0:
-                local_ax.plot(trajectory_segment[:, 0], trajectory_segment[:, 1], 
+                local_ax.plot(trajectory_segment[:, 0], trajectory_segment[:, 1],
                              '-', linewidth=2, color='tab:blue', alpha=0.7, label='Trajectory (±2.5km)')
-            
+
             # 绘制主车辆位置
-            local_ax.scatter(main_pos[0], main_pos[1], color='orange', s=150, 
+            local_ax.scatter(main_pos[0], main_pos[1], color='orange', s=150,
                            marker='o', edgecolors='black', linewidth=2, label='Main Vehicle', zorder=5)
-            local_ax.text(main_pos[0], main_pos[1], ' Vehicle', fontsize=9, 
+            local_ax.text(main_pos[0], main_pos[1], ' Vehicle', fontsize=9,
                          verticalalignment='center', horizontalalignment='left', fontweight='bold')
-            
+
             # 绘制连接的基站
             if main_vehicle.bs_connection is not None:
                 connected_bs = self._get_base_station_by_id(main_vehicle.bs_connection)
                 if connected_bs:
                     bs_pos = connected_bs['position']
-                    local_ax.scatter(bs_pos[0], bs_pos[1], color='red', s=150, 
+                    local_ax.scatter(bs_pos[0], bs_pos[1], color='red', s=150,
                                    marker='^', edgecolors='black', linewidth=2, label='Connected BS', zorder=5)
-                    local_ax.text(bs_pos[0], bs_pos[1], f' BS{connected_bs["id"]}', 
+                    local_ax.text(bs_pos[0], bs_pos[1], f' BS{connected_bs["id"]}',
                                  fontsize=9, verticalalignment='bottom', horizontalalignment='left', fontweight='bold')
-                    
+
                     # 绘制连接线
-                    local_ax.plot([main_pos[0], bs_pos[0]], [main_pos[1], bs_pos[1]], 
+                    local_ax.plot([main_pos[0], bs_pos[0]], [main_pos[1], bs_pos[1]],
                                 '--', color='gray', linewidth=1.5, alpha=0.6, label='Connection')
-            
+
             # 计算轨迹段的边界来确定显示范围
             if len(trajectory_segment) > 0:
                 min_x, max_x = trajectory_segment[:, 0].min(), trajectory_segment[:, 0].max()
@@ -298,7 +298,7 @@ class VehicleEnvironment:
                 y_range = max_y - min_y
                 margin_x = max(x_range * margin_ratio, 500)  # 至少500米
                 margin_y = max(y_range * margin_ratio, 500)
-                
+
                 local_ax.set_xlim(min_x - margin_x, max_x + margin_x)
                 local_ax.set_ylim(min_y - margin_y, max_y + margin_y)
             else:
@@ -306,19 +306,19 @@ class VehicleEnvironment:
                 radius_5km = 5000
                 local_ax.set_xlim(main_pos[0] - radius_5km, main_pos[0] + radius_5km)
                 local_ax.set_ylim(main_pos[1] - radius_5km, main_pos[1] + radius_5km)
-            
+
             # 子图样式
             local_ax.set_title('Vehicle & connected BS', fontsize=10)
             local_ax.set_xlabel("X (km)", fontsize=8)
             local_ax.set_ylabel("Y (km)", fontsize=8)
-            
+
             # 将坐标轴刻度转换为km（使用Formatter避免警告）
             def format_km(x, pos):
                 return f'{x/1000:.2f}'
-            
+
             local_ax.xaxis.set_major_formatter(FuncFormatter(format_km))
             local_ax.yaxis.set_major_formatter(FuncFormatter(format_km))
-            
+
             local_ax.axis('equal')
             local_ax.tick_params(labelsize=7)
             local_ax.grid(True, linestyle='--', alpha=0.5)
@@ -328,11 +328,11 @@ class VehicleEnvironment:
         main_ax.set_title("Trajectory with Current Base Stations", fontsize=14)
         main_ax.set_xlabel("X (km)")
         main_ax.set_ylabel("Y (km)")
-        
+
         # 将主图坐标轴刻度转换为km（使用Formatter避免警告）
         def format_km_main(x, pos):
             return f'{x/1000:.1f}'
-        
+
         main_ax.xaxis.set_major_formatter(FuncFormatter(format_km_main))
         main_ax.yaxis.set_major_formatter(FuncFormatter(format_km_main))
         main_ax.axis('equal')
@@ -379,7 +379,6 @@ class VehicleEnvironment:
 
     def _initialize_base_stations_along_trajectory(self):
         """沿轨迹按 Y 轴均匀划分部署基站，X 坐标取对应轨迹点并东偏 50 米"""
-        coverage_radius = Config.BASE_STATION_COVERAGE
         spacing = 10000  # 间距（单位：米）
 
         y_coords = self.trajectory_points[:, 1]
@@ -399,12 +398,12 @@ class VehicleEnvironment:
 
             # 获取该点的 X，并向东偏移 50 米
             x_on_road = self.trajectory_points[idx, 0]
-            bs_position = np.array([x_on_road + 500.0, target_y])
+            bs_position = np.array([x_on_road + 50.0, target_y])
 
             self.base_stations.append({
                 "id": i,
                 "position": bs_position,
-                "coverage": coverage_radius,
+                "coverage": Config.BASE_STATION_COVERAGE,
                 "capacity": 50,
                 "connected_vehicles": [],
                 "utilization": 0.0,
@@ -479,6 +478,71 @@ class VehicleEnvironment:
             return None
 
         return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["position"]))
+    # def _find_nearest_base_station(self, position):
+    #     """
+    #     找到距离指定位置最近的可用基站
+    #     input:
+    #         position: 车辆位置坐标 [x, y]
+    #     return:
+    #         dict: 最近的基站信息，如果没有可用基站则返回None
+    #     """
+    #     position = np.array(position)  # 确保是 numpy array
+
+    #     # 先计算所有基站的距离和状态
+    #     bs_info = []
+    #     for bs in self.base_stations:
+    #         dist = np.linalg.norm(position - np.array(bs["position"]))
+    #         within_coverage = dist <= bs["coverage"]
+    #         has_capacity = len(bs["connected_vehicles"]) < bs["capacity"]
+    #         bs_info.append({
+    #             "bs": bs,
+    #             "distance": dist,
+    #             "within_coverage": within_coverage,
+    #             "has_capacity": has_capacity
+    #         })
+
+    #     # 筛选可用基站
+    #     available_bs = [
+    #         info["bs"] for info in bs_info
+    #         if info["within_coverage"] and info["has_capacity"]
+    #     ]
+
+    #     if not available_bs:
+    #         print(f"\n⚠️ 车辆无法连接任何基站！")
+    #         print(f"   车辆位置: {position}")
+    #         print(f"   总基站数量: {len(self.base_stations)}")
+    #         print(f"   {'-' * 60}")
+
+    #         for i, info in enumerate(bs_info):
+    #             bs = info["bs"]
+    #             dist = info["distance"]
+    #             cov = bs["coverage"]
+    #             conn = len(bs["connected_vehicles"])
+    #             cap = bs["capacity"]
+
+    #             reasons = []
+    #             if not info["within_coverage"]:
+    #                 reasons.append(f"超出覆盖 (距离={dist:.2f}m > 覆盖={cov}m)")
+    #             if not info["has_capacity"]:
+    #                 reasons.append(f"容量已满 ({conn}/{cap})")
+
+    #             status = "❌ 不可用" if reasons else "✅ 可用"
+    #             reason_str = "; ".join(reasons) if reasons else "—"
+
+    #             print(f"   基站 #{i}: 位置={bs['position']}, 距离={dist:.2f}m")
+    #             print(f"             覆盖={cov}m, 连接数={conn}/{cap} → {status}")
+    #             if reasons:
+    #                 print(f"             原因: {reason_str}")
+    #             print()
+
+    #         # 找出全局最近的基站（即使不可用）
+    #         nearest_any = min(bs_info, key=lambda x: x["distance"])
+    #         print(f"   📏 全局最近基站距离: {nearest_any['distance']:.2f} 米")
+    #         return None
+
+    #     # 正常返回最近的可用基站
+    #     nearest = min(available_bs, key=lambda bs: np.linalg.norm(position - np.array(bs["position"])))
+    #     return nearest
 
     def update_vehicle_positions(self, time_delta=1.0):
         """更新车辆位置：主车沿轨迹移动，PPP车辆在主车周围重新生成"""
@@ -505,7 +569,7 @@ class VehicleEnvironment:
     def _find_next_trajectory_index(self, distance):
         """找到移动指定距离后的轨迹点索引，支持前进和后退"""
         dist_accumulated = 0.0
-        
+
         if distance > 0:  # 前进
             for i in range(self.trajectory_index, self.trajectory_length - 1):
                 segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
@@ -526,12 +590,15 @@ class VehicleEnvironment:
 
     def _update_vehicle_connections(self):
         """更新所有车辆的基站连接"""
+        for bs in self.base_stations:
+            bs["connected_vehicles"] = []
+
         for vehicle in self.vehicles:
-            # 断开旧连接
-            old_bs = self._get_base_station_by_id(vehicle.bs_connection)
-            if old_bs and vehicle.id in old_bs["connected_vehicles"]:
-                old_bs["connected_vehicles"].remove(vehicle.id)
-                print(f"Vehicle {vehicle.id} disconnected from Base Station {old_bs['id']}")
+            # # 断开旧连接
+            # old_bs = self._get_base_station_by_id(vehicle.bs_connection)
+            # if old_bs and vehicle.id in old_bs["connected_vehicles"]:
+            #     old_bs["connected_vehicles"].remove(vehicle.id)
+            #     print(f"Vehicle {vehicle.id} disconnected from Base Station {old_bs['id']}")
 
             # 建立新连接
             nearest_bs = self._find_nearest_base_station(vehicle.position)
@@ -540,15 +607,16 @@ class VehicleEnvironment:
                 nearest_bs["connected_vehicles"].append(vehicle.id)
                 print(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
             else:
-                # 调试信息：打印车辆位置和最近基站信息
-                print(f"Vehicle {vehicle.id} at position {vehicle.position} could not connect to any Base Station")
-                if nearest_bs:
-                    print(f"  Nearest BS {nearest_bs['id']} at {nearest_bs['position']}, distance: {np.linalg.norm(vehicle.position - nearest_bs['position'])}, capacity: {len(nearest_bs['connected_vehicles'])}/{nearest_bs['capacity']}")
-                else:
-                    # 计算到所有基站的距离
-                    distances = [np.linalg.norm(vehicle.position - bs["position"]) for bs in self.base_stations]
-                    min_dist = min(distances) if distances else float('inf')
-                    print(f"  No available BS within range. Min distance to any BS: {min_dist} meters")
+                # print(f"nearest_bs: {nearest_bs}")
+                # # 调试信息：打印车辆位置和最近基站信息
+                # print(f"Vehicle {vehicle.id} at position {vehicle.position} could not connect to any Base Station")
+                # if nearest_bs:
+                #     print(f"  Nearest BS {nearest_bs['id']} at {nearest_bs['position']}, distance: {np.linalg.norm(vehicle.position - nearest_bs['position'])}, capacity: {len(nearest_bs['connected_vehicles'])}/{nearest_bs['capacity']}")
+                # else:
+                #     # 计算到所有基站的距离
+                #     distances = [np.linalg.norm(vehicle.position - bs["position"]) for bs in self.base_stations]
+                #     min_dist = min(distances) if distances else float('inf')
+                #     print(f"  No available BS within range. Min distance to any BS: {min_dist} meters")
                 vehicle.set_bs_connection(None)
 
     def _get_base_station_by_id(self, bs_id):
@@ -618,14 +686,14 @@ class VehicleEnvironment:
 if __name__ == "__main__":
     """测试车辆与基站的连接切换及来回移动"""
     env = VehicleEnvironment(None, None, None, None)
-    
+
     # 测试多次位置更新，观察方向变化和连接
     print("=== 初始状态 ===")
     print(f"轨迹长度: {env.trajectory_length}")
     print(f"初始轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
     print(f"主车辆位置: {env.vehicles[0].position}")
     print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
-    
+
     # 多次更新位置
     updates = [
         (750, "第一次更新"),
@@ -641,20 +709,20 @@ if __name__ == "__main__":
         (750, "第十一次更新（应开始后退）"),
         (750, "第十二次更新（应开始后退）"),
     ]
-    
+
     for time_delta, description in updates:
         print(f"\n=== {description} (time_delta={time_delta}) ===")
         env.update_vehicle_positions(time_delta=time_delta)
         print(f"轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
         print(f"主车辆位置: {env.vehicles[0].position}")
         print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
-        
+
         # 检查边界
         if env.trajectory_index == 0:
             print("✓ 已到达起点")
         elif env.trajectory_index == env.trajectory_length - 1:
             print("✓ 已到达终点")
-    
+
     # 最终绘图
     env.plot_trajectory(save_path="./results/trajectory.png")
     print("\n轨迹图已保存至 ./results/trajectory.png")

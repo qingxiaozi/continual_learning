@@ -63,16 +63,13 @@ class BaselineComparison:
         for session in range(num_sessions):
             print(f"\n=== 训练会话 {session + 1}/{num_sessions} ===")
             # 步骤1: 更新会话和环境
-            self._update_session_environment(session)
+            available_batches = self._update_session_environment(session)
 
             # 步骤2: 获取环境状态
             state = self._get_environment_state()
 
-            # 步骤3：获取车辆可用批次数量
-            available_batches = self._get_available_batches()
-
             # 步骤4：集成决策（上传批次 + 带宽分配）
-            action_vector, batch_choices, allocation_info = self._integrated_decision(state, available_batches, session)
+            batch_choices, bandwidth_ratios = self._integrated_decision(state, available_batches, session)
 
             # 步骤5: 执行数据上传
             upload_results = self._upload_datas(batch_choices)
@@ -85,7 +82,7 @@ class BaselineComparison:
 
             # 步骤8：计算通信时延
             communication_results = self._calculate_communication_delay(
-                batch_choices, allocation_info, session, training_results
+                batch_choices, bandwidth_ratios, session, training_results
             )
 
             # 步骤9: 性能评估
@@ -108,7 +105,7 @@ class BaselineComparison:
             # 步骤13: 存储经验（关键修改：传入正确的done值）
             self.drl_agent.store_experience(
                 state,
-                action_vector,
+                batch_choices,
                 reward,
                 next_state,
                 done  # 不再是固定的False
@@ -153,39 +150,31 @@ class BaselineComparison:
         self.vehicle_env.update_vehicle_positions(time_delta=250)
 
         # 为车辆生成新数据
-        self._refresh_vehicle_data()
-
+        available_batches = self._refresh_vehicle_data()
         self.current_domain = current_domain
-
         print(f"\n 环境更新完成 - 当前域: {current_domain}")
+
+        return available_batches
 
     def _refresh_vehicle_data(self):
         """为所有车辆刷新数据"""
+        available_batches = []
         for vehicle in self.vehicle_env.vehicles:
             # 生成新的数据批次
             new_data = self.data_simulator.generate_vehicle_data(vehicle.id)
             vehicle.data_batches = new_data
+            available_batches.append(len(new_data))
+        return available_batches
 
     def _get_environment_state(self):
         """获取环境状态用于DRL决策"""
         state = self.vehicle_env.get_environment_state()
         return state
 
-    def _get_available_batches(self):
-        """获取每辆车实际可用的批次数量"""
-        available_batches = []
-        for v in range(Config.NUM_VEHICLES):
-            vehicle = self.vehicle_env._get_vehicle_by_id(v)
-            if vehicle and vehicle.data_batches:
-                available_batches.append(len(vehicle.data_batches))
-            else:
-                available_batches.append(0)
-        return available_batches
-
     def _integrated_decision(self, state, available_batches, session):
         """集成决策：DRL选择批次 + 带宽分配优化"""
         # 1. DRL选择批次
-        action_vector, batch_choices = self.drl_agent.select_action(
+        batch_choices = self.drl_agent.select_action(
             state, available_batches=available_batches
         )
 
@@ -199,20 +188,11 @@ class BaselineComparison:
         # 使用优化分配方法
         bandwidth_ratios, min_max_delay = allocator.allocate_minmaxdelay_bandwidth(session)
 
-        # 3. 更新动作向量中的带宽部分
-        for i in range(len(batch_choices)):
-            action_vector[i * 2 + 1] = bandwidth_ratios[i]
-
-        allocation_info = {
-            'method': 'optimized',
-            'bandwidth_ratios': bandwidth_ratios,
-            'min_max_delay': min_max_delay
-        }
         print(f"\n决策结果")
         print(f"总上传批次: {sum(batch_choices)}")
         print(f"上传批次: {batch_choices}")
         print(f"带宽分配: {bandwidth_ratios}")
-        return action_vector, batch_choices, allocation_info
+        return batch_choices, bandwidth_ratios
 
     def _upload_datas(self, batch_choices):
         uploaded_data = {}
@@ -249,11 +229,11 @@ class BaselineComparison:
         print(f"缓存中新数据批次：{new_batches}")
         print(f"缓存中旧数据批次：{old_batches}")
 
-    def _calculate_communication_delay(self, batch_choices, allocation_info, session, training_results=None):
+    def _calculate_communication_delay(self, batch_choices, bandwidth_ratios, session, training_results=None):
         """计算通信时延 - 使用分配器的计算方法"""
         # 构建带宽分配字典
         bandwidth_allocations = {}
-        for i, ratio in enumerate(allocation_info['bandwidth_ratios']):
+        for i, ratio in enumerate(bandwidth_ratios):
             if ratio > 0:
                 bandwidth_allocations[i] = ratio
 
