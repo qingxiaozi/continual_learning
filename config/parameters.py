@@ -23,7 +23,7 @@ class Config:
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
 
-    TRAJECTORY_FILE = "trajectory_12213.csv"
+    TRAJECTORY_FILE = "trajectory.csv"
 
     # 模型参数
     NUM_CLASSES = 10  # 类别的数量

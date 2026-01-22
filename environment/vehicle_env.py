@@ -9,6 +9,7 @@ from matplotlib.ticker import FuncFormatter
 import pandas as pd
 import random
 import os
+import ast
 
 
 class Vehicle:
@@ -159,17 +160,12 @@ class VehicleEnvironment:
         self.environment_time = 0.0  # 环境运行时间(s)
 
         self.trajectory_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, Config.TRAJECTORY_FILE))
-        self.trajectory_points = self._convert_to_cartesian(
-            self.trajectory_data['lon'].values,
-            self.trajectory_data['lat'].values
-        )
-        self.trajectory_length = len(self.trajectory_points)
-        self.trajectory_index = 0  # 当前轨迹点索引
-        self.direction = 1  # 移动方向：1前进，-1后退
+        self.trajectory_points = None  # 初始为空
 
         # PPP参数
         self.ppp_radius = 200  # PPP生成半径（米）
         self.ppp_lambda = 0.001  # 单位面积车辆密度（辆/平方米）
+        self.ppp_lambda_bs = 6 # 单位面积基站密度（个/平方公里）
 
         # 初始化数据环境
         self.data_simulator = data_simulator
@@ -178,182 +174,56 @@ class VehicleEnvironment:
         self.cache_manager = cache_manager
 
         # 初始化物理环境
-        self._initialize_environment()
-        #self.plot_trajectory("./results/trajectory.png")
+        self._initialize_base_stations()
+        # self._initialize_environment()
+        self.plot_all_trajectories_and_bs("./results/all_trajectories.png")
 
-    def plot_trajectory(self, save_path=None):
-        """
-        可视化轨迹，主图显示完整轨迹和当前基站，小图显示初始车辆和PPP车辆。
-        """
-        if len(self.trajectory_points) == 0:
-            print("轨迹点为空，无法绘图")
-            return
+    def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png'):
+        """绘制所有轨迹"""
+        for poly in self.trajectory_data['POLYLINE']:
+            try:
+                pts = ast.literal_eval(poly)
+                if pts:
+                    plt.plot(*zip(*pts), 'b-', linewidth=0.3)
+            except:
+                continue
 
-        x, y = self.trajectory_points[:, 0], self.trajectory_points[:, 1]
+        if self.base_stations:
+            plt.scatter([bs['position'][0] for bs in self.base_stations],
+                   [bs['position'][1] for bs in self.base_stations],
+                   c='red', s=30, marker='^', alpha=0.7, label=f'{len(self.base_stations)} BS')
+            plt.legend()
 
-        # 创建图形
-        fig, main_ax = plt.subplots(figsize=(12, 8))
+        plt.title(f"{len(self.trajectory_data)} Trajectories with {len(self.base_stations)} BS")
+        plt.xlabel("Longitude")
+        plt.ylabel("Latitude")
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
 
-        # 绘制主图：完整轨迹
-        main_ax.plot(x, y, '-', linewidth=2, color='tab:blue', alpha=0.7, label='Vehicle Trajectory')
-        main_ax.scatter(x[0], y[0], color='green', s=100, label='Start')
-        main_ax.scatter(x[-1], y[-1], color='red', s=100, label='End')
-
-        # 绘制当前基站
-        for bs in self.base_stations:
-            bs_x, bs_y = bs['position']
-            main_ax.scatter(bs_x, bs_y, color='black', s=100, marker='^', label='Base Station' if bs == self.base_stations[0] else "")
-
-        # 添加小图：显示初始车辆和PPP车辆
-        if self.vehicles:
-            inset_ax = fig.add_axes([0.2, 0.6, 0.25, 0.25])  # 小图位置（大图右上角）
-
-            for vehicle in self.vehicles:
-                vx, vy = vehicle.position
-                color = 'orange' if vehicle.id == 0 else 'purple'
-                inset_ax.scatter(vx, vy, color=color, s=100 if vehicle.id == 0 else 80, marker='o', edgecolors='black', linewidth=1.5)
-                inset_ax.text(vx, vy, f' {vehicle.id}', fontsize=8, verticalalignment='bottom', horizontalalignment='right')
-
-            # 设置小图范围
-            vehicle_positions = np.array([v.position for v in self.vehicles])
-            min_x, max_x = vehicle_positions[:, 0].min(), vehicle_positions[:, 0].max()
-            min_y, max_y = vehicle_positions[:, 1].min(), vehicle_positions[:, 1].max()
-            margin = 50
-            inset_ax.set_xlim(min_x - margin, max_x + margin)
-            inset_ax.set_ylim(min_y - margin, max_y + margin)
-
-            # 小图样式
-            inset_ax.set_title('Vehicles', fontsize=10)
-            inset_ax.axis('equal')
-            inset_ax.tick_params(labelsize=8)
-            inset_ax.grid(True, linestyle='--', alpha=0.5)
-
-        # 添加新子图：显示主车辆前后各2.5km轨迹和连接的基站
-        if self.vehicles and len(self.vehicles) > 0:
-            main_vehicle = self.vehicles[0]  # 主车辆（ID=0）
-            main_pos = main_vehicle.position
-            distance_each_direction = 2500  # 前后各2.5km = 2500米
-            current_idx = self.trajectory_index
-
-            # 创建新子图（在当前子图下方，增大y轴方向距离）
-            local_ax = fig.add_axes([0.2, 0.25, 0.25, 0.25])  # 位于第一个小图下方，距离更大
-
-            # 沿轨迹向前（索引减小方向）查找2.5km的起始索引
-            forward_distance = 0.0
-            start_idx = current_idx
-            for i in range(current_idx - 1, -1, -1):
-                segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
-                forward_distance += segment_dist
-                if forward_distance > distance_each_direction:
-                    start_idx = i + 1  # i+1是最后一个不超过距离的点
-                    break
-                start_idx = i
-
-            # 沿轨迹向后（索引增大方向）查找2.5km的结束索引
-            backward_distance = 0.0
-            end_idx = current_idx
-            for i in range(current_idx, self.trajectory_length - 1):
-                segment_dist = np.linalg.norm(self.trajectory_points[i+1] - self.trajectory_points[i])
-                backward_distance += segment_dist
-                if backward_distance > distance_each_direction:
-                    end_idx = i + 1  # i+1是第一个超过距离的点
-                    break
-                end_idx = i + 1
-
-            # 获取轨迹段
-            trajectory_segment = self.trajectory_points[start_idx:end_idx+1]
-
-            # 绘制轨迹段
-            if len(trajectory_segment) > 0:
-                local_ax.plot(trajectory_segment[:, 0], trajectory_segment[:, 1],
-                             '-', linewidth=2, color='tab:blue', alpha=0.7, label='Trajectory (±2.5km)')
-
-            # 绘制主车辆位置
-            local_ax.scatter(main_pos[0], main_pos[1], color='orange', s=150,
-                           marker='o', edgecolors='black', linewidth=2, label='Main Vehicle', zorder=5)
-            local_ax.text(main_pos[0], main_pos[1], ' Vehicle', fontsize=9,
-                         verticalalignment='center', horizontalalignment='left', fontweight='bold')
-
-            # 绘制连接的基站
-            if main_vehicle.bs_connection is not None:
-                connected_bs = self._get_base_station_by_id(main_vehicle.bs_connection)
-                if connected_bs:
-                    bs_pos = connected_bs['position']
-                    local_ax.scatter(bs_pos[0], bs_pos[1], color='red', s=150,
-                                   marker='^', edgecolors='black', linewidth=2, label='Connected BS', zorder=5)
-                    local_ax.text(bs_pos[0], bs_pos[1], f' BS{connected_bs["id"]}',
-                                 fontsize=9, verticalalignment='bottom', horizontalalignment='left', fontweight='bold')
-
-                    # 绘制连接线
-                    local_ax.plot([main_pos[0], bs_pos[0]], [main_pos[1], bs_pos[1]],
-                                '--', color='gray', linewidth=1.5, alpha=0.6, label='Connection')
-
-            # 计算轨迹段的边界来确定显示范围
-            if len(trajectory_segment) > 0:
-                min_x, max_x = trajectory_segment[:, 0].min(), trajectory_segment[:, 0].max()
-                min_y, max_y = trajectory_segment[:, 1].min(), trajectory_segment[:, 1].max()
-                # 添加一些边距
-                margin_ratio = 0.1
-                x_range = max_x - min_x
-                y_range = max_y - min_y
-                margin_x = max(x_range * margin_ratio, 500)  # 至少500米
-                margin_y = max(y_range * margin_ratio, 500)
-
-                local_ax.set_xlim(min_x - margin_x, max_x + margin_x)
-                local_ax.set_ylim(min_y - margin_y, max_y + margin_y)
-            else:
-                # 如果没有轨迹段，使用车辆位置为中心
-                radius_5km = 5000
-                local_ax.set_xlim(main_pos[0] - radius_5km, main_pos[0] + radius_5km)
-                local_ax.set_ylim(main_pos[1] - radius_5km, main_pos[1] + radius_5km)
-
-            # 子图样式
-            local_ax.set_title('Vehicle & connected BS', fontsize=10)
-            local_ax.set_xlabel("X (km)", fontsize=8)
-            local_ax.set_ylabel("Y (km)", fontsize=8)
-
-            # 将坐标轴刻度转换为km（使用Formatter避免警告）
-            def format_km(x, pos):
-                return f'{x/1000:.2f}'
-
-            local_ax.xaxis.set_major_formatter(FuncFormatter(format_km))
-            local_ax.yaxis.set_major_formatter(FuncFormatter(format_km))
-
-            local_ax.axis('equal')
-            local_ax.tick_params(labelsize=7)
-            local_ax.grid(True, linestyle='--', alpha=0.5)
-            local_ax.legend(fontsize=7, loc='upper left')
-
-        # 主图设置
-        main_ax.set_title("Trajectory with Current Base Stations", fontsize=14)
-        main_ax.set_xlabel("X (km)")
-        main_ax.set_ylabel("Y (km)")
-
-        # 将主图坐标轴刻度转换为km（使用Formatter避免警告）
-        def format_km_main(x, pos):
-            return f'{x/1000:.1f}'
-
-        main_ax.xaxis.set_major_formatter(FuncFormatter(format_km_main))
-        main_ax.yaxis.set_major_formatter(FuncFormatter(format_km_main))
-        main_ax.axis('equal')
-        main_ax.grid(True, linestyle='--', alpha=0.6)
-        main_ax.legend()
-
-        # 保存或显示图像
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"轨迹图已保存至: {save_path}")
 
         plt.close()
+        print(f"Saved: {save_path}")
 
     def _initialize_environment(self):
-        """初始化车辆和基站环境"""
-        # 1. 沿轨迹部署基站（每5km一个）
-        self._initialize_base_stations_along_trajectory()
+        """初始化车辆"""
+        self.vehicles = []
+        self._load_random_trajectory()
         # 2. 初始化车辆（主车辆+PPP车辆）
         self._initialize_vehicles_with_ppp()
         # 3. 建立连接
         self._establish_initial_connections()
+
+    def _load_random_trajectory(self):
+        """随机加载一条轨迹"""
+        if self.trajectory_data.empty: return
+        try:
+            pts = ast.literal_eval(self.trajectory_data.sample(1).iloc[0]['POLYLINE'])
+            if len(pts) >= 2:
+                self.trajectory_points = self._convert_to_cartesian(*zip(*pts))
+        except:
+            self.trajectory_points = None
 
     def _convert_to_cartesian(self, lon_array, lat_array):
         """
@@ -377,37 +247,42 @@ class VehicleEnvironment:
         # 平移至非负
         return np.column_stack([x - x.min(), y - y.min()])
 
-    def _initialize_base_stations_along_trajectory(self):
-        """沿轨迹按 Y 轴均匀划分部署基站，X 坐标取对应轨迹点并东偏 50 米"""
-        spacing = 10000  # 间距（单位：米）
+    def _get_all_trajectory_points(self):
+        """获取所有轨迹点（最简洁版）"""
+        return [
+            point
+            for poly in self.trajectory_data['POLYLINE']
+            for point in (ast.literal_eval(poly) if isinstance(poly, str) else poly)
+            if isinstance(poly, str)  # 确保是字符串
+        ]
 
-        y_coords = self.trajectory_points[:, 1]
-        y_min, y_max = np.min(y_coords), np.max(y_coords)
-        total_y_span = y_max - y_min
+    def _initialize_base_stations(self):
+        """PPP生成基站"""
+        points = self._get_all_trajectory_points()
+        if not points: return
 
-        # 估算基站数量（基于 Y 跨度）
-        num_bs = min(80, max(2, int(total_y_span / spacing) + 1))
-        print(f"初始化 {num_bs} 个基站")
+        lons, lats = zip(*points)
+        R, center_lat = 6371000, np.mean(lats)
+        m_lon = R * np.cos(np.radians(center_lat)) * np.pi / 180
+        m_lat = R * np.pi / 180
 
-        # 均匀划分 Y 轴，并反转顺序
-        target_ys = np.linspace(y_min, y_max, num_bs)[::-1]
+        # 一行式计算面积和基站数
+        area_km2 = ((max(lons)-min(lons))*m_lon * (max(lats)-min(lats))*m_lat) / 1e6
+        num_bs = max(10, int(area_km2 * self.ppp_lambda_bs))
 
-        for i, target_y in enumerate(target_ys):
-            # 找到轨迹中 Y 最接近 target_y 的点的索引
-            idx = np.argmin(np.abs(y_coords - target_y))
+        # 生成基站
+        self.base_stations = [{
+            "id": i,
+            "position": np.array([
+                np.random.uniform(min(lons), max(lons)),
+                np.random.uniform(min(lats), max(lats))
+            ]),
+            "coverage": Config.BASE_STATION_COVERAGE,
+            "capacity": 50,
+            "connected_vehicles": [],
+        } for i in range(num_bs)]
 
-            # 获取该点的 X，并向东偏移 50 米
-            x_on_road = self.trajectory_points[idx, 0]
-            bs_position = np.array([x_on_road + 50.0, target_y])
-
-            self.base_stations.append({
-                "id": i,
-                "position": bs_position,
-                "coverage": Config.BASE_STATION_COVERAGE,
-                "capacity": 50,
-                "connected_vehicles": [],
-                "utilization": 0.0,
-            })
+        print(f"生成{num_bs}个基站")
 
     def _initialize_vehicles_with_ppp(self):
         """初始化车辆：主车辆 + PPP生成的其他车辆"""
@@ -606,42 +481,9 @@ if __name__ == "__main__":
     """测试车辆与基站的连接切换及来回移动"""
     env = VehicleEnvironment(None, None, None, None)
 
-    # 测试多次位置更新，观察方向变化和连接
-    print("=== 初始状态 ===")
-    print(f"轨迹长度: {env.trajectory_length}")
-    print(f"初始轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
-    print(f"主车辆位置: {env.vehicles[0].position}")
-    print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
-
-    # 多次更新位置
-    updates = [
-        (750, "第一次更新"),
-        (750, "第二次更新"),
-        (750, "第三次更新"),
-        (10750, "第四次更新"),
-        (750, "第五次更新"),
-        (750, "第六次更新"),
-        (750, "第七次更新"),
-        (10750, "第八次更新"),
-        (750, "第九次更新（应开始前进）"),
-        (750, "第十次更新（应开始后退）"),
-        (750, "第十一次更新（应开始后退）"),
-        (750, "第十二次更新（应开始后退）"),
-    ]
-
-    for time_delta, description in updates:
-        print(f"\n=== {description} (time_delta={time_delta}) ===")
-        env.update_vehicle_positions(time_delta=time_delta)
-        print(f"轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
-        print(f"主车辆位置: {env.vehicles[0].position}")
-        print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
-
-        # 检查边界
-        if env.trajectory_index == 0:
-            print("✓ 已到达起点")
-        elif env.trajectory_index == env.trajectory_length - 1:
-            print("✓ 已到达终点")
-
-    # 最终绘图
-    env.plot_trajectory(save_path="./results/trajectory.png")
-    print("\n轨迹图已保存至 ./results/trajectory.png")
+    # # 测试多次位置更新，观察方向变化和连接
+    # print("=== 初始状态 ===")
+    # print(f"轨迹长度: {env.trajectory_length}")
+    # print(f"初始轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
+    # print(f"主车辆位置: {env.vehicles[0].position}")
+    # print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
