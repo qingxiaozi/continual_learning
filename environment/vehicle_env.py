@@ -478,71 +478,6 @@ class VehicleEnvironment:
             return None
 
         return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["position"]))
-    # def _find_nearest_base_station(self, position):
-    #     """
-    #     找到距离指定位置最近的可用基站
-    #     input:
-    #         position: 车辆位置坐标 [x, y]
-    #     return:
-    #         dict: 最近的基站信息，如果没有可用基站则返回None
-    #     """
-    #     position = np.array(position)  # 确保是 numpy array
-
-    #     # 先计算所有基站的距离和状态
-    #     bs_info = []
-    #     for bs in self.base_stations:
-    #         dist = np.linalg.norm(position - np.array(bs["position"]))
-    #         within_coverage = dist <= bs["coverage"]
-    #         has_capacity = len(bs["connected_vehicles"]) < bs["capacity"]
-    #         bs_info.append({
-    #             "bs": bs,
-    #             "distance": dist,
-    #             "within_coverage": within_coverage,
-    #             "has_capacity": has_capacity
-    #         })
-
-    #     # 筛选可用基站
-    #     available_bs = [
-    #         info["bs"] for info in bs_info
-    #         if info["within_coverage"] and info["has_capacity"]
-    #     ]
-
-    #     if not available_bs:
-    #         print(f"\n⚠️ 车辆无法连接任何基站！")
-    #         print(f"   车辆位置: {position}")
-    #         print(f"   总基站数量: {len(self.base_stations)}")
-    #         print(f"   {'-' * 60}")
-
-    #         for i, info in enumerate(bs_info):
-    #             bs = info["bs"]
-    #             dist = info["distance"]
-    #             cov = bs["coverage"]
-    #             conn = len(bs["connected_vehicles"])
-    #             cap = bs["capacity"]
-
-    #             reasons = []
-    #             if not info["within_coverage"]:
-    #                 reasons.append(f"超出覆盖 (距离={dist:.2f}m > 覆盖={cov}m)")
-    #             if not info["has_capacity"]:
-    #                 reasons.append(f"容量已满 ({conn}/{cap})")
-
-    #             status = "❌ 不可用" if reasons else "✅ 可用"
-    #             reason_str = "; ".join(reasons) if reasons else "—"
-
-    #             print(f"   基站 #{i}: 位置={bs['position']}, 距离={dist:.2f}m")
-    #             print(f"             覆盖={cov}m, 连接数={conn}/{cap} → {status}")
-    #             if reasons:
-    #                 print(f"             原因: {reason_str}")
-    #             print()
-
-    #         # 找出全局最近的基站（即使不可用）
-    #         nearest_any = min(bs_info, key=lambda x: x["distance"])
-    #         print(f"   📏 全局最近基站距离: {nearest_any['distance']:.2f} 米")
-    #         return None
-
-    #     # 正常返回最近的可用基站
-    #     nearest = min(available_bs, key=lambda bs: np.linalg.norm(position - np.array(bs["position"])))
-    #     return nearest
 
     def update_vehicle_positions(self, time_delta=1.0):
         """更新车辆位置：主车沿轨迹移动，PPP车辆在主车周围重新生成"""
@@ -594,12 +529,6 @@ class VehicleEnvironment:
             bs["connected_vehicles"] = []
 
         for vehicle in self.vehicles:
-            # # 断开旧连接
-            # old_bs = self._get_base_station_by_id(vehicle.bs_connection)
-            # if old_bs and vehicle.id in old_bs["connected_vehicles"]:
-            #     old_bs["connected_vehicles"].remove(vehicle.id)
-            #     print(f"Vehicle {vehicle.id} disconnected from Base Station {old_bs['id']}")
-
             # 建立新连接
             nearest_bs = self._find_nearest_base_station(vehicle.position)
             if nearest_bs and len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
@@ -607,16 +536,6 @@ class VehicleEnvironment:
                 nearest_bs["connected_vehicles"].append(vehicle.id)
                 print(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
             else:
-                # print(f"nearest_bs: {nearest_bs}")
-                # # 调试信息：打印车辆位置和最近基站信息
-                # print(f"Vehicle {vehicle.id} at position {vehicle.position} could not connect to any Base Station")
-                # if nearest_bs:
-                #     print(f"  Nearest BS {nearest_bs['id']} at {nearest_bs['position']}, distance: {np.linalg.norm(vehicle.position - nearest_bs['position'])}, capacity: {len(nearest_bs['connected_vehicles'])}/{nearest_bs['capacity']}")
-                # else:
-                #     # 计算到所有基站的距离
-                #     distances = [np.linalg.norm(vehicle.position - bs["position"]) for bs in self.base_stations]
-                #     min_dist = min(distances) if distances else float('inf')
-                #     print(f"  No available BS within range. Min distance to any BS: {min_dist} meters")
                 vehicle.set_bs_connection(None)
 
     def _get_base_station_by_id(self, bs_id):
