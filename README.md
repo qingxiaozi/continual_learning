@@ -201,7 +201,7 @@ xx.gz是上述文件的压缩版本
 3. 修改main.py，进行基线对比实验 10days
 4. 消融实验 5days
 5. 完善digit和dominNet数据集训练 10days
-
+6. BWT计算有误
 
 完整的强化学习流程
 ```python

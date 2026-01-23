@@ -162,11 +162,12 @@ class VehicleEnvironment:
         self.trajectory_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, Config.TRAJECTORY_FILE))
         self.trajectory_points = None  # 初始为空
         self.trajectory_index = 0  # 轨迹点索引
+        self.base_point = [-9.374787, 37.088271]
 
         # PPP参数
         self.ppp_radius = 200  # PPP生成半径（米）
         self.ppp_lambda = 0.001  # 单位面积车辆密度（辆/平方米）
-        self.ppp_lambda_bs = 6 # 单位面积基站密度（个/平方公里）
+        self.ppp_lambda_bs = 0.01 # 单位面积基站密度（个/平方公里）
 
         # 初始化数据环境
         self.data_simulator = data_simulator
@@ -176,7 +177,7 @@ class VehicleEnvironment:
 
         # 初始化物理环境
         self._initialize_base_stations()
-        # self._initialize_environment()
+        self._initialize_environment()
         self.plot_all_trajectories_and_bs("./results/all_trajectories.png")
 
     def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png'):
@@ -190,14 +191,14 @@ class VehicleEnvironment:
                 continue
 
         if self.base_stations:
-            plt.scatter([bs['position'][0] for bs in self.base_stations],
-                   [bs['position'][1] for bs in self.base_stations],
-                   c='red', s=30, marker='^', alpha=0.7, label=f'{len(self.base_stations)} BS')
-            plt.legend()
-
+            plt.scatter([bs['lonlat_position'][0] for bs in self.base_stations],
+                   [bs['lonlat_position'][1] for bs in self.base_stations],
+                   c='red', s=5, marker='^', alpha=0.7, label=f'{len(self.base_stations)} BS')
+        plt.plot([], [], 'b-', linewidth=0.3, label=f'Trajectories ({len(self.trajectory_data)})')
         plt.title(f"{len(self.trajectory_data)} Trajectories with {len(self.base_stations)} BS")
         plt.xlabel("Longitude")
         plt.ylabel("Latitude")
+        plt.legend(loc='best')
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
 
@@ -211,10 +212,7 @@ class VehicleEnvironment:
         """初始化车辆"""
         self.vehicles = []
         self._load_random_trajectory()
-        # 2. 初始化车辆（主车辆+PPP车辆）
         self._initialize_vehicles_with_ppp()
-        # 3. 建立连接
-        self._update_vehicle_connections()
 
     def _load_random_trajectory(self):
         """随机加载一条轨迹"""
@@ -222,34 +220,36 @@ class VehicleEnvironment:
         try:
             pts = ast.literal_eval(self.trajectory_data.sample(1).iloc[0]['POLYLINE'])
             if len(pts) >= 2:
-                self.trajectory_points = self._convert_to_cartesian(*zip(*pts))
+                lons, lats = zip(*pts)
+                self.trajectory_points = self._convert_to_cartesian(lons, lats)
         except:
             self.trajectory_points = None
 
     def _convert_to_cartesian(self, lon_array, lat_array):
         """
         使用 UTM 投影将经纬度转换为平面坐标（单位：米），
-        并平移坐标系使得所有点的 x, y ≥ 0。
+        以基准点[-9.374787, 37.088271]为中心
         """
-        center_lon = np.mean(lon_array)
-        center_lat = np.mean(lat_array)
+        lon_array = np.asarray(lon_array, dtype=np.float64)
+        lat_array = np.asarray(lat_array, dtype=np.float64)
+
+        # 固定基准点
+        BASE_LON, BASE_LAT = -9.374787, 37.088271
 
         wgs84 = CRS("EPSG:4326")
         utm_crs = CRS(
             proj="utm",
-            zone=int((center_lon + 180) // 6) + 1,
-            south=center_lat < 0,
+            zone=int((BASE_LON + 180) // 6) + 1,
+            south=BASE_LAT < 0,
             ellps="WGS84"
         )
 
-        transformer = Transformer.from_crs(wgs84, utm_crs, always_xy=True)
-        x, y = transformer.transform(lon_array, lat_array)
+        x, y = Transformer.from_crs(wgs84, utm_crs, always_xy=True).transform(lon_array, lat_array)
 
-        # 平移至非负
-        return np.column_stack([x - x.min(), y - y.min()])
+        return np.column_stack([x, y])
 
     def _get_all_trajectory_points(self):
-        """获取所有轨迹点（最简洁版）"""
+        """获取所有轨迹点"""
         return [
             point
             for poly in self.trajectory_data['POLYLINE']
@@ -263,6 +263,10 @@ class VehicleEnvironment:
         if not points: return
 
         lons, lats = zip(*points)
+        # 计算经纬度范围
+        min_lon, max_lon = min(lons), max(lons)
+        min_lat, max_lat = min(lats), max(lats)
+
         R, center_lat = 6371000, np.mean(lats)
         m_lon = R * np.cos(np.radians(center_lat)) * np.pi / 180
         m_lat = R * np.pi / 180
@@ -271,24 +275,26 @@ class VehicleEnvironment:
         area_km2 = ((max(lons)-min(lons))*m_lon * (max(lats)-min(lats))*m_lat) / 1e6
         num_bs = max(10, int(area_km2 * self.ppp_lambda_bs))
 
-        # 生成基站
+        # 批量生成经纬度并转换为UTM
+        bs_lons = np.random.uniform(min_lon, max_lon, num_bs)
+        bs_lats = np.random.uniform(min_lat, max_lat, num_bs)
+        bs_utm = self._convert_to_cartesian(bs_lons, bs_lats)
+
+        # 创建基站
         self.base_stations = [{
             "id": i,
-            "position": np.array([
-                np.random.uniform(min(lons), max(lons)),
-                np.random.uniform(min(lats), max(lats))
-            ]),
+            "lonlat_position": np.array([bs_lons[i], bs_lats[i]]),
+            "utm_position": bs_utm[i],
             "coverage": Config.BASE_STATION_COVERAGE,
             "capacity": 50,
             "connected_vehicles": [],
         } for i in range(num_bs)]
 
-        print(f"生成{num_bs}个基站")
+        print(f"初始化 {num_bs} 个基站")
 
     def _initialize_vehicles_with_ppp(self):
         """初始化车辆：主车辆 + PPP生成的其他车辆"""
         print(f"初始化 {Config.NUM_VEHICLES} 辆智能车辆")
-
         # 1. 主车辆（ID 0）在轨迹起点
         main_vehicle = Vehicle(
             vehicle_id=0,
@@ -298,6 +304,7 @@ class VehicleEnvironment:
 
         # 2. PPP生成其他车辆
         self._generate_ppp_vehicles(main_vehicle.position)
+        self._update_vehicle_connections()
 
     def _generate_ppp_vehicles(self, center_position):
         """泊松点过程生成车辆"""
@@ -322,21 +329,6 @@ class VehicleEnvironment:
             )
             self.vehicles.append(vehicle)
 
-    # def _establish_initial_connections(self):
-    #     """建立车辆与基站的初始连接"""
-    #     connection_success_count = 0
-
-    #     for vehicle in self.vehicles:
-    #         nearest_bs = self._find_nearest_base_station(vehicle.position)
-    #         if nearest_bs:
-    #             vehicle.set_bs_connection(nearest_bs["id"])
-    #             nearest_bs["connected_vehicles"].append(vehicle.id)
-    #             connection_success_count += 1
-    #         else:
-    #             vehicle.set_bs_connection(None)
-
-    #     print(f"初始连接: {connection_success_count}/{len(self.vehicles)} 车辆成功连接")
-
     def _find_nearest_base_station(self, position):
         """
         找到距离指定位置最近的可用基站
@@ -347,17 +339,18 @@ class VehicleEnvironment:
         """
         available_bs = [
             bs for bs in self.base_stations
-            if np.linalg.norm(position - bs["position"]) <= bs["coverage"]
+            if np.linalg.norm(position - bs["utm_position"]) <= bs["coverage"]
             and len(bs["connected_vehicles"]) < bs["capacity"]
         ]
         if not available_bs:
             return None
 
-        return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["position"]))
+        return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["utm_position"]))
 
     def update_vehicle_positions(self, time_delta=1.0):
         """更新车辆位置"""
         if self.trajectory_index >= len(self.trajectory_points) - 1:
+            print(f"车辆已行驶至终点")
             return
 
         distance = 15.0 * time_delta
@@ -454,12 +447,47 @@ class VehicleEnvironment:
         print("环境重置完成")
 
 if __name__ == "__main__":
-    """测试车辆与基站的连接切换及来回移动"""
+    """测试车辆位置更新"""
     env = VehicleEnvironment(None, None, None, None)
 
-    # # 测试多次位置更新，观察方向变化和连接
-    # print("=== 初始状态 ===")
-    # print(f"轨迹长度: {env.trajectory_length}")
-    # print(f"初始轨迹索引: {env.trajectory_index}, 方向: {'前进' if env.direction == 1 else '后退'}")
-    # print(f"主车辆位置: {env.vehicles[0].position}")
-    # print(f"主车辆连接基站: {env.vehicles[0].bs_connection}")
+    # 1. 检查初始状态
+    print("=== 初始状态 ===")
+    print(f"主车辆位置: {env.vehicles[0].position}")
+    print(f"轨迹点数量: {len(env.trajectory_points)}")
+    print(f"基站数量: {len(env.base_stations)}")
+    print(f"车辆总数: {len(env.vehicles)}")
+
+    # 2. 首次更新位置
+    print("\n=== 第一次位置更新 ===")
+    env.update_vehicle_positions(10)  # 移动10秒
+    print(f"轨迹索引: {env.trajectory_index}")
+    print(f"主车辆新位置: {env.vehicles[0].position}")
+    print(f"车辆总数(更新后): {len(env.vehicles)}")
+
+    # 3. 检查坐标一致性
+    print("\n=== 坐标一致性检查 ===")
+    # 检查第一个基站坐标
+    if env.base_stations:
+        bs = env.base_stations[0]
+        print(f"基站0 - 经纬度: {bs['lonlat_position']}")
+        print(f"基站0 - UTM坐标: {bs['utm_position']}")
+
+    # 检查车辆UTM坐标是否合理
+    if env.vehicles:
+        vehicle = env.vehicles[0]
+        print(f"主车辆UTM坐标: {vehicle.position}")
+
+        # 检查与最近基站的距离
+        nearest_bs = env._find_nearest_base_station(vehicle.position)
+        if nearest_bs:
+            distance = np.linalg.norm(vehicle.position - nearest_bs["utm_position"])
+            print(f"到最近基站{nearest_bs['id']}的距离: {distance:.2f}米")
+            print(f"基站覆盖范围: {nearest_bs['coverage']}米")
+
+    # 4. 多次更新检查
+    print("\n=== 连续位置更新 ===")
+    for step in range(3):
+        env.update_vehicle_positions(250)
+        print(f"Step {step+1}: 位置={env.vehicles[0].position}, 索引={env.trajectory_index}")
+
+    print("\n测试完成")
