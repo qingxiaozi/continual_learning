@@ -343,6 +343,7 @@ class VehicleEnvironment:
             and len(bs["connected_vehicles"]) < bs["capacity"]
         ]
         if not available_bs:
+            print(f"No available base station for position {position}")
             return None
 
         return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["utm_position"]))
@@ -449,42 +450,6 @@ class VehicleEnvironment:
 if __name__ == "__main__":
     """测试车辆位置更新"""
     env = VehicleEnvironment(None, None, None, None)
-
-    # 1. 检查初始状态
-    print("=== 初始状态 ===")
-    print(f"主车辆位置: {env.vehicles[0].position}")
-    print(f"轨迹点数量: {len(env.trajectory_points)}")
-    print(f"基站数量: {len(env.base_stations)}")
-    print(f"车辆总数: {len(env.vehicles)}")
-
-    # 2. 首次更新位置
-    print("\n=== 第一次位置更新 ===")
-    env.update_vehicle_positions(10)  # 移动10秒
-    print(f"轨迹索引: {env.trajectory_index}")
-    print(f"主车辆新位置: {env.vehicles[0].position}")
-    print(f"车辆总数(更新后): {len(env.vehicles)}")
-
-    # 3. 检查坐标一致性
-    print("\n=== 坐标一致性检查 ===")
-    # 检查第一个基站坐标
-    if env.base_stations:
-        bs = env.base_stations[0]
-        print(f"基站0 - 经纬度: {bs['lonlat_position']}")
-        print(f"基站0 - UTM坐标: {bs['utm_position']}")
-
-    # 检查车辆UTM坐标是否合理
-    if env.vehicles:
-        vehicle = env.vehicles[0]
-        print(f"主车辆UTM坐标: {vehicle.position}")
-
-        # 检查与最近基站的距离
-        nearest_bs = env._find_nearest_base_station(vehicle.position)
-        if nearest_bs:
-            distance = np.linalg.norm(vehicle.position - nearest_bs["utm_position"])
-            print(f"到最近基站{nearest_bs['id']}的距离: {distance:.2f}米")
-            print(f"基站覆盖范围: {nearest_bs['coverage']}米")
-
-    # 4. 多次更新检查
     print("\n=== 连续位置更新 ===")
     for step in range(3):
         env.update_vehicle_positions(250)
