@@ -8,6 +8,8 @@ import scipy.io as sio
 import logging
 from collections import defaultdict
 from config.parameters import Config
+from learning.evaluator import ModelEvaluator
+from utils.metrics import IncrementalMetricsCalculator
 import matplotlib.pyplot as plt
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,6 @@ class DomainIncrementalDataSimulator:
     def __init__(self):
         self.num_vehicles = Config.NUM_VEHICLES
         self.current_dataset = Config.CURRENT_DATASET
-        self.current_domain_idx = 0
         self.current_session = 0
 
         # 域序列
@@ -36,19 +37,22 @@ class DomainIncrementalDataSimulator:
 
         # 已见域记录
         self.seen_domains = []  # 记录已经出现过的域
-        self.seen_domains_test_sets = {}  # 存储已见域的测试集
+        self.accuracy_history = {}      # {domain: [acc₁, acc₂, ...]}
+        self.aa_history = []   # [AA_1, AA_2, ..., AA_k]
 
         # 数据集信息
         self.dataset_info = {
             "office31": {
                 "num_classes": Config.OFFICE31_CLASSES,
                 "domains": ["amazon", "webcam", "dslr"],
-                "data_loader": self._load_office31_data,
+                "base_path": os.path.join(Config.DATA_BASE_PATH, "office-31"),
+                "dataset_class": Office31Dataset,
             },
             "digit10": {
                 "num_classes": Config.DIGIT10_CLASSES,
                 "domains": ["mnist", "emnist", "usps", "svhn"],
-                "data_loader": self._load_digit10_data,
+                "base_path": os.path.join(Config.DATA_BASE_PATH, "digit10"),
+                "dataset_class": Digit10Dataset,
             },
             "domainnet": {
                 "num_classes": Config.DOMAINNET_CLASSES,
@@ -60,10 +64,13 @@ class DomainIncrementalDataSimulator:
                     "real",
                     "sketch",
                 ],
-                "data_loader": self._load_domainnet_data,
+                "base_path": os.path.join(Config.DATA_BASE_PATH, "domainnet"),
+                "dataset_class": DomainNetDataset,
             },
         }
 
+        self.domain_label_cache = {}
+        self.train_indices_cache = {}  # {domain_key: [orig_idx1, orig_idx2, ...]}
         # 数据缓存（现在分别缓存训练集、测试集和验证集）
         self.train_data_cache = {}  # {domain_key: train_dataset}
         self.test_data_cache = {}  # {domain_key: test_dataset}
@@ -118,10 +125,8 @@ class DomainIncrementalDataSimulator:
             alpha = np.full(num_vehicles, Config.DIRICHLET_ALPHA)
             distribution = np.random.dirichlet(alpha)
             self.class_distributions[class_idx] = distribution
-        print("\n=== 数据环境初始化完成 ===")
-        print(f"狄利克雷分布系数 α = {Config.DIRICHLET_ALPHA}")
+
         print(f"初始化{num_vehicles}辆车的数据分配")
-        print("=====================\n")
 
     def get_current_domain(self):
         """
@@ -145,11 +150,8 @@ class DomainIncrementalDataSimulator:
             self.seen_domains.append(new_domain)
             print(f"新域 {new_domain} 已加入已见域")
 
-        # 域发生变化时打印切换信息
+        # 域是否发生变化
         domain_changed = (old_domain != new_domain)
-        if domain_changed:
-            old_display = old_domain if self.current_session > 0 else "初始域"
-            print(f"Session {session_id}: 域切换 {old_display} -> {new_domain}")
 
         # 预加载新域的数据集
         self._preload_domain_dataset(new_domain)
@@ -164,8 +166,12 @@ class DomainIncrementalDataSimulator:
             # 加载完整数据集并分割
             original_dataset = self._load_domain_data(domain)
             if len(original_dataset) == 0:
-                print(f"警告: 域 {domain} 的数据集为空")
+                logger.warning(f"域 {domain} 的数据集为空")
                 return
+
+            # 预缓存标签 ===
+            all_labels = [original_dataset[i][1] for i in range(len(original_dataset))]
+            self.domain_label_cache[domain_key] = all_labels
 
             total_size = len(original_dataset)
             test_size = int(Config.TEST_RATIO * total_size)
@@ -184,6 +190,9 @@ class DomainIncrementalDataSimulator:
                 generator=generator
             )
 
+            # 缓存训练索引
+            self.train_indices_cache[domain_key] = train_indices.indices
+
             # 创建应用变换的子集
             train_dataset = self._create_subset_with_transform(
                 original_dataset, train_indices, self.train_transform
@@ -199,15 +208,6 @@ class DomainIncrementalDataSimulator:
             self.train_data_cache[domain_key] = train_dataset
             self.test_data_cache[domain_key] = test_dataset
             self.val_data_cache[domain_key] = val_dataset
-
-        # 保存到已见域测试集，仅首次
-        if domain_key not in self.seen_domains_test_sets:
-            self.seen_domains_test_sets[domain_key] = self.test_data_cache[domain_key]
-            print(
-                f"已加载 {domain} 域的数据集 - 训练集: {len(self.train_data_cache[domain_key])}, "
-                f"验证集: {len(self.val_data_cache[domain_key])}, "
-                f"测试集: {len(self.test_data_cache[domain_key])}"
-            )
 
     def _create_subset_with_transform(self, original_dataset, indices, transform):
         """创建应用了特定变换的子集"""
@@ -243,7 +243,7 @@ class DomainIncrementalDataSimulator:
         domain_key = f"{self.current_dataset}_{current_domain}"
 
         train_dataset = self.train_data_cache[domain_key]
-        vehicle_indices = self._get_vehicle_data_indices(vehicle_id, train_dataset)
+        vehicle_indices = self._get_vehicle_data_indices(vehicle_id)
 
         if not vehicle_indices:
             logger.warning(f"车辆 {vehicle_id} 在域 {current_domain} 中无训练数据")
@@ -265,39 +265,38 @@ class DomainIncrementalDataSimulator:
         logger.info(f"车辆 {vehicle_id} 在域 {current_domain} 中共有 {len(batches)} 个数据批次")
         return batches
 
-    def _get_vehicle_data_indices(self, vehicle_id, train_dataset):
+    def _get_vehicle_data_indices(self, vehicle_id):
         """
         获取指定车辆在当前域中的数据索引
         输入：
             vehicle_id：车辆id
-            train_dataset：某个域的训练集
         输出：
-
+            List[int]: 该车辆分配到的样本索引列表
         """
         vehicle_idx = vehicle_id
 
         # 如果还没有为该域分配数据，则进行分配
         domain_key = f"{self.current_dataset}_{self.get_current_domain()}"
         if domain_key not in self.vehicle_data_assignments:
-            self._assign_domain_data_to_vehicles(train_dataset)
+            self._assign_domain_data_to_vehicles()
 
         return self.vehicle_data_assignments[domain_key].get(vehicle_idx, [])
 
-    def _assign_domain_data_to_vehicles(self, train_dataset):
+    def _assign_domain_data_to_vehicles(self):
         """
         使用狄利克雷分布将域训练数据分配给各个车辆
         """
-        num_vehicles = self.num_vehicles
         domain_key = f"{self.current_dataset}_{self.get_current_domain()}"
+        orig_train_indices = self.train_indices_cache[domain_key]
+        train_labels = [self.domain_label_cache[domain_key][i] for i in orig_train_indices]
 
         # 按类别组织训练数据索引
         class_indices = defaultdict(list)
-        for idx in range(len(train_dataset)):
-            _, label = train_dataset[idx]
+        for idx, label in enumerate(train_labels):
             class_indices[label].append(idx)
 
         # 为每个车辆分配训练数据索引
-        vehicle_assignments = {i: [] for i in range(num_vehicles)}
+        vehicle_assignments = {i: [] for i in range(self.num_vehicles)}
 
         for class_idx, indices in class_indices.items():
 
@@ -305,7 +304,7 @@ class DomainIncrementalDataSimulator:
             if class_idx not in self.class_distributions:
 
                 # 如果类别不在初始分布中，创建新的分布
-                alpha = np.full(num_vehicles, Config.DIRICHLET_ALPHA)
+                alpha = np.full(self.num_vehicles, Config.DIRICHLET_ALPHA)
                 self.class_distributions[class_idx] = np.random.dirichlet(alpha)
 
             distribution = self.class_distributions[class_idx]
@@ -319,7 +318,7 @@ class DomainIncrementalDataSimulator:
             if total_assigned < num_samples:
                 # 将剩余样本随机分配给车辆
                 remaining = num_samples - total_assigned
-                extra_assignments = np.random.choice(num_vehicles, remaining)
+                extra_assignments = np.random.choice(self.num_vehicles, remaining)
                 for vehicle_idx in extra_assignments:
                     sample_counts[vehicle_idx] += 1
 
@@ -335,55 +334,17 @@ class DomainIncrementalDataSimulator:
 
         self.vehicle_data_assignments[domain_key] = vehicle_assignments
 
-        # 打印分配统计
-        self._print_allocation_statistics(vehicle_assignments, domain_key)
-
-    def _print_allocation_statistics(self, assignments, domain_key):
-        """打印数据分配统计信息"""
-        vehicle_counts = [len(indices) for indices in assignments.values()]
-        total_samples = sum(vehicle_counts)
-
-        print(f"\n=== {domain_key} 训练数据分配统计 ===")
-        print(f"总训练样本数: {total_samples}")
-        print(
-            f"车辆训练数据量: 平均{np.mean(vehicle_counts):.1f}, "
-            f"最小{min(vehicle_counts)}, 最大{max(vehicle_counts)}"
-        )
-        print(f"训练数据异构程度: 标准差{np.std(vehicle_counts):.1f}")
-        print("=======================================\n")
-
     def _load_domain_data(self, domain):
-        """加载指定域的数据(未分割)"""
-        loader_func = self.dataset_info[self.current_dataset]["data_loader"]
-        return loader_func(domain, transform=self.base_transform)
-
-    def _load_office31_data(self, domain, transform=None):
-        """
-        加载office-31数据集
-        """
-        dataset_path = os.path.join(Config.DATA_BASE_PATH, "office-31", domain)
-        if not os.path.exists(dataset_path):
-            print(f"警告：Office-31 {domain}路径不存在：{dataset_path}")
-        return Office31Dataset(dataset_path, transform=transform)
-
-    def _load_digit10_data(self, domain, transform=None):
-        """加载Digit10数据集"""
-        dataset_path = os.path.join(Config.DATA_BASE_PATH, "digit10", domain)
-        if not os.path.exists(dataset_path):
-            print(f"警告：digit10 {domain}路径不存在：{dataset_path}")
-        return Digit10Dataset(dataset_path, transform=transform)
-
-    def _load_domainnet_data(self, domain, transform=None):
-        """加载DomainNet数据集"""
-        dataset_path = os.path.join(Config.DATA_BASE_PATH, "domainnet", domain)
-        if not os.path.exists(dataset_path):
-            print(f"警告：domainnet {domain}路径不存在：{dataset_path}")
-        return DomainNetDataset(dataset_path, transform=transform)
+        """加载指定域的所有数据"""
+        info = self.dataset_info[self.current_dataset]
+        path = os.path.join(info["base_path"], domain)
+        if not os.path.exists(path):
+            logger.warning(f"Path not found: {path}")
+        return info["dataset_class"](path, transform=self.base_transform)
 
     def evaluate_model(self, model, strategy=None):
         """
-        评估模型性能
-
+        评估模型在增量学习设置下的性能（支持 current / cumulative 策略）
         参数:
             model: 要评估的模型
             strategy: 测试策略 ('current', 'cumulative')，如果为None则使用配置的策略
@@ -394,13 +355,8 @@ class DomainIncrementalDataSimulator:
         if strategy is None:
             strategy = Config.TEST_STRATEGY
 
-        results = {}
-
         # 计算当前域的性能
         current_domain = self.get_current_domain()
-        current_results = self._evaluate_on_domain(model, current_domain)
-        results["current_domain"] = current_results
-        results["current_domain_name"] = current_domain
 
         # 保存当前评估结果到历史
         if not hasattr(self, 'accuracy_history'):
@@ -408,143 +364,62 @@ class DomainIncrementalDataSimulator:
         if not hasattr(self, 'aa_history'):
             self.aa_history = []
 
-        # 获取当前任务/域索引
-        current_task_idx = self.seen_domains.index(current_domain) if current_domain in self.seen_domains else -1
-        k = current_task_idx + 1  # k: 当前已学习的任务数量
-
-        # 评估所有已见域的性能
+        ## Step 1: 评估所有已见域（包括当前域）
         cumulative_results = {}
         for domain in self.seen_domains:
-            if domain == current_domain:
-                cumulative_results[domain] = current_results
-            else:
-                domain_results = self._evaluate_on_domain(model, domain)
-                cumulative_results[domain] = domain_results
+            cumulative_results[domain] = self._evaluate_on_domain(model, domain)
 
-        # 更新历史记录
+        # Step 2: 更新 accuracy_history
         for domain, result in cumulative_results.items():
             if domain not in self.accuracy_history:
                 self.accuracy_history[domain] = []
             self.accuracy_history[domain].append(result["accuracy"])
 
-        # 提取准确率矩阵的当前行
-        current_accuracies = {}
-        for domain in self.seen_domains:
-            if domain in self.accuracy_history:
-                history = self.accuracy_history[domain]
-                # 当前性能是历史记录的最后一个值
-                current_accuracies[domain] = history[-1] if history else 0.0
+        # Step 3: 计算指标
+        metrics = IncrementalMetricsCalculator.compute_metrics(
+            self.seen_domains, self.accuracy_history
+        )
 
-        aa_k = 0.0
-        aia_k = 0.0
-        fm_k = 0.0
-        bwt_k = 0.0
+        # Step 4: 计算并更新 AIA
+        if "AA" in metrics:
+            self.aa_history.append(metrics["AA"])
+            aia = IncrementalMetricsCalculator.compute_aia(self.aa_history)
+            metrics["AIA"] = aia
 
-        # 计算四种指标
-        if k > 0:  # 至少学习了一个任务
-            # 1. 平均准确率 AA_k
-            aa_k = np.mean(list(current_accuracies.values()))
+        # Step 5: 构建返回结果
+        current_result = cumulative_results.get(current_domain, {"accuracy": 0.0, "loss": 0.0})
+        accuracies = [r["accuracy"] for r in cumulative_results.values()]
+        losses = [r["loss"] for r in cumulative_results.values()]
 
-            # 2. 平均增量准确率 AIA_k
-            if not hasattr(self, 'aa_history'):
-                self.aa_history = []
-            self.aa_history.append(aa_k)
-            aia_k = np.mean(self.aa_history)
-
-            # 3. 遗忘度量 FM_k (需要修正)
-            if k > 1:
-                forgetting_values = []
-                for domain in self.seen_domains[:k-1]:  # 遍历前k-1个任务
-                    if domain in self.accuracy_history:
-                        history = self.accuracy_history[domain]
-                        if history:
-                            # 历史最佳：该任务所有历史评估中的最大值
-                            max_historical = max(history)
-                            current_acc = current_accuracies.get(domain, 0.0)
-                            forgetting = max_historical - current_acc
-                            forgetting_values.append(forgetting)
-
-                fm_k = np.mean(forgetting_values) if forgetting_values else 0.0
-
-            # 4. 反向迁移 BWT_k (需要重大修正)
-            if k > 1:
-                bwt_values = []
-                for j, domain in enumerate(self.seen_domains[:k-1], 1):  # j从1到k-1
-                    if domain in self.accuracy_history:
-                        history = self.accuracy_history[domain]
-                        if len(history) > 0:
-                            # 关键修正：a_{j,j}是任务j首次出现时的准确率
-                            # 任务j在第j次评估时首次出现，所以应该是history[0]
-                            # 因为每个任务的历史列表从它首次出现开始记录
-                            initial_acc = history[0]  # 修正：用history[0]而不是history[j-1]
-                            current_acc = current_accuracies.get(domain, 0.0)
-                            bwt = current_acc - initial_acc
-                            bwt_values.append(bwt)
-                            # 调试输出
-                            print(f"BWT计算: 任务{domain}(j={j}), history={history}, "
-                                f"初始={initial_acc:.4f}, 当前={current_acc:.4f}, BWT={bwt:.4f}")
-
-                bwt_k = np.mean(bwt_values) if bwt_values else 0.0
-
-            # 将指标添加到结果中
-            results["metrics"] = {
-                "AA": aa_k,          # 平均准确率
-                "AIA": aia_k,        # 平均增量准确率
-                "FM": fm_k,          # 遗忘度量
-                "BWT": bwt_k,        # 反向迁移
-                "k": k               # 当前任务数
-            }
-
-        # 保持原有的累积评估结果
-        if cumulative_results:
-            accuracies = [result["accuracy"] for result in cumulative_results.values()]
-            losses = [result["loss"] for result in cumulative_results.values()]
-
-            results["cumulative"] = {
+        return {
+            "current_domain": current_result,
+            "current_domain_name": current_domain,
+            "cumulative": {
                 "average_accuracy": np.mean(accuracies),
                 "average_loss": np.mean(losses),
                 "domain_results": cumulative_results,
-            }
-
-        return results
+            },
+            "metrics": metrics
+        }
 
     def _evaluate_on_domain(self, model, domain):
         """在指定域上评估模型"""
         domain_key = f"{self.current_dataset}_{domain}"
 
         if domain_key not in self.test_data_cache:
-            print(f"警告: 域 {domain} 的测试数据未加载")
+            logger.warning(f"{domain_key} 域的测试数据未加载:")
             return {"accuracy": 0.0, "loss": 0.0}
 
-        test_dataset = self.test_data_cache[domain_key]
         test_loader = DataLoader(
-            test_dataset, batch_size=Config.BATCH_SIZE, shuffle=False
+            self.test_data_cache[domain_key],
+            batch_size=Config.BATCH_SIZE,
+            shuffle=False
         )
 
-        # 计算准确率和损失
-        model.eval()
-        correct = 0
-        total = 0
-        total_loss = 0.0
-        criterion = torch.nn.CrossEntropyLoss()
+        evalator = ModelEvaluator()
+        accuracy, avg_loss = evalator.evaluate_model(model, test_loader)
 
-        with torch.no_grad():
-            for inputs, targets in test_loader:
-                device = next(model.parameters()).device
-                inputs = inputs.to(device)
-                targets = targets.to(device)
-                outputs = model(inputs)
-                loss = criterion(outputs, targets)
-                total_loss += loss.item()
-
-                _, predicted = torch.max(outputs.data, 1)
-                total += targets.size(0)
-                correct += (predicted == targets).sum().item()
-
-        accuracy = correct / total if total > 0 else 0.0
-        avg_loss = total_loss / len(test_loader) if len(test_loader) > 0 else 0.0
-
-        return {"accuracy": accuracy, "loss": avg_loss, "samples": total}
+        return {"accuracy": accuracy, "loss": avg_loss}
 
     def get_test_dataset(self, domain=None):
         """获取指定域的测试数据集"""
@@ -564,39 +439,11 @@ class DomainIncrementalDataSimulator:
 
     def get_cumulative_test_datasets(self):
         """获取所有已见域的测试数据集"""
-        cumulative_datasets = {}
-        for domain in self.seen_domains:
-            domain_key = f"{self.current_dataset}_{domain}"
-            if domain_key in self.seen_domains_test_sets:
-                cumulative_datasets[domain] = self.seen_domains_test_sets[domain_key]
-
-        return cumulative_datasets
-
-    def get_data_distribution_info(self):
-        """获取当前数据分布信息"""
-        current_domain = self.get_current_domain()
-        domain_key = f"{self.current_dataset}_{current_domain}"
-
-        info = {
-            "dataset": self.current_dataset,
-            "domain": current_domain,
-            "session": self.current_session,
-            "total_domains": len(self.current_domains),
-            "seen_domains": self.seen_domains.copy(),
+        return {
+            domain: self.test_data_cache[f"{self.current_dataset}_{domain}"]
+            for domain in self.seen_domains
+            if f"{self.current_dataset}_{domain}" in self.test_data_cache
         }
-
-        if domain_key in self.train_data_cache:
-            info.update(
-                {
-                    "dataset_sizes": {
-                        "train": len(self.train_data_cache[domain_key]),
-                        "val": len(self.val_data_cache[domain_key]),
-                        "test": len(self.test_data_cache[domain_key]),
-                    }
-                }
-            )
-
-        return info
 
 
 # 基础数据集类
@@ -671,7 +518,7 @@ class Digit10Dataset(BaseDataset):
 
     def _load_data(self):
         """
-        加载office-31数据
+        加载digit10数据
         """
         classes = [
             d
@@ -718,26 +565,15 @@ class DomainNetDataset(BaseDataset):
     def _load_data(self):
         print("DomainNetDataset待补充")
 
+    def __getitem__(self, idx):
+        image_path = self.data[idx]
+        label = self.labels[idx]
+        # 加载图像
+        image = Image.open(image_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
 
-def display_dataset_statistics(dataset):
-    """
-    显示数据集的统计信息
-    """
-    print("\n=== 数据集统计信息 ===")
-    print(f"总样本数: {len(dataset)}")
-    print(f"类别数: {len(dataset.class_to_idx)}")
-
-    # 统计每个类别的样本数
-    class_counts = {}
-    for label in dataset.labels:
-        class_name = dataset.get_class_name(label)
-        class_counts[class_name] = class_counts.get(class_name, 0) + 1
-
-    print("\n各类别样本分布:")
-    for class_name, count in sorted(class_counts.items()):
-        print(f"  {class_name}: {count} 个样本")
-
-    print("=====================\n")
+        return image, label
 
 
 if __name__ == "__main__":
@@ -761,11 +597,6 @@ if __name__ == "__main__":
         current_domain = data_simulator.get_current_domain()
         print(f"当前域: {current_domain}")
         print(f"已见域: {data_simulator.seen_domains}")
-        # 获取数据分布信息
-        dist_info = data_simulator.get_data_distribution_info()
-        print(f"训练数据总量: {dist_info['dataset_sizes']['train']}")
-        print(f"测试数据总量: {dist_info['dataset_sizes']['test']}")
-        print(f"验证数据总量: {dist_info['dataset_sizes']['val']}")
         # 为前3辆车分配数据并显示信息
         print("\n车辆数据分配示例:")
         for vehicle_id in range(data_simulator.num_vehicles):

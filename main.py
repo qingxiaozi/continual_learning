@@ -1,7 +1,5 @@
 import torch
-import time
 import random
-from collections import defaultdict
 import numpy as np
 from config.parameters import Config
 from environment.communication_env import CommunicationSystem
@@ -16,7 +14,6 @@ from models.gold_model import GoldModel
 from models.mab_selector import MABDataSelector
 from models.bandwidth_allocator import BandwidthAllocator
 from utils.metrics import ResultVisualizer
-import json
 
 
 class BaselineComparison:
@@ -33,7 +30,6 @@ class BaselineComparison:
 
         # 初始化学习组件
         self.cache_manager = CacheManager()
-        self.evaluator = ModelEvaluator(self.gold_model)
         self.continual_learner = ContinualLearner(self.global_model, self.gold_model)
 
         # 初始化车辆环境

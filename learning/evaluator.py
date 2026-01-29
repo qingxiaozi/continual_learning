@@ -1,52 +1,39 @@
 import torch
 import numpy as np
 from config.parameters import Config
-
+from torch.utils.data import DataLoader
 
 class ModelEvaluator:
-    """模型评估器"""
+    """模型评估器：给定模型和带标签数据，返回准确率和损失"""
 
-    def __init__(self, gold_model):
-        self.gold_model = gold_model
+    def __init__(self):
         self.criterion = torch.nn.CrossEntropyLoss()
 
-    def evaluate_model(self, model, data):
-        """评估模型性能"""
+    def evaluate_model(self, model, dataloader):
+        """
+        评估模型性能
+        Args:
+            model: PyTorch 模型
+            dataloader: 包含 (inputs, labels) 的 DataLoader
+        Returns:
+            dict: {"accuracy": float, "loss": float}
+        """
         model.eval()
-        self.gold_model.eval()
-
-        total_correct = 0
-        total_samples = 0
         total_loss = 0.0
-
-        # 检查数据是否为 DataLoader，如果不是则转换
-        from torch.utils.data import DataLoader
-
-        if not isinstance(data, DataLoader):
-            dataloader = DataLoader(data, batch_size=32, shuffle=False)
-        else:
-            dataloader = data
+        correct_predictions = 0
+        total_samples = 0
 
         with torch.no_grad():
-            for batch in dataloader:
-                if isinstance(batch, (list, tuple)):
-                    inputs, true_targets = batch
-                else:
-                    inputs = batch
-                    true_targets = self.gold_model(inputs).argmax(dim=1)
-
+            for inputs, labels in dataloader:
+                inputs, labels = inputs.to(Config.DEVICE), labels.to(Config.DEVICE)
                 outputs = model(inputs)
-                predictions = outputs.argmax(dim=1)
+                loss = self.criterion(outputs, labels)
+                total_loss += loss.item() * inputs.size(0)
+                _, predicted = torch.max(outputs, 1)
+                correct_predictions += (predicted == labels).sum().item()
+                total_samples += inputs.size(0)
 
-                loss = self.criterion(outputs, true_targets)
-                total_loss += loss.item()
+        average_loss = total_loss / total_samples
+        accuracy = correct_predictions / total_samples
 
-                total_correct += (predictions == true_targets).sum().item()
-                total_samples += inputs.size(
-                    0
-                )  # 使用 inputs.size(0) 而不是 len(inputs)
-
-        accuracy = total_correct / total_samples if total_samples > 0 else 0
-        avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0
-
-        return accuracy, avg_loss
+        return accuracy, average_loss

@@ -203,8 +203,13 @@ xx.gz是上述文件的压缩版本
 5. 完善digit和dominNet数据集训练 10days
 6. BWT计算有误
 
-完整的强化学习流程
+强化学习训练流程
 ```python
+
+self.episode_rewards = []
+rewards_window = deque(maxlen=window_size)  # 滑动窗口
+best_avg_reward = -float('inf')             # 历史最佳平均奖励
+
 for episode in range(num_episodes):
     episode_reward = 0
     # 车辆与数据都处于初始状态
@@ -229,8 +234,20 @@ for episode in range(num_episodes):
             break
     # 记录episode结果
     self.episode_rewards.append(episode_reward)
+    rewards_window.append(episode_reward)
+
     # 定期更新目标网络
     if episode % Config.TARGET_UPDATE_INTERVAL == 0:
         self.drl_agent.update_target_network()
+
+    if len(rewards_window) == window_size:
+            current_avg_reward = np.mean(rewards_window)
+            if current_avg_reward > best_avg_reward:
+                best_avg_reward = current_avg_reward
+                self.drl_agent.save_model(save_path)
+                print(f"Episode {episode+1}: New best model saved! ",f"Avg reward ({window_size}-ep): {best_avg_reward:.2f})
+
+    print(f"Training completed over {num_episodes} episodes.")
+
 return self.episode_rewards
 ```

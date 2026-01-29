@@ -348,13 +348,13 @@ class VehicleEnvironment:
 
         return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["utm_position"]))
 
-    def update_vehicle_positions(self, time_delta=1.0):
+    def update_vehicle_positions(self, time_delta=20):
         """更新车辆位置"""
         if self.trajectory_index >= len(self.trajectory_points) - 1:
             print(f"车辆已行驶至终点")
             return
 
-        distance = 15.0 * time_delta
+        distance = 20.0 * time_delta
         idx, accumulated = self.trajectory_index, 0.0
 
         # 累加距离找到目标点
