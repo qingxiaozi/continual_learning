@@ -63,7 +63,7 @@ class CommunicationSystem:
         if vehicle is None or base_station is None:
             return 0.0
         # 计算距离
-        distance = np.linalg.norm(vehicle.position - base_station["position"])
+        distance = np.linalg.norm(vehicle.position - base_station["utm_position"])
         # 避免除零
         distance = max(distance, 1.0)
         # 计算路径损耗部分: G_0 * (d_v^s)^{-α}

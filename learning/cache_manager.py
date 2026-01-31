@@ -90,51 +90,6 @@ class CacheManager:
                 f"剩余 {len(cache['old_data'])} 个旧批次, {len(cache['quality_scores'])} 个质量评分"
             )
 
-    # def _maintain_cache_size(self, vehicle_id):
-    #     """维护缓存大小 - 从新旧数据中统一移除"""
-    #     cache = self.caches[vehicle_id]
-    #     total_size = len(cache["old_data"]) + len(cache["new_data"])
-
-    #     if total_size > self.max_size:
-    #         # 移除质量最低的数据（不区分新旧）
-    #         excess = total_size - self.max_size
-
-    #         if cache["quality_scores"] and len(cache["quality_scores"]) == total_size:
-    #             # 基于质量评分移除（考虑所有数据）
-    #             quality_indices = np.argsort(cache["quality_scores"])[:excess]
-
-    #             # 按索引从大到小移除，避免索引错位
-    #             for idx in sorted(quality_indices, reverse=True):
-    #                 # 判断是旧数据还是新数据
-    #                 if idx < len(cache["old_data"]):
-    #                     cache["old_data"].pop(idx)
-    #                 else:
-    #                     # 调整索引到新数据的位置
-    #                     new_idx = idx - len(cache["old_data"])
-    #                     cache["new_data"].pop(new_idx)
-
-    #                 # 移除对应的质量评分
-    #                 cache["quality_scores"].pop(idx)
-
-    #         else:
-    #             # 随机移除：先移旧数据，不够再移新数据
-    #             remove_count = min(excess, len(cache["old_data"]))
-    #             cache["old_data"] = cache["old_data"][remove_count:]
-
-    #             # 如果旧数据不够移，再移新数据
-    #             if remove_count < excess:
-    #                 remaining = excess - remove_count
-    #                 cache["new_data"] = cache["new_data"][remaining:]
-
-    #             # 同时移除对应的质量评分
-    #             if cache["quality_scores"]:
-    #                 cache["quality_scores"] = cache["quality_scores"][excess:]
-
-    #         print(
-    #             f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
-    #             f"剩余 {len(cache['old_data'])} 个旧批次, {len(cache['new_data'])} 个新批次"
-    #         )
-
     def get_vehicle_cache(self, vehicle_id):
         """获取车辆缓存"""
         return self.caches.get(
@@ -162,3 +117,8 @@ class CacheManager:
                 "quality_scores": cache["quality_scores"],
             }
         return stats
+    
+    def reset(self):
+        """重置缓存管理器"""
+        self.caches = {}
+        print("缓存重置完成")

@@ -28,6 +28,51 @@ continual_learning/
     └── ablation_study.py
 ```
 
+## 二、总体目标
+通过强化学习（RL agent）学习智能决策策略 π(a|s)，使系统在动态域漂移环境下，自适应优化车辆标注量和带宽分配策略，从而：
+    最大化模型性能提升效率（单位时间损失下降）
+    最小化通信与训练时延
+    抵抗灾难性遗忘
+最终得到一个训练好的 DRL 策略网络（Policy Network）；
+然后在测试阶段复现不同的 domain drift 场景，验证策略泛化性能。
+系统分为三层
+基础层：环境仿真，构建车联网物理与数据漂移模型，封装于rl_env.py
+策略学习层：强化学习，进行数据上传决策，封装于rl_train.py
+评估层：性能度量，测试策略在不同场景下的表现，封装于rl_test.py
+
+整体框架如下：
+```python
+
+Initialize RL environment (VehicleEdgeEnv)
+Initialize DRL agent (DQN/PPO etc.)
+For episode in range(NUM_EPISODES):
+    state = env.reset()
+    for step in range(NUM_SESSIONS):
+        action = agent.select_action(state)
+        next_state, reward, done, info = env.step(action)
+        agent.store(state, action, reward, next_state, done)
+        agent.optimize()
+        state = next_state
+        if done:
+            break
+After training:
+    Save trained model
+    Evaluate in test environment
+
+```
+关于episode
+单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域
+在每个episode中的env.reset()中，车辆位置、模型状态、数据状态和缓存都会重新初始化
+每个episode训练的目标是学会如何面对随时间变化的域漂移序列
+训练阶段的所有eposide都使用同一个数据集，每个step或者多个step对应不同的domain
+当域序列走完，或者step步达到上限，或者奖励变化小于阈值，则判定eposide结束
+
+关于step
+每个step是一个完整的持续学习训练阶段，包括数据决策、带宽分配优化、数据上传、缓存更新、全局模型训练、奖励计算、状态更新，判断是否结束
+当一个训练阶段结束，则判定step结束。而判断“一个训练阶段结束”，可通过当前阶段达到固定的epoch数、当前step在episode中的索引达到上限等确定
+
+
+
 ## 二、联合优化模型实验步骤
 当前版本代码运行流程：<br>
 ```python
@@ -203,51 +248,3 @@ xx.gz是上述文件的压缩版本
 5. 完善digit和dominNet数据集训练 10days
 6. BWT计算有误
 
-强化学习训练流程
-```python
-
-self.episode_rewards = []
-rewards_window = deque(maxlen=window_size)  # 滑动窗口
-best_avg_reward = -float('inf')             # 历史最佳平均奖励
-
-for episode in range(num_episodes):
-    episode_reward = 0
-    # 车辆与数据都处于初始状态
-    state = self._reset_environment_for_new_episode()
-
-    for step in range(Config.MAX_STEPS_PER_EPISODE):
-        # 选择动作（包含探索）
-        action = self._selection_action_with_exploration(state, episode)
-        # 执行动作，获取结果
-        next_state, reward, done = self._execute_step(state, action, step)
-        # 存储经验
-        self.drl_agent.store_experience(state, action, reward, next_state, done)
-        # 优化模型
-        if len(self.drl_agent.memory) >= Config.DRL_BATCH_SIZE:
-            loss = self.drl_agent.optimize_model()
-        # 更新状态和累积奖励
-        state = next_state
-        episode_reward += reward
-        # 如果episode结束，跳出循环
-        if done:
-            print(f"Episode {episode+1} 在第{step+1}步结束")
-            break
-    # 记录episode结果
-    self.episode_rewards.append(episode_reward)
-    rewards_window.append(episode_reward)
-
-    # 定期更新目标网络
-    if episode % Config.TARGET_UPDATE_INTERVAL == 0:
-        self.drl_agent.update_target_network()
-
-    if len(rewards_window) == window_size:
-            current_avg_reward = np.mean(rewards_window)
-            if current_avg_reward > best_avg_reward:
-                best_avg_reward = current_avg_reward
-                self.drl_agent.save_model(save_path)
-                print(f"Episode {episode+1}: New best model saved! ",f"Avg reward ({window_size}-ep): {best_avg_reward:.2f})
-
-    print(f"Training completed over {num_episodes} episodes.")
-
-return self.episode_rewards
-```

@@ -132,7 +132,7 @@ class BaselineComparison:
 
     def _update_session_environment(self, session):
         """更新会话和环境状态"""
-        domain_changed, previous_domain, current_domain = self.data_simulator.update_session(session)
+        domain_changed, previous_domain, current_domain = self.data_simulator.update_session_dataset(session)
 
         # 域发生变化，提升所有车辆的缓存
         if domain_changed:

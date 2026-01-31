@@ -72,9 +72,6 @@ class IncrementalMetricsCalculator:
         """计算 Average Incremental Accuracy"""
         return np.mean(aa_history) if aa_history else 0.0
 
-
-
-
 class ResultVisualizer:
     """结果可视化类"""
 

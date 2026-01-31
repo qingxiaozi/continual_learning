@@ -137,7 +137,7 @@ class DomainIncrementalDataSimulator:
         )
         return self.current_domains[domain_idx]
 
-    def update_session(self, session_id):
+    def update_session_dataset(self, session_id):
         """
         更新训练会话
         """
@@ -154,7 +154,9 @@ class DomainIncrementalDataSimulator:
         domain_changed = (old_domain != new_domain)
 
         # 预加载新域的数据集
-        self._preload_domain_dataset(new_domain)
+        domain_key = f"{self.current_dataset}_{new_domain}"
+        if domain_key not in self.test_data_cache:
+            self._preload_domain_dataset(new_domain)
 
         return domain_changed, old_domain, new_domain
 
@@ -445,6 +447,22 @@ class DomainIncrementalDataSimulator:
             if f"{self.current_dataset}_{domain}" in self.test_data_cache
         }
 
+    def reset(self):
+        """
+        重置数据模拟器状态，用于新 episode 开始
+        1. 重置会话计数器
+        2. 清空已见域列表
+        3. 清空数据缓存
+        4. 重新初始化数据分配
+        """
+        self.current_session = 0
+        self.seen_domains = []
+        self.train_data_cache.clear()
+        self.test_data_cache.clear()
+        self.val_data_cache.clear()
+        self.vehicle_data_assignments.clear()
+        self._initialize_data_distribution()
+        logger.info("数据重置完成")
 
 # 基础数据集类
 class BaseDataset(Dataset):
@@ -580,23 +598,14 @@ if __name__ == "__main__":
     # 1. 初始化车辆环境
     print("1. 初始化车辆环境...")
     data_simulator = DomainIncrementalDataSimulator()
-
-    # 2. 显示初始信息
-    print(f"车辆数量: {data_simulator.num_vehicles}")
-    print(f"当前数据集: {data_simulator.current_dataset}")
-    print(f"可用域: {data_simulator.current_domains}")
-    print(f"狄利克雷参数 α: {Config.DIRICHLET_ALPHA}")
-    # 3. 演示域增量切换
     print("\n2. 域增量切换演示...")
     sessions_to_demo = [0, 1, 2, 3, 4]  # 演示的会话点
 
     for session in sessions_to_demo:
         print(f"\n--- Session {session} ---")
         # 更新会话
-        data_simulator.update_session(session)
+        data_simulator.update_session_dataset(session)
         current_domain = data_simulator.get_current_domain()
-        print(f"当前域: {current_domain}")
-        print(f"已见域: {data_simulator.seen_domains}")
         # 为前3辆车分配数据并显示信息
         print("\n车辆数据分配示例:")
         for vehicle_id in range(data_simulator.num_vehicles):

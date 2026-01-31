@@ -116,7 +116,7 @@ class GlobalModel(nn.Module):
             else:
                 self.save_model()
 
-        print("✅ 微调完成！")
+        print("微调完成！")
 
     def evaluate(self, data_loader):
         self.eval()
