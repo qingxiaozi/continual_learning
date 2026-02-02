@@ -448,7 +448,6 @@ class BaselineComparison:
         # 提取核心指标
         if evaluation_results is None:
             print("警告: 评估结果为空")
-            eval_results = self._get_default_eval_results()
         elif "metrics" in evaluation_results:
             metrics = evaluation_results["metrics"]
             eval_results = {

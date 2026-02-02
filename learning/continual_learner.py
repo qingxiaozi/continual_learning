@@ -47,6 +47,62 @@ class ContinualLearner:
             elastic_loss = ce_loss + self.elastic_alpha * self.l1_lambda * l1_regularization
 
             return elastic_loss
+    
+    def train_with_cache(self, cache_manager, data_simulator, current_domain, num_epochs):
+        """
+        使用缓存数据进行全局模型训练，并基于 MAB 更新缓存质量
+        """
+        # 1. 构建全局训练数据 + batch 映射
+        global_batches = []
+        batch_mapping = {}
+        batch_counter = 0
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            cache = cache_manager.get_vehicle_cache(vehicle_id)
+            for batch_idx, batch in enumerate(cache["old_data"]):
+                global_batches.append(batch)
+                batch_mapping[batch_counter] = {
+                    "vehicle_id": vehicle_id,
+                    "data_type": "old",
+                    "local_batch_idx": batch_idx,
+                }
+                batch_counter += 1
+
+            for batch_idx, batch in enumerate(cache["new_data"]):
+                global_batches.append(batch)
+                batch_mapping[batch_counter] = {
+                    "vehicle_id": vehicle_id,
+                    "data_type": "new",
+                    "local_batch_idx": batch_idx,
+                }
+                batch_counter += 1
+
+        if len(global_batches) == 0:
+            return {
+                "loss_before": 1.0,
+                "loss_after": 1.0,
+                "actual_epochs": 0,
+            }
+        # 2. 构建验证集
+        val_dataset = data_simulator.get_val_dataset(current_domain)
+        # 3. 训练前损失
+        loss_before = self._compute_loss_on_batches(global_batches)
+        # 4. 训练模型
+        train_result = self.train_with_mab_selection(
+            train_loader=global_batches,
+            val_loader=val_dataset,
+            num_epochs=num_epochs,
+        )
+        # 5.训练后损失
+        loss_after = self._compute_loss_on_batches(global_batches)
+        # 6. 更新缓存质量
+        self._update_cache_quality(cache_manager, batch_mapping)
+
+        return {
+            "loss_before": loss_before,
+            "loss_after": loss_after,
+            "training_ce_loss": train_result["training_ce_loss"],
+            "actual_epochs": train_result["actual_epochs"],
+        }
 
     def train_with_mab_selection(self, train_loader, val_loader, num_epochs=1):
         """在数据集上训练模型，集成MAB算法进行批次选择"""
@@ -151,37 +207,61 @@ class ContinualLearner:
             "config_epochs": num_epochs,
         }
 
-    def train_on_dataset(self, dataloader, num_epochs=1):
-        """在数据集上训练模型"""
-        self.model.train()
-        # 记录每个epoch的损失值
-        epoch_losses = []
+    def _compute_loss_on_batches(self, batch_list):
+        """
+        计算模型在一组 batch 上的加权总损失
+        等价于 main.py 中 _compute_weighted_loss_on_uploaded_data
+        """
+        total_loss = 0.0
+        criterion = torch.nn.CrossEntropyLoss()
 
-        for epoch in range(num_epochs):
-            epoch_loss = 0.0
-            for batch_idx, batch in enumerate(dataloader):
+        self.model.eval()
+        with torch.no_grad():
+            for batch in batch_list:
                 if isinstance(batch, (list, tuple)):
                     inputs, targets = batch
                 else:
                     inputs = batch
-                    # 使用黄金模型生成标签
-                    with torch.no_grad():
-                        targets = self.gold_model(inputs).argmax(dim=1)
-
-                self.optimizer.zero_grad()
+                    targets = self.gold_model.model(inputs).argmax(dim=1)
+                device = next(self.model.parameters()).device
+                inputs = inputs.to(device)
+                targets = targets.to(device)
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, targets)
-                loss.backward()
-                self.optimizer.step()
+                loss = criterion(outputs, targets)
+                # batch-size 加权
+                total_loss += loss.item() * inputs.shape[0]
 
-                epoch_loss += loss.item()
+        self.model.train()
+        return total_loss if total_loss > 0 else 1.0
 
-            avg_loss = epoch_loss / len(dataloader)
-            epoch_losses.append(avg_loss)
-            print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")
+    def _update_cache_quality(self, cache_manager, batch_mapping):
+        quality_scores = self.mab_selector.get_batch_quality_scores()
 
-        return avg_loss, epoch_losses
+        vehicle_scores = {}
+        for global_idx, score in enumerate(quality_scores):
+            if global_idx not in batch_mapping:
+                continue
 
+            info = batch_mapping[global_idx]
+            vid = info["vehicle_id"]
+            dtype = info["data_type"]
+
+            vehicle_scores.setdefault(vid, {"old": [], "new": []})
+            vehicle_scores[vid][dtype].append(
+                (info["local_batch_idx"], score)
+            )
+
+        for vid, scores in vehicle_scores.items():
+            cache = cache_manager.get_vehicle_cache(vid)
+
+            scores["old"].sort()
+            scores["new"].sort()
+
+            cache["quality_scores"] = (
+                [s for _, s in scores["old"]] +
+                [s for _, s in scores["new"]]
+            )
+    
     def _evaluate_on_validation(self, val_dataset):
         """在验证集上评估模型"""
         val_loader = DataLoader(
