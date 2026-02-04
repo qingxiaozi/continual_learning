@@ -26,7 +26,7 @@ class VehicleEdgeEnv:
         self.vehicle_env = VehicleEnvironment(
             self.global_model, self.gold_model, self.cache_manager, self.data_simulator
         )
-        self.communication_system = CommunicationSystem(self.vehicle_env)
+        self.communication_system = CommunicationSystem(self.vehicle_env, self.global_model)
         self.visualize = ResultVisualizer()
         self.current_domain = self.data_simulator.get_current_domain()
         self.session = 0
@@ -111,7 +111,6 @@ class VehicleEdgeEnv:
         return self.communication_system.calculate_total_training_delay(
             upload_decisions=[(i, n) for i, n in enumerate(batch_choices) if n > 0],
             bandwidth_allocations={i: r for i, r in enumerate(bandwidth_ratios) if r > 0},
-            session=self.session,
             total_samples=total_samples,
             actual_epochs=training_results.get("actual_epochs", 0),
         )

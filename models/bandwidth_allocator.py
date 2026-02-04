@@ -91,19 +91,19 @@ class BandwidthAllocator:
             # 这里需要通信系统的相关函数来计算信道增益和SNR
             if hasattr(self.comm_system, 'calculate_channel_gain'):
                 channel_gain = self.comm_system.calculate_channel_gain(
-                    vehicle, base_station, session_id
+                    vehicle, base_station
                 )
 
                 # 计算信噪比
                 signal_power = self.comm_system.vehicle_transmit_power * channel_gain
-                noise_interference = self.comm_system.noise_power + self.comm_system.I_v
+                noise_interference = self.comm_system.noise_power + self.comm_system.interference_power
                 snr = signal_power / max(noise_interference, 1e-20)
 
                 # 计算对数项，避免log2(1)为0
                 log_term = max(np.log2(1 + snr), 0.01)
 
                 # 计算数据量
-                data_per_batch = self.comm_system.samples_of_per_batch * self.comm_system.sample_size
+                data_per_batch = self.comm_system.batch_size * self.comm_system.sample_bits
                 total_data = self.batch_choices[v] * data_per_batch
 
                 # 计算K_v

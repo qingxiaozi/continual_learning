@@ -38,7 +38,7 @@ class BaselineComparison:
         )
 
         # 初始化通信系统
-        self.communication_system = CommunicationSystem(self.vehicle_env)
+        self.communication_system = CommunicationSystem(self.vehicle_env, self.global_model)
 
         # 初始化MAB选择器
         self.mab_selector = MABDataSelector(num_arms=Config.MAX_LOCAL_BATCHES)
@@ -249,7 +249,7 @@ class BaselineComparison:
 
         # 计算时延
         delay_breakdown = self.communication_system.calculate_total_training_delay(
-            upload_decisions, bandwidth_allocations, session, total_samples, actual_epochs
+            upload_decisions, bandwidth_allocations, total_samples, actual_epochs
         )
 
         print(f"\n通信计算")
