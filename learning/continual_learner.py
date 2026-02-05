@@ -3,7 +3,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from config.parameters import Config
-from models.mab_selector import MABDataSelector
+from learning.mab_selector import MABDataSelector
 
 
 class ContinualLearner:
@@ -133,8 +133,7 @@ class ContinualLearner:
                 self.total_steps += 1
 
                 if self.epoch_count > self.init_epochs:
-                    selected_arm = self.mab_selector.select_arm(self.total_steps)
-                    self.mab_selector.record_ucb_selection(selected_arm)
+                    selected_arm = self.mab_selector.select()
 
                 batch_idx = step % num_batches
                 batch = batch_list[batch_idx]
@@ -152,7 +151,7 @@ class ContinualLearner:
                 reward = ce_loss_before - ce_loss_after
 
                 if self.epoch_count >= self.init_epochs:
-                    self.mab_selector.update_arm(batch_idx, reward)
+                    self.mab_selector.update(batch_idx, reward)
 
                 total_elastic_loss += elastic_loss.item()
                 total_ce_loss += ce_loss.item()
@@ -235,7 +234,7 @@ class ContinualLearner:
         return total_loss if total_loss > 0 else 1.0
 
     def _update_cache_quality(self, cache_manager, batch_mapping):
-        quality_scores = self.mab_selector.get_batch_quality_scores()
+        quality_scores = self.mab_selector.get_quality_scores()
 
         vehicle_scores = {}
         for global_idx, score in enumerate(quality_scores):
@@ -347,8 +346,4 @@ class ContinualLearner:
 
         self.model.train()
         return loss.item(), inputs, targets
-
-    def get_batch_rankings(self):
-        """获取批次排序（基于UCB选择次数）"""
-        return self.mab_selector.get_batch_rankings()
 
