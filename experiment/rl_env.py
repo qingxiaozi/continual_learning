@@ -20,7 +20,7 @@ class VehicleEdgeEnv:
         self.config = Config
         self.data_simulator = DomainIncrementalDataSimulator()
         self.gold_model = GoldModel(self.data_simulator.current_dataset)
-        self.global_model = GlobalModel(self.data_simulator.current_dataset, auto_load=True)
+        self.global_model = GlobalModel(self.data_simulator.current_dataset)
         self.cache_manager = CacheManager()
         self.continual_learner = ContinualLearner(self.global_model, self.gold_model)
         self.vehicle_env = VehicleEnvironment(
@@ -36,6 +36,8 @@ class VehicleEdgeEnv:
 
     def reset(self):
         """重置环境，开始新的episode"""
+        # self.gold_model.reset_parameters()
+        self.global_model.reset_parameters()
         self.vehicle_env.reset()
         self.data_simulator.reset()
         self.cache_manager.reset()
