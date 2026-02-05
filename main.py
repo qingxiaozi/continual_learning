@@ -11,7 +11,7 @@ from learning.continual_learner import ContinualLearner
 from models.drl_agent import DRLAgent
 from models.global_model import GlobalModel
 from models.gold_model import GoldModel
-from models.mab_selector import MABDataSelector
+from learning.mab_selector import MABDataSelector
 from models.bandwidth_allocator import BandwidthAllocator
 from utils.metrics import ResultVisualizer
 
