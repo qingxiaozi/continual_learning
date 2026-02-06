@@ -7,7 +7,7 @@ from environment.communication_env import CommunicationSystem
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 from environment.vehicle_env import VehicleEnvironment
 from learning.cache_manager import CacheManager
-from learning.continual_learner import ContinualLearner
+from learning.continualLearner import ContinualLearner
 from models.global_model import GlobalModel
 from models.gold_model import GoldModel
 from models.bandwidth_allocator import BandwidthAllocator
