@@ -1,31 +1,60 @@
 ## 一、项目结构
 ```
-continual_learning/
-├── main.py
-├── config/
+├── README.md
+├── config
 │   ├── parameters.py
 │   └── paths.py
-├── environment/
-│   ├── vehicle_env.py
+├── data
+│   ├── PortoTaxi
+│   │   ├── train.csv
+│   │   ├── trajectory.csv
+│   │   └── trajectory_12213.csv
+│   ├── digit10
+│   │   ├── digit10_deal.py
+│   │   ├── digit10_download.py
+│   │   ├── emnist
+│   │   ├── mnist
+│   │   ├── svhn
+│   │   └── usps
+│   ├── domainnet
+│   │   ├── clipart.zip
+│   │   ├── infograph.zip
+│   │   ├── quickdraw.zip
+│   │   └── sketch.zip
+│   └── office-31
+│       ├── amazon
+│       ├── dslr
+│       └── webcam
+├── environment
 │   ├── communication_env.py
-│   └── dataSimu_env.py
-├── models/
-│   ├── global_model.py
-│   ├── gold_model.py
-│   ├── mab_selector.py
-│   ├── drl_agent.py
-│   └── bandwidth_allocator.py
-├── learning/
-│   ├── continual_learner.py
+│   ├── dataSimu_env.py
+│   └── vehicle_env.py
+├── experiment
+│   ├── rl_env.py
+│   ├── rl_test.py
+│   └── rl_train.py
+├── learning
+│   ├── batch_selector.py
 │   ├── cache_manager.py
-│   └── evaluator.py
-├── results/
-├── utils/
-│   └── metrics.py
-└── experiments/
-    ├── __init__.py
-    ├── baseline_comparison.py
-    └── ablation_study.py
+│   ├── continualLearner.py
+│   ├── evaluator.py
+│   ├── losses.py
+│   ├── mab_selector.py
+│   └── trainer.py
+├── models
+│   ├── bandwidth_allocator.py
+│   ├── drl_agent.py
+│   ├── global_model.py
+│   └── gold_model.py
+├── requirements.txt
+├── results
+│   ├── global_model_digit10.pth
+│   ├── global_model_office31.pth
+│   ├── golden_model_digit10.pth
+│   └── golden_model_office31.pth
+└── utils
+    ├── data_deal.py
+    └── metrics.py
 ```
 
 ## 二、总体目标

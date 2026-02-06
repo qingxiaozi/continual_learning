@@ -6,6 +6,7 @@ from collections import defaultdict
 from pyproj import Transformer, CRS
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from scipy.spatial import cKDTree
 import pandas as pd
 import random
 import os
@@ -167,7 +168,7 @@ class VehicleEnvironment:
         # PPP参数
         self.ppp_radius = 200  # PPP生成半径（米）
         self.ppp_lambda = 0.001  # 单位面积车辆密度（辆/平方米）
-        self.ppp_lambda_bs = 0.01 # 单位面积基站密度（个/平方公里）
+        self.ppp_lambda_bs = 3 # 单位面积基站密度（个/平方公里）
 
         # 初始化数据环境
         self.data_simulator = data_simulator
@@ -193,7 +194,7 @@ class VehicleEnvironment:
         if self.base_stations:
             plt.scatter([bs['lonlat_position'][0] for bs in self.base_stations],
                    [bs['lonlat_position'][1] for bs in self.base_stations],
-                   c='red', s=5, marker='^', alpha=0.7, label=f'{len(self.base_stations)} BS')
+                   c='red', s=2, marker='.', alpha=0.7, label=f'{len(self.base_stations)} BS')
         plt.plot([], [], 'b-', linewidth=0.3, label=f'Trajectories ({len(self.trajectory_data)})')
         plt.title(f"{len(self.trajectory_data)} Trajectories with {len(self.base_stations)} BS")
         plt.xlabel("Longitude")
@@ -258,39 +259,140 @@ class VehicleEnvironment:
         ]
 
     def _initialize_base_stations(self):
-        """PPP生成基站"""
+        """
+        城市级宏基站部署（沿轨迹缓冲区的 PPP）
+        - 仅在车辆真实活动区域附近生成基站
+        - KDTree 去重，复杂度 O(N log N)
+        """
         points = self._get_all_trajectory_points()
-        if not points: return
+        if not points:
+            self.base_stations = []
+            return
 
+        # ========= 1. 所有轨迹点 → UTM =========
         lons, lats = zip(*points)
-        # 计算经纬度范围
-        min_lon, max_lon = min(lons), max(lons)
-        min_lat, max_lat = min(lats), max(lats)
+        traj_utm = self._convert_to_cartesian(lons, lats)
+        LAMBDA_MACRO = self.ppp_lambda_bs / 1e6       # 3 BS / km² → BS / m²
+        MIN_BS_DISTANCE = 500.0        # 宏基站最小间距（m）
 
-        R, center_lat = 6371000, np.mean(lats)
-        m_lon = R * np.cos(np.radians(center_lat)) * np.pi / 180
-        m_lat = R * np.pi / 180
+        # ========= 3. 沿轨迹缓冲区生成 PPP 候选基站 =========
+        bs_candidates = []
 
-        # 一行式计算面积和基站数
-        area_km2 = ((max(lons)-min(lons))*m_lon * (max(lats)-min(lats))*m_lat) / 1e6
-        num_bs = max(10, int(area_km2 * self.ppp_lambda_bs))
+        local_area = np.pi * Config.BASE_STATION_COVERAGE ** 2
 
-        # 批量生成经纬度并转换为UTM
-        bs_lons = np.random.uniform(min_lon, max_lon, num_bs)
-        bs_lats = np.random.uniform(min_lat, max_lat, num_bs)
-        bs_utm = self._convert_to_cartesian(bs_lons, bs_lats)
+        for p in traj_utm:
+            n_bs = np.random.poisson(local_area * LAMBDA_MACRO)
+            if n_bs == 0:
+                continue
 
-        # 创建基站
-        self.base_stations = [{
-            "id": i,
-            "lonlat_position": np.array([bs_lons[i], bs_lats[i]]),
-            "utm_position": bs_utm[i],
-            "coverage": Config.BASE_STATION_COVERAGE,
-            "capacity": 50,
-            "connected_vehicles": [],
-        } for i in range(num_bs)]
+            angles = np.random.uniform(0, 2 * np.pi, n_bs)
+            radii = np.random.uniform(0, Config.BASE_STATION_COVERAGE, n_bs)
 
-        print(f"初始化 {num_bs} 个基站")
+            offsets = np.column_stack([
+                radii * np.cos(angles),
+                radii * np.sin(angles)
+            ])
+
+            bs_candidates.append(p + offsets)
+
+        if not bs_candidates:
+            self.base_stations = []
+            return
+
+        bs_candidates = np.vstack(bs_candidates)
+
+        # 随机打乱，避免空间顺序偏置（很重要）
+        np.random.shuffle(bs_candidates)
+
+        # ========= 4. KDTree 去除过密基站（O(N log N)） =========
+        filtered_bs = []
+        kdtree = None
+
+        for p in bs_candidates:
+            if not filtered_bs:
+                filtered_bs.append(p)
+                kdtree = cKDTree(np.array(filtered_bs))
+                continue
+
+            # 查询最小间距内是否已有基站
+            idxs = kdtree.query_ball_point(p, r=MIN_BS_DISTANCE)
+
+            if len(idxs) == 0:
+                filtered_bs.append(p)
+                kdtree = cKDTree(np.array(filtered_bs))  # 动态更新
+
+        filtered_bs = np.array(filtered_bs)
+
+        # ========= 5. UTM → 经纬度 =========
+        utm_zone = int((self.base_point[0] + 180) // 6) + 1
+        utm_crs = CRS(
+            proj="utm",
+            zone=utm_zone,
+            south=self.base_point[1] < 0,
+            ellps="WGS84"
+        )
+
+        transformer = Transformer.from_crs(
+            utm_crs,
+            CRS("EPSG:4326"),
+            always_xy=True
+        )
+
+        bs_lons, bs_lats = transformer.transform(
+            filtered_bs[:, 0],
+            filtered_bs[:, 1]
+        )
+
+        # ========= 6. 构建基站对象 =========
+        self.base_stations = []
+        for i, (lon, lat, utm) in enumerate(zip(bs_lons, bs_lats, filtered_bs)):
+            self.base_stations.append({
+                "id": i,
+                "lonlat_position": np.array([lon, lat]),
+                "utm_position": utm,
+                "coverage": Config.BASE_STATION_COVERAGE,
+                "capacity": 80,
+                "connected_vehicles": []
+            })
+
+        print(f"初始化 {len(self.base_stations)} 个基站")
+
+
+
+    # def _initialize_base_stations(self):
+    #     """PPP生成基站"""
+    #     points = self._get_all_trajectory_points()
+    #     if not points: return
+
+    #     lons, lats = zip(*points)
+    #     # 计算经纬度范围
+    #     min_lon, max_lon = min(lons), max(lons)
+    #     min_lat, max_lat = min(lats), max(lats)
+
+    #     R, center_lat = 6371000, np.mean(lats)
+    #     m_lon = R * np.cos(np.radians(center_lat)) * np.pi / 180
+    #     m_lat = R * np.pi / 180
+
+    #     # 一行式计算面积和基站数
+    #     area_km2 = ((max(lons)-min(lons))*m_lon * (max(lats)-min(lats))*m_lat) / 1e6
+    #     num_bs = max(10, int(area_km2 * self.ppp_lambda_bs))
+
+    #     # 批量生成经纬度并转换为UTM
+    #     bs_lons = np.random.uniform(min_lon, max_lon, num_bs)
+    #     bs_lats = np.random.uniform(min_lat, max_lat, num_bs)
+    #     bs_utm = self._convert_to_cartesian(bs_lons, bs_lats)
+
+    #     # 创建基站
+    #     self.base_stations = [{
+    #         "id": i,
+    #         "lonlat_position": np.array([bs_lons[i], bs_lats[i]]),
+    #         "utm_position": bs_utm[i],
+    #         "coverage": Config.BASE_STATION_COVERAGE,
+    #         "capacity": 50,
+    #         "connected_vehicles": [],
+    #     } for i in range(num_bs)]
+
+    #     print(f"初始化 {num_bs} 个基站")
 
     def _initialize_vehicles_with_ppp(self):
         """初始化车辆：主车辆 + PPP生成的其他车辆"""
