@@ -32,16 +32,12 @@ class GoldModel:
         self.model.eval()
         return self
 
-    def _get_num_classes(self, dataset_name):
-        """根据数据集名称获取类别数量"""
-        if dataset_name == "office31":
-            return Config.OFFICE31_CLASSES
-        elif dataset_name == "digit10":
-            return Config.DIGIT10_CLASSES
-        elif dataset_name == "domainnet":
-            return Config.DOMAINNET_CLASSES
-        else:
-            return 10  # 默认值
+    def _get_num_classes(self, dataset):
+        return {
+            "office31": Config.OFFICE31_CLASSES,
+            "digit10": Config.DIGIT10_CLASSES,
+            "domainnet": Config.DOMAINNET_CLASSES,
+        }.get(dataset, 10)
 
     def _initialize_model(self):
         """初始化ResNet18模型"""
@@ -60,38 +56,24 @@ class GoldModel:
         checkpoint = torch.load(self.model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
 
-    def label_data(self, dataloader):
-        """
-        为无标签数据生成标签
-        参数:
-            dataloader: 包含无标签数据的DataLoader
-        返回:
-            list: 包含(数据, 标签)的元组列表
-        """
+    def label_data(self, dataloader, confidence_threshold=0.8):
         self.model.eval()
         labeled_data = []
 
         with torch.no_grad():
             for batch in dataloader:
-                if isinstance(batch, (list, tuple)) and len(batch) == 2:
-                    # 有标签数据，直接使用
-                    inputs, true_labels = batch
-                    labeled_data.append((inputs, true_labels))
-                else:
-                    # 无标签数据，使用模型预测
-                    inputs = batch[0] if isinstance(batch, (list, tuple)) else batch
-                    inputs = inputs.to(self.device)
+                inputs = batch[0] if isinstance(batch, (list, tuple)) else batch
+                inputs = inputs.to(self.device)
 
-                    outputs = self.model(inputs)
-                    probabilities = torch.softmax(outputs, dim=1)
-                    confidence, predictions = torch.max(probabilities, 1)
+                outputs = self.model(inputs)
+                probs = torch.softmax(outputs, dim=1)
+                conf, preds = probs.max(dim=1)
 
-                    # 只保留高置信度的预测
-                    high_conf_mask = confidence > 0.8  # 置信度阈值
-                    if high_conf_mask.any():
-                        high_conf_inputs = inputs[high_conf_mask].cpu()
-                        high_conf_predictions = predictions[high_conf_mask].cpu()
-                        labeled_data.append((high_conf_inputs, high_conf_predictions))
+                mask = conf > confidence_threshold
+                if mask.any():
+                    labeled_data.append(
+                        (inputs[mask].cpu(), preds[mask].cpu())
+                    )
 
         return labeled_data
 

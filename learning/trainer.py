@@ -26,6 +26,7 @@ class EpochTrainer:
 
     def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=5):
         """训练模型"""
+        print(f"training......")
         selector = MABDataSelector(num_arms=len(batches))
         best_state = self.model.state_dict()
         best_val = float("inf")
@@ -67,6 +68,7 @@ class EpochTrainer:
     def _train_one_epoch(self, batches, selector, use_mab):
         """训练一个epoch"""
         self.model.train()
+        criterion = torch.nn.CrossEntropyLoss()
 
         for step in range(len(batches)):
             if use_mab:
@@ -80,7 +82,7 @@ class EpochTrainer:
             # ===== loss before =====
             with torch.no_grad():
                 outputs_before = self.model(inputs)
-                loss_before = torch.nn.CrossEntropyLoss(
+                loss_before = criterion(
                     outputs_before, targets
                 )
             # ===== update =====
@@ -94,7 +96,7 @@ class EpochTrainer:
             # ===== loss after =====
             with torch.no_grad():
                 outputs_after = self.model(inputs)
-                loss_after = torch.nn.functional.cross_entropy(
+                loss_after = criterion(
                     outputs_after, targets
                 )
 

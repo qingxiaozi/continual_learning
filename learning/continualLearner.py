@@ -89,7 +89,7 @@ class ContinualLearner:
                 targets = targets.to(device)
                 outputs = self.model(inputs)
                 loss = criterion(outputs, targets)
-                # batch-size 加权
+                #所有batch上的“样本级总交叉熵损失”
                 total_loss += loss.item() * inputs.shape[0]
 
         self.model.train()
@@ -109,7 +109,7 @@ class ContinualLearner:
 
             vehicle_scores.setdefault(vid, {"old": [], "new": []})
             vehicle_scores[vid][dtype].append(
-                (info["local_batch_idx"], score)
+                (info["local_idx"], score)
             )
 
         for vid, scores in vehicle_scores.items():
