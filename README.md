@@ -100,104 +100,11 @@ After training:
 每个step是一个完整的持续学习训练阶段，包括数据决策、带宽分配优化、数据上传、缓存更新、全局模型训练、奖励计算、状态更新，判断是否结束
 当一个训练阶段结束，则判定step结束。而判断“一个训练阶段结束”，可通过当前阶段达到固定的epoch数、当前step在episode中的索引达到上限等确定
 
-
-
-## 二、联合优化模型实验步骤
-当前版本代码运行流程：<br>
-```python
-Initialize all components
-
-get training sessions
-get current dataset
-get vehicle numbers
-
-for each session:
-
-    _update_session_environment(session)
-        更新当前的session，将新域加入到已见域中，预加载新域的数据集，保存到 train_data_cache、test_data_cache和val_data_cache中；
-        当域发生变化，将新数据缓存提升为旧数据缓存；
-        更新车辆位置，time_delata = 1；
-        采用狄利克雷分布为每辆车生成数据批次，保存至vehicle.data_batches，该数据批次即为车辆在环境中实时采集到的数据批次。
-
-    _get_environment_state()
-        for each vehicle in vehicles:
-            计算置信度，该置信度为车辆所采集的数据样本在全局模型上的最大概率平均值，默认值为 0；
-            计算测试损失，该测试损失为上一阶段车辆上传数据在全局模型推理结果与黄金模型标注结果之间的交叉熵，默认值为 1.0。由于当前阶段全局模型还未更新，因此此处的全局模型是上一个阶段训练得到的全局模型；
-            计算数据质量评分，该评分为车辆缓存数据的评分的均值，默认值为 0。在第一个session，数据还未到缓存中，因此质量评分为默认值。
-        return 环境状态向量
-
-    _get_available_batches()
-        return 每辆车实际可用于DRL决策的数据批次数量，即 len(vehicle.data_batches)
-
-    _integrated_decision(state, available_batches, session)
-        输入为当前环境状态向量，每辆车实际数据批次数量和session，输出为上传数据批次分配值和带宽分配比例。
-        在批次决策过程中，使用了ε-greedy策略。在训练早期，随机生成动作，而后逐步减少探索，在训练后期，更多利用智能体的policy网络输出动作。
-        ε(t) = ε_end + (ε_start - ε_end) * exp(-t/τ)
-        ε(t)是第 t 步时的探索率
-        t是已执行的训练步数
-        ε_start是初始探索率，0.9
-        ε_end是最终探索率，0.05
-        τ为衰减时间常数，800
-        exp(-t/τ)为指数衰减因子
-        使用当前策略网络（policy network）对输入状态进行前向推理，得到每辆车在各个可选动作（上传批次数）上的 Q 值估计。
-        最大允许上传批次为车辆实际数据批次与最大上传数据批次之间的最小值，即 max_allowed = min(available_batches[v], Config.MAX_UPLOAD_BATCHES)
-        if max_allowed == 0:
-            batch = 0
-        else:
-            进入ε策略。探索时在randint(0, max_allowed)中随机，利用时切片 :max_allowed+1 进行掩码
-        通过spicy计算带宽分配结果
-
-    _upload_datas(batch_choices)
-        每辆车根据drl数据批次上传结果随机选择进行上传，即从vehicle.data_batches中随机选择放到vehicle.uploaded_data中。如果结果是0，则清空vehicle.uploaded_data。
-
-    _manage_cache_and_data_selection()
-        for vehilce in vehicles:
-            将vehicle.uploaded_data放置于缓存中车辆id对应的新数据中，并维护缓存的大小。
-        统计缓存总批次和缓存中新旧数据的批次
-
-    _train_and_update_global_model(session)
-        收集所有缓存数据构建为全局训练集，并维护全局训练集批次索引到车辆缓存的映射batch_mapping。如下：
-        for vehicle in vehicles:
-            获取车辆的缓存
-            for batch_idx, batch in cache["old_data"]:
-                将batch添加到全局训练集中
-                记录旧数据的映射
-            for batch_idx, batch in cache["new_data"]:
-                将batch添加到全局训练集中
-                记录新数据的映射
-        获取验证集。
-        计算当前阶段上传的数据集在全局模型上的测试损失和，由于全局模型尚未更新，因此当前的全局模型仍旧是上一阶段训练后的全局模型。
-        训练模型得到新模型。该阶段集成MAB选择对数据批次进行质量评分。
-        计算当前阶段上传的数据集在全局模型上的测试损失和，由于全局模型已经更新，此时的全局模型为新全局模型。
-
-    _calculate_communication_delay(action, session, corrected_upload_decisions)
-        计算通信时延
-
-    _train_and_update_global_model(session)
-
-
-        计算所有车辆上传数据在模型上的平均损失，并同时运行MAB算法更新arm的counts、reward、avg_reward和ucb_counts
-        根据训练过程中MAB统计信息更新数据缓存的质量评分
-
-    _evaluate_model_performance(session)
-        评估模型在当前域的准确率与损失
-        评估模型在已有域上的准确率和损失
-
-    _calculate_reward_and_optimize(state, action, eval_results, comm_results, training_results)
-        计算奖励，该奖励为每阶段新上传数据在模型更新前后的损失变化
-        获取DRL智能体下一个状态
-        存储经验，当经验长度 > Config.DRL_BATCH_SIZE时，优化DRL智能体
-
-    _record_session_results(session, evaluation_results, communication_results, training_results
-            )
-        记录当前域下的准确率、损失和通信延时
-
-_final_evaluation_and_summary()
-    最终准确率、平均准确率、平均通信时延、平均缓存利用率
-    各个域上的准确率
-
-
-```
+## 三、评价指标
+1. 持续学习的质量
+-     AA、AIA、FM、BWT
+2. 系统与通信指标
+-     
 
 ### data
 #### ./mnist/MNIST/raw

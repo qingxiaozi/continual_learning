@@ -7,7 +7,7 @@ from utils.metrics import ResultVisualizer
 
 
 class RLTester:
-    def __init__(self, model_path="trained_drl_model.pth"):
+    def __init__(self, model_path="./results/trained_drl_model.pth"):
         self.env = VehicleEdgeEnv()
         self.agent = DRLAgent(state_dim=self.env.config.STATE_DIM)
         self.agent.load_model(model_path)

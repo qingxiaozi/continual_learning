@@ -52,7 +52,7 @@ class RLTrainer:
             print(f"Episode {episode + 1}/{self.num_episodes}, Total Reward: {total_reward:.4f}")
 
         # 训练完成后保存模型
-        self.agent.save_model("trained_drl_model.pth")
+        self.agent.save_model("./results/trained_drl_model.pth")
 
         return self.episode_rewards
 
