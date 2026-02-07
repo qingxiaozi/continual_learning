@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from config.parameters import Config
 from config.paths import Paths
 from environment.dataSimu_env import DomainIncrementalDataSimulator
+from torchvision.models import resnet18, ResNet18_Weights
 
 
 class GoldModel:
@@ -41,7 +42,7 @@ class GoldModel:
 
     def _initialize_model(self):
         """初始化ResNet18模型"""
-        model = models.resnet18(pretrained=True)
+        model = models.resnet18(weights=None)
 
         # 冻结前面的层（可选，根据数据量决定）
         # self._freeze_layers(model)

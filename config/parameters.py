@@ -26,7 +26,6 @@ class Config:
     TRAJECTORY_FILE = "trajectory.csv"
 
     # 模型参数
-    NUM_CLASSES = 10  # 类别的数量
     GOLD_MODEL_ACCURACY = 0.95  # 黄金模型准确率95%
     LEARNING_RATE = 0.001  # 学习率
 
@@ -75,7 +74,7 @@ class Config:
     DIGIT10_CLASSES = 10
     DOMAINNET_CLASSES = 345
     # 域切换参数
-    DOMAIN_CHANGE_INTERVAL = 1  # 每1个session切换一个域
+    DOMAIN_CHANGE_INTERVAL = 7  # 每1个session切换一个域
     # 数据加载参数
     IMAGE_SIZE = 32  # 统一调整到相同尺寸
     # 测试策略参数

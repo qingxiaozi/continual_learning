@@ -21,7 +21,7 @@ class EpochTrainer:
         )
         self.loss_fn = ElasticNetLoss(
             alpha=0.5,
-            l1_lambda=1e-3,
+            l1_lambda=1e-6,
         )
 
     def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=5):
@@ -34,11 +34,13 @@ class EpochTrainer:
         actual_epochs = 0
         for epoch in range(num_epochs):
             actual_epochs += 1
-            self._train_one_epoch(
+            train_loss = self._train_one_epoch(
                 batches=batches,
                 selector=selector,
                 use_mab=(epoch >= init_epochs),
             )
+
+            log_msg = f"[Epoch {epoch+1}/{num_epochs}] train_loss={train_loss:.4f}"
 
             if val_dataset is not None:
                 val_loader = DataLoader(
@@ -49,14 +51,21 @@ class EpochTrainer:
                 _, val_loss = ModelEvaluator().evaluate_model(
                     self.model, val_loader
                 )
+
+                log_msg += f", val_loss={val_loss:.4f}"
+
                 if val_loss < best_val:
                     best_val = val_loss
                     best_state = self.model.state_dict()
                     patience_cnt = 0
                 else:
                     patience_cnt += 1
+
+                    log_msg += f" (patience {patience_cnt}/{patience})"
+
                     if patience_cnt >= patience:
                         break
+            print(log_msg)
         self.model.load_state_dict(best_state)
 
         return {
@@ -70,6 +79,9 @@ class EpochTrainer:
         self.model.train()
         criterion = torch.nn.CrossEntropyLoss()
 
+        total_loss = 0.0
+        num_steps = 0
+
         for step in range(len(batches)):
             if use_mab:
                 idx = selector.select()
@@ -79,12 +91,12 @@ class EpochTrainer:
             batch = batches[idx]
             inputs, targets = self._prepare_batch(batch)
 
-            # ===== loss before =====
-            with torch.no_grad():
-                outputs_before = self.model(inputs)
-                loss_before = criterion(
-                    outputs_before, targets
-                )
+            # # ===== loss before =====
+            # with torch.no_grad():
+            #     outputs_before = self.model(inputs)
+            #     loss_before = criterion(
+            #         outputs_before, targets
+            #     )
             # ===== update =====
             outputs = self.model(inputs)
             loss = self.loss_fn(outputs, targets, self.model)
@@ -93,6 +105,9 @@ class EpochTrainer:
             loss.backward()
             self.optimizer.step()
 
+            total_loss += loss.item()
+            num_steps += 1
+
             # ===== loss after =====
             with torch.no_grad():
                 outputs_after = self.model(inputs)
@@ -100,9 +115,11 @@ class EpochTrainer:
                     outputs_after, targets
                 )
 
-            reward = loss_before.item() - loss_after.item()
             if use_mab:
+                reward = -loss_after.item()
                 selector.update(idx, reward)
+
+        return total_loss / max(num_steps, 1)
 
     def _prepare_batch(self, batch):
         if isinstance(batch, (list, tuple)):

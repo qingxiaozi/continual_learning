@@ -357,8 +357,6 @@ class VehicleEnvironment:
 
         print(f"初始化 {len(self.base_stations)} 个基站")
 
-
-
     # def _initialize_base_stations(self):
     #     """PPP生成基站"""
     #     points = self._get_all_trajectory_points()
@@ -546,6 +544,7 @@ class VehicleEnvironment:
         """重置环境"""
         print("重置车辆环境...")
         self.environment_time = 0.0
+        self.trajectory_index = 0
         self._initialize_environment()
         print("环境重置完成")
 
