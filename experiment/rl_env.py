@@ -1,7 +1,9 @@
 from xml.parsers.expat import model
+from learning.evaluator import ModelEvaluator
 import torch
 import random
 import numpy as np
+from torch.utils.data import DataLoader
 from config.parameters import Config
 from environment.communication_env import CommunicationSystem
 from environment.dataSimu_env import DomainIncrementalDataSimulator
@@ -27,6 +29,7 @@ class VehicleEdgeEnv:
             self.global_model, self.gold_model, self.cache_manager, self.data_simulator
         )
         self.communication_system = CommunicationSystem(self.vehicle_env, self.global_model)
+        self.evaluator = ModelEvaluator()
         self.visualize = ResultVisualizer()
         self.current_domain = self.data_simulator.get_current_domain()
         self.session = 0
@@ -91,6 +94,12 @@ class VehicleEdgeEnv:
         self.session += 1
 
         return next_state, reward, done, info
+
+    def evaluate_model(self, domain):
+        dataset = self.data_simulator.get_val_dataset(domain)
+        loader = DataLoader(dataset, batch_size=Config.BATCH_SIZE)
+        acc, loss = self.evaluator.evaluate_model(self.global_model.model, loader)
+        return acc
 
     def _allocate_bandwidth(self, batch_choices):
         allocator = BandwidthAllocator(
