@@ -6,25 +6,9 @@
 │   └── paths.py
 ├── data
 │   ├── PortoTaxi
-│   │   ├── train.csv
-│   │   ├── trajectory.csv
-│   │   └── trajectory_12213.csv
 │   ├── digit10
-│   │   ├── digit10_deal.py
-│   │   ├── digit10_download.py
-│   │   ├── emnist
-│   │   ├── mnist
-│   │   ├── svhn
-│   │   └── usps
 │   ├── domainnet
-│   │   ├── clipart.zip
-│   │   ├── infograph.zip
-│   │   ├── quickdraw.zip
-│   │   └── sketch.zip
 │   └── office-31
-│       ├── amazon
-│       ├── dslr
-│       └── webcam
 ├── environment
 │   ├── communication_env.py
 │   ├── dataSimu_env.py
@@ -88,6 +72,14 @@ After training:
     Save trained model
     Evaluate in test environment
 
+for episode in TEST_EPISODES:
+    reset env
+    load trained policy
+    for session in NUM_TRAINING_SESSIONS:
+        action = policy(state)
+        next_state, reward, done, info = env.step(action)
+        record comm metrics
+    evaluate CL metrics (AA, BWT, FM, AIA)
 ```
 关于episode
 单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域
@@ -104,7 +96,8 @@ After training:
 1. 持续学习的质量
 -     AA、AIA、FM、BWT
 2. 系统与通信指标
--     
+-     每个episode下的reward，平均reward
+-     每个episode下的通信时延，平均时延
 
 ### data
 #### ./mnist/MNIST/raw

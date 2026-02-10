@@ -1,9 +1,10 @@
+import os
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import defaultdict
-import os
-import time
+from utils.metrics import IncrementalMetricsCalculator
 from datetime import datetime
 
 class IncrementalMetricsCalculator:

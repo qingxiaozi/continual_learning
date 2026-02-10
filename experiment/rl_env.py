@@ -32,7 +32,13 @@ class VehicleEdgeEnv:
         self.session = 0
         dummy_state = self._get_state()
         self.state_dim = dummy_state.shape[0]
-        print(self.state_dim)
+        self.last_comm_metrics = {
+            "transmission_delay": 0.0,
+            "labeling_delay": 0.0,      
+            "retraining_delay": 0.0,
+            "broadcast_delay": 0.0,
+            "total_delay": 0.0
+        }
 
     def reset(self):
         """重置环境，开始新的episode"""
@@ -73,7 +79,9 @@ class VehicleEdgeEnv:
         total_samples = self._get_total_samples()
         # 3. 通信开销
         comm_results = self._calculate_delay(batch_choices, bandwidth_ratios, training_results, total_samples)
+        self.last_comm_metrics = comm_results
 
+        # 4. 计算奖励
         reward = self._calculate_reward(comm_results, training_results, total_samples)
         # 5. 更新环境
         self._update_session_environment()
@@ -167,9 +175,18 @@ class VehicleEdgeEnv:
 
     def _get_info(self):
         """获取环境信息"""
-        # eval_results = self._evaluate_model_performance()
-        # return eval_results
-        pass
+        info = {
+            "current_domain": self.current_domain,
+            "session": self.session,
+        }
+        info["comm"] = {
+            "t_trans": self.last_comm_metrics["transmission_delay"],
+            "t_label": self.last_comm_metrics["labeling_delay"],
+            "t_retrain": self.last_comm_metrics["retraining_delay"],
+            "t_broadcast": self.last_comm_metrics["broadcast_delay"],
+            "t_total_comm": self.last_comm_metrics["total_delay"],
+        }
+        return info
 
     def _get_state(self):
         """获取当前环境状态表示"""
