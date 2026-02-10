@@ -6,8 +6,8 @@ class Config:
     NUM_EPISODES = 837  # episode数，根据轨迹数量设置
     NUM_TRAINING_SESSIONS = 20  # train session
     TARGET_UPDATE_INTERVAL = 5  # 每10个episode硬更新目标网络
-    NUM_TEST_EPISODES = 10
-    NUM_TESTING_SESSIONS = 3
+    NUM_TEST_EPISODES = 70
+    NUM_TESTING_SESSIONS = 21
 
     NUM_VEHICLES = 20  # 车辆数
     NUM_EPOCH = 60  # 训练epoch数
