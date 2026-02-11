@@ -3,7 +3,7 @@ import numpy as np
 from config.parameters import Config
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
-from utils.metrics import ResultVisualizer
+from utils.visualizer import ResultVisualizer
 
 
 class RLTrainer:

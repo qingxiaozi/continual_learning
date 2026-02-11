@@ -13,7 +13,7 @@ from learning.continualLearner import ContinualLearner
 from models.global_model import GlobalModel
 from models.gold_model import GoldModel
 from models.bandwidth_allocator import BandwidthAllocator
-from utils.metrics import ResultVisualizer
+from utils.visualizer import ResultVisualizer
 
 
 class VehicleEdgeEnv:

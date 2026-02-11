@@ -13,7 +13,7 @@ from models.global_model import GlobalModel
 from models.gold_model import GoldModel
 from learning.mab_selector import MABDataSelector
 from models.bandwidth_allocator import BandwidthAllocator
-from utils.metrics import ResultVisualizer
+from utils.visualizer import ResultVisualizer
 
 
 class BaselineComparison:

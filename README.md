@@ -68,9 +68,7 @@ For episode in range(NUM_EPISODES):
         state = next_state
         if done:
             break
-After training:
-    Save trained model
-    Evaluate in test environment
+Save trained model
 
 for episode in TEST_EPISODES:
     reset env
@@ -81,6 +79,7 @@ for episode in TEST_EPISODES:
         record comm metrics
     evaluate CL metrics (AA, BWT, FM, AIA)
 ```
+
 关于episode
 单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域
 在每个episode中的env.reset()中，车辆位置、模型状态、数据状态和缓存都会重新初始化

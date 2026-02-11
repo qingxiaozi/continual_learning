@@ -317,8 +317,11 @@ class DRLAgent:
 
     def load_model(self, path):
         """加载模型"""
-        checkpoint = torch.load(path)
+        if torch.cuda.is_available():
+            checkpoint = torch.load(path)
+        else:
+            checkpoint = torch.load(path, map_location=torch.device('cpu'))
         self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
-        self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        self.steps_done = checkpoint.get("steps_done", 0)
+        # self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
+        # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        # self.steps_done = checkpoint.get("steps_done", 0)
