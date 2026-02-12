@@ -47,11 +47,9 @@ class RLTester:
             total_reward = 0
             step_delays = []
 
-            seen_domains = []
+            seen_tasks  = []
             accuracy_history = defaultdict(list)
-            aa_history = []
             acc_matrix = []
-
             AA_curve, FM_curve, BWT_curve = [], [], []
 
             for t in range(self.max_timesteps):
@@ -64,21 +62,22 @@ class RLTester:
                 step_delays.append(info["comm"]["t_total_comm"])
 
                 if (t + 1) % self.domain_interval == 0:
-                    current_domain = self.env.current_domain
-                    if current_domain not in seen_domains:
-                        seen_domains.append(current_domain)
+                    current_task = self.env.current_domain
+                    if current_task not in seen_tasks:
+                        seen_tasks.append(current_task)
+
+                    row = []
                     
-                    for d in seen_domains:
+                    for d in seen_tasks:
                         acc = self.env.evaluate_model(d)
+                        row.append(acc)
                         accuracy_history[d].append(acc)
 
-                    row = [accuracy_history[d][-1] for d in seen_domains]
                     acc_matrix.append(row)
 
                     metrics = IncrementalMetricsCalculator.compute_metrics(
-                        seen_domains, accuracy_history
+                        seen_tasks, accuracy_history
                     )
-                    aa_history.append(metrics["AA"])
 
                     AA_curve.append(metrics["AA"])
                     FM_curve.append(metrics["FM"])
@@ -88,9 +87,9 @@ class RLTester:
                     break
 
             final_metrics = IncrementalMetricsCalculator.compute_metrics(
-                seen_domains, accuracy_history
+                seen_tasks, accuracy_history
             )
-            AIA = IncrementalMetricsCalculator.compute_aia(aa_history)
+            AIA = IncrementalMetricsCalculator.compute_aia(AA_curve)
 
             self.AA_all.append(final_metrics["AA"])
             self.FM_all.append(final_metrics["FM"])
@@ -131,10 +130,10 @@ class RLTester:
         np.save("results/FM_steps.npy", np.array(self.FM_steps))
         np.save("results/BWT_steps.npy", np.array(self.BWT_steps))
         np.save("results/accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
-        np.save("results/AA_final.npy", np.array(self.AA_all))
-        np.save("results/FM_final.npy", np.array(self.FM_all))
-        np.save("results/BWT_final.npy", np.array(self.BWT_all))
-        np.save("results/AIA_final.npy", np.array(self.AIA_all))
+        np.save("results/AA_all.npy", np.array(self.AA_all))
+        np.save("results/FM_all.npy", np.array(self.FM_all))
+        np.save("results/BWT_all.npy", np.array(self.BWT_all))
+        np.save("results/AIA_all.npy", np.array(self.AIA_all))
         np.save("results/episode_rewards.npy", np.array(self.episode_rewards))
         np.save("results/episode_delays.npy", np.array(self.episode_delays))
     

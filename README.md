@@ -42,12 +42,8 @@
 ```
 
 ## 二、总体目标
-通过强化学习（RL agent）学习智能决策策略 π(a|s)，使系统在动态域漂移环境下，自适应优化车辆标注量和带宽分配策略，从而：
-    最大化模型性能提升效率（单位时间损失下降）
-    最小化通信与训练时延
-    抵抗灾难性遗忘
-最终得到一个训练好的 DRL 策略网络（Policy Network）；
-然后在测试阶段复现不同的 domain drift 场景，验证策略泛化性能。
+通过强化学习（RL agent）学习智能决策策略 π(a|s)，使系统在动态域漂移环境下，自适应优化车辆标注量和带宽分配策略，从而最大化模型性能提升效率（单位时间损失下降）
+并抵抗灾难性遗忘，得到一个训练好的 DRL 策略网络（Policy Network）。而后在测试阶段复现不同的 domain drift 场景，验证策略泛化性能。
 系统分为三层
 基础层：环境仿真，构建车联网物理与数据漂移模型，封装于rl_env.py
 策略学习层：强化学习，进行数据上传决策，封装于rl_train.py
@@ -81,44 +77,49 @@ for episode in TEST_EPISODES:
 ```
 
 关于episode
-单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域
-在每个episode中的env.reset()中，车辆位置、模型状态、数据状态和缓存都会重新初始化
-每个episode训练的目标是学会如何面对随时间变化的域漂移序列
-训练阶段的所有eposide都使用同一个数据集，每个step或者多个step对应不同的domain
-当域序列走完，或者step步达到上限，或者奖励变化小于阈值，则判定eposide结束
+
+单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域;
+
+在每个episode中的env.reset()中，车辆位置、模型状态、数据状态和缓存都会重新初始化;
+
+每个episode训练的目标是学会如何面对随时间变化的域漂移序列;
+
+训练阶段的所有eposide都使用同一个数据集，每个step或者多个step对应不同的domain;
+
+当域序列走完，或者step步达到上限，或者奖励变化小于阈值，则判定eposide结束。
 
 关于step
-每个step是一个完整的持续学习训练阶段，包括数据决策、带宽分配优化、数据上传、缓存更新、全局模型训练、奖励计算、状态更新，判断是否结束
-当一个训练阶段结束，则判定step结束。而判断“一个训练阶段结束”，可通过当前阶段达到固定的epoch数、当前step在episode中的索引达到上限等确定
+
+每个step是一个完整的持续学习训练阶段，包括数据决策、带宽分配优化、数据上传、缓存更新、全局模型训练、奖励计算、状态更新，判断是否结束；
+
+当一个训练阶段结束，则判定step结束。而判断“一个训练阶段结束”，可通过当前阶段达到固定的epoch数、当前step在episode中的索引达到上限等确定。
 
 关于测试指标
+
 持续学习相关的指标，需要在task/domain级别进行计算，即在domain结束时计算。
 
 ## 三、评价指标
 1. 持续学习的质量
--     AA、AIA、FM、BWT
-2. 系统与通信指标
--     每个episode下的reward，平均reward
--     每个episode下的通信时延，平均时延
+AA、AIA、FM、BWT
+1. 系统与通信指标
+每个episode下的reward，平均reward
+每个episode下的通信时延，平均时延
 
-### data
-#### ./mnist/MNIST/raw
-- train-images-idx3-ubyte: 训练集图像数据
-- train-labels-idx1-ubyte: 训练集标签数据
-- t10k-images-idx3-ubyte: 测试集图像数据（t10k代表10000个测试样本）
-- t10k-labels-idx1-ubyte: 测试集标签数据
-xx.gz是上述文件的压缩版本
-#### ./emnist/EMNIST/raw
-- emnist-digits-train-images-idx3-ubyte: 训练图像
-- emnist-digits-train-labels-idx1-ubyte: 训练标签
-- emnist-digits-test-images-idx3-ubyte: 测试图像
-- emnist-digits-test-labels-idx1-ubyte: 测试标签
-#### ./svhn
-每个图像都是32x32像素的RGB图像
-#### ./usps
-16×16像素的灰度图像<br>
-总计 9,298 个样本 (训练集: 7,291，测试集: 2,007)
+## 四、数据集
+|数据集|域|类别数|类别|样本数|图像大小|通道数|说明|
+|------|------|------|------|------|------|------|------|
+|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795|图像大小|通道数|说明|
+|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST：70000；EMNIST：280000；USPS：7291；SVHN：99289|图像大小|通道数|数字识别|
+|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|Real: 约 172,000 张；Clipart: 约 48,000 张；Painting: 约 72,000 张；Quickdraw: 约 172,000 张；Sketch: 约 72,000 张；Infograph: 约 48,000 张|图像大小|通道数|说明|
+<br>
 
+## 五、结果
+1. accuracy_matrices.npy：per-episode n*(1~n)，三角准确率估计
+2. xx_steps.npy：[episodes,n]，过程分析
+3. xx_all.npy：[episodes]，每个eposide的最终指标
+4. episode_rewards.npy
+5. episode_delays.npy
+   
 ### environment
 #### 车辆环境（vehicle_env）
 1. 初始化车辆和基站环境。
@@ -145,14 +146,6 @@ xx.gz是上述文件的压缩版本
 3. 使用狄利克雷分布将每个域的数据非独立同分布的划分给多个车辆。
 4. 每个车辆维护自己的数据缓存，并能够按照批次提供数据。
 
-数据集：
-|数据集|域|类别数|类别|样本数|图像大小|通道数|说明|
-|------|------|------|------|------|------|------|------|
-|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795|图像大小|通道数|说明|
-|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST：70000；EMNIST：280000；USPS：7291；SVHN：99289|图像大小|通道数|数字识别|
-|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|Real: 约 172,000 张；Clipart: 约 48,000 张；Painting: 约 72,000 张；Quickdraw: 约 172,000 张；Sketch: 约 72,000 张；Infograph: 约 48,000 张|图像大小|通道数|说明|
-<br>
-
 ### models
 #### 多臂老虎机（mab_selector）
 功能：<br>
@@ -173,9 +166,8 @@ xx.gz是上述文件的压缩版本
 
 #### 接下来要做的
 1. 通信参数找其他论文确认
-2. 深度学习buffer为32，说明至少得32个session，花时间
-3. 修改main.py，进行基线对比实验 10days
-4. 消融实验 5days
-5. 完善digit和dominNet数据集训练 10days
-6. BWT计算有误
+2. 进行基线对比实验 10days
+3. 消融实验 5days
+4. 完善digit和dominNet数据集训练 10days
+
 

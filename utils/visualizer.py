@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 from datetime import datetime
 
@@ -265,52 +266,50 @@ class ResultVisualizer:
         return np.load(path, allow_pickle=True) if os.path.exists(path) else None
 
     def plot_cl_metric_curves(self, AA_steps, FM_steps, BWT_steps, filename="cl_metrics_curve.png"):
+        if AA_steps is None:
+            return
+            
         x = np.arange(1, len(AA_steps[0]) + 1)
         plt.figure(figsize=self.style_config['figsize'])
-        for name, data, color in [('AA', AA_steps, 'AA'), ('FM', FM_steps, 'FM'), ('BWT', BWT_steps, 'BWT')]:
+        
+        for name, data, color_key in [('AA', AA_steps, 'AA'), ('FM', FM_steps, 'FM'), ('BWT', BWT_steps, 'BWT')]:
+            if data is None:
+                continue
+            data = np.array(data)
             mean = np.mean(data, axis=0)
-            plt.plot(x, mean, marker=self.style_config['markers'][name],
-                     color=self.style_config['colors'][name], linewidth=2, label=name)
+            std = np.std(data, axis=0)
+            plt.plot(x, mean, marker=self.style_config['markers'][color_key],
+                     color=self.style_config['colors'][color_key], linewidth=2, label=name)
+            plt.fill_between(x, mean - std, mean + std, alpha=0.2, color=self.style_config['colors'][color_key])
+        
         plt.xlabel("Domain Index")
         plt.ylabel("Metric Value")
-        plt.title("Continual Learning Metrics")
-        plt.legend(); plt.grid(alpha=0.3)
+        plt.title("Continual Learning Metrics (Mean ± Std)")
+        plt.legend()
+        plt.grid(alpha=0.3)
         self._save_fig(filename)
 
-    def plot_accuracy_matrix(self, acc_matrix, filename="accuracy_matrix_heatmap.png"):
-        """Robust accuracy matrix heatmap with auto shape fixing."""
-        import seaborn as sns
-        acc = np.array(acc_matrix, dtype=object)
-
-        # Case 1: object array of episode matrices
-        if acc.ndim == 1 and isinstance(acc[0], (list, np.ndarray)):
-            acc = np.array(acc[-1])   # take last episode matrix
-
-        acc = np.array(acc, dtype=float)
-
-        # Case 2: ragged triangular matrix → pad to square
-        if acc.ndim == 2 and acc.shape[0] != acc.shape[1]:
-            print(f"[Warning] Non-square accuracy matrix {acc.shape}, auto-padding.")
-            max_dim = max(acc.shape)
-            padded = np.zeros((max_dim, max_dim))
-            padded[:acc.shape[0], :acc.shape[1]] = acc
-            acc = padded
-
-        # Case 3: 1D vector → reshape to square if possible
-        if acc.ndim == 1:
-            n = int(np.sqrt(acc.shape[0]))
-            if n * n == acc.shape[0]:
-                acc = acc.reshape(n, n)
-            else:
-                acc = acc.reshape(-1, 1)
-
-        print(f"[Accuracy Matrix Shape] {acc.shape}")
+    def plot_accuracy_matrix(self, acc_matrices, filename="accuracy_matrix_heatmap.png"):
+        if not acc_matrices or len(acc_matrices) == 0:
+            print("No accuracy matrix data to plot.")
+            return
+        
+        max_domains = max(len(mat) for mat in acc_matrices)
+        full_mats = []
+        
+        for mat in acc_matrices:
+            full = np.full((max_domains, max_domains), np.nan)
+            for i, row in enumerate(mat):
+                full[i, :len(row)] = row
+            full_mats.append(full)
+            
+        mean_acc = np.nanmean(full_mats, axis=0)
 
         plt.figure(figsize=(6, 5))
-        sns.heatmap(acc, annot=True, cmap="viridis", fmt=".3f")
-        plt.xlabel("Test Domain j")
-        plt.ylabel("After Learning Domain i")
-        plt.title("Accuracy Matrix R(i,j)")
+        sns.heatmap(mean_acc, annot=True, fmt=".3f", cmap="viridis", cbar_kws={'label': 'Accuracy'})
+        plt.xlabel("Test Domain")
+        plt.ylabel("After Learning Domain")
+        plt.title("Average Accuracy Matrix")
         self._save_fig(filename)
 
 
@@ -365,9 +364,7 @@ class ResultVisualizer:
         
         # 绘制 Accuracy Matrix（取最后一个 episode 的矩阵）
         if acc_matrices is not None and len(acc_matrices) > 0:
-            last_acc = acc_matrices[-1]
-            if isinstance(last_acc, np.ndarray):
-                self.plot_accuracy_matrix(last_acc)
+            self.plot_accuracy_matrix(acc_matrices)
 
         # 绘制 Boxplot
         if AA_final is not None:
