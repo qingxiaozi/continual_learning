@@ -290,19 +290,20 @@ class ResultVisualizer:
         self._save_fig(filename)
 
     def plot_accuracy_matrix(self, acc_matrices, filename="accuracy_matrix_heatmap.png"):
-        if not acc_matrices or len(acc_matrices) == 0:
+        if acc_matrices is None or len(acc_matrices) == 0:
             print("No accuracy matrix data to plot.")
             return
-        
+
         max_domains = max(len(mat) for mat in acc_matrices)
         full_mats = []
-        
+
         for mat in acc_matrices:
+            mat = np.array(mat)
             full = np.full((max_domains, max_domains), np.nan)
             for i, row in enumerate(mat):
                 full[i, :len(row)] = row
             full_mats.append(full)
-            
+
         mean_acc = np.nanmean(full_mats, axis=0)
 
         plt.figure(figsize=(6, 5))
@@ -349,10 +350,10 @@ class ResultVisualizer:
         FM_steps = self._load_if_exists("FM_steps.npy")
         BWT_steps = self._load_if_exists("BWT_steps.npy")
         acc_matrices = self._load_if_exists("accuracy_matrices.npy")
-        AA_final = self._load_if_exists("AA_final.npy")
-        FM_final = self._load_if_exists("FM_final.npy")
-        BWT_final = self._load_if_exists("BWT_final.npy")
-        AIA_final = self._load_if_exists("AIA_final.npy")
+        AA_all = self._load_if_exists("AA_all.npy")
+        FM_all = self._load_if_exists("FM_all.npy")
+        BWT_all = self._load_if_exists("BWT_all.npy")
+        AIA_all = self._load_if_exists("AIA_all.npy")
 
         # 加载系统指标
         rewards = self._load_if_exists("episode_rewards.npy")
@@ -367,8 +368,8 @@ class ResultVisualizer:
             self.plot_accuracy_matrix(acc_matrices)
 
         # 绘制 Boxplot
-        if AA_final is not None:
-            self.plot_episode_boxplot(AA_final, FM_final, BWT_final, AIA_final)
+        if AA_all is not None:
+            self.plot_episode_boxplot(AA_all, FM_all, BWT_all, AIA_all)
 
         # 绘制系统指标
         if rewards is not None:
