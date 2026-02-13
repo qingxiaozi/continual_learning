@@ -18,7 +18,8 @@ from utils.visualizer import ResultVisualizer
 
 class VehicleEdgeEnv:
     """强化学习环境，模拟车辆边缘计算场景"""
-    def __init__(self):
+    def __init__(self,mode="train"):
+        self.mode = mode
         self.config = Config
         self.data_simulator = DomainIncrementalDataSimulator()
         self.gold_model = GoldModel(self.data_simulator.current_dataset)
@@ -127,10 +128,12 @@ class VehicleEdgeEnv:
         )
     
     def _calculate_delay(self, batch_choices, bandwidth_ratios, training_results, total_samples):
+        include_broadcast = (self.mode == "test")
         return self.communication_system.calculate_total_training_delay(
             upload_decisions=[(i, n) for i, n in enumerate(batch_choices) if n > 0],
             bandwidth_allocations={i: r for i, r in enumerate(bandwidth_ratios) if r > 0},
             total_samples=total_samples,
+            include_broadcast=include_broadcast,
             actual_epochs=training_results.get("actual_epochs", 0),
         )
     

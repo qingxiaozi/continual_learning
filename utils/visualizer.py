@@ -313,7 +313,6 @@ class ResultVisualizer:
         plt.title("Average Accuracy Matrix")
         self._save_fig(filename)
 
-
     def plot_episode_boxplot(self, AA, FM, BWT, AIA, filename="cl_metrics_boxplot.png"):
         data = [AA, FM, BWT, AIA]
         labels = ["AA", "FM", "BWT", "AIA"]
