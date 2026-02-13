@@ -8,7 +8,7 @@ from utils.visualizer import ResultVisualizer
 
 class RLTrainer:
     def __init__(self):
-        self.env = VehicleEdgeEnv()
+        self.env = VehicleEdgeEnv(mode="train")
         self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES)
         self.visualizer = ResultVisualizer()
         self.num_episodes = Config.NUM_EPISODES
