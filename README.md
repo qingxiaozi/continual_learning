@@ -76,26 +76,16 @@ for episode in TEST_EPISODES:
     evaluate CL metrics (AA, BWT, FM, AIA)
 ```
 
-关于episode
-
+1. 关于episode
 单个episode可以模拟一次完整的车辆持续学习流程，经历多个step，每个step/每多个step对应车辆感知到的不同域;
-
 在每个episode中的env.reset()中，车辆位置、模型状态、数据状态和缓存都会重新初始化;
-
 每个episode训练的目标是学会如何面对随时间变化的域漂移序列;
-
 训练阶段的所有eposide都使用同一个数据集，每个step或者多个step对应不同的domain;
-
 当域序列走完，或者step步达到上限，或者奖励变化小于阈值，则判定eposide结束。
-
-关于step
-
+2. 关于step
 每个step是一个完整的持续学习训练阶段，包括数据决策、带宽分配优化、数据上传、缓存更新、全局模型训练、奖励计算、状态更新，判断是否结束；
-
 当一个训练阶段结束，则判定step结束。而判断“一个训练阶段结束”，可通过当前阶段达到固定的epoch数、当前step在episode中的索引达到上限等确定。
-
-关于测试指标
-
+3. 关于测试指标
 持续学习相关的指标，需要在task/domain级别进行计算，即在domain结束时计算。
 
 ## 三、评价指标
@@ -119,6 +109,22 @@ AA、AIA、FM、BWT
 3. xx_all.npy：[episodes]，每个eposide的最终指标
 4. episode_rewards.npy
 5. episode_delays.npy
+
+## 六、对比实验
+1. 带宽分配策略 
+EQUAL (均匀分配)：所有上传车辆平分总带宽。
+PROPORTIONAL (按比例分配)：带宽与上传的数据量成正比。
+GREEDY_CHANNEL (贪婪信道分配)：将更多带宽分配给信道条件（SNR）更好的车辆。
+MINMAX_DELAY (最小化最大传输时延)
+2. 上传决策策略
+FIXED_RATIO (固定比例)：每辆车上传其可用数据的固定比例
+RANDOM (随机)：每辆车随机决定上传0到MAX_UPLOAD_BATCHES之间的批次数。
+LOSS_GREEDY (损失贪心)：优先上传本地模型在其上损失最大的批次。
+DRL (深度强化学习)：通过DRL智能体，基于全局状态做出联合优化决策。
+3. 训练数据选择策略
+NEW_ONLY (仅用新数据)：只使用本次会话上传的新数据进行训练。
+FIXED_RATIO (固定新旧比例)：按固定比例（如1:1）混合新旧数据。
+MAB (多臂老虎机)：动态评估每个数据源（或批次）的价值，自适应地选择最有信息量的数据。
    
 ### environment
 #### 车辆环境（vehicle_env）
