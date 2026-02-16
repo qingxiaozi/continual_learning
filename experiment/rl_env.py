@@ -104,13 +104,13 @@ class VehicleEdgeEnv:
         allocator = BandwidthAllocator(
             batch_choices, self.communication_system, self.vehicle_env,
         )
-        if Config.BANDWIDTH_POLICY == "EQUAL":
+        if Config.BANDWIDTH_STRATEGY == "EQUAL":
             ratios = allocator.allocate_average_bandwidth()
-        elif Config.BANDWIDTH_POLICY == "GREEDY":
+        elif Config.BANDWIDTH_STRATEGY == "GREEDY_CHANNEL":
             ratios = allocator.allocate_greedy_channel_bandwidth()
-        elif Config.BANDWIDTH_POLICY == "PROPORTIONAL":
+        elif Config.BANDWIDTH_STRATEGY == "PROPORTIONAL":
             ratios = allocator.allocate_proportional_bandwidth()
-        else: # "OPT" (默认)
+        else: # "MINMAX_DELAY" (默认)
             ratios, _ = allocator.allocate_minmaxdelay_bandwidth(self.session)
         # ratios, _ = allocator.allocate_minmaxdelay_bandwidth(self.session)
         return ratios
