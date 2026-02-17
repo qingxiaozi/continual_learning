@@ -104,15 +104,17 @@ class VehicleEdgeEnv:
         allocator = BandwidthAllocator(
             batch_choices, self.communication_system, self.vehicle_env,
         )
-        if Config.BANDWIDTH_STRATEGY == "EQUAL":
+        policy = Config.BANDWIDTH_STRATEGY
+        if policy == "EQUAL":
             ratios = allocator.allocate_average_bandwidth()
-        elif Config.BANDWIDTH_STRATEGY == "GREEDY_CHANNEL":
-            ratios = allocator.allocate_greedy_channel_bandwidth()
-        elif Config.BANDWIDTH_STRATEGY == "PROPORTIONAL":
+        elif policy == "PROPORTIONAL":
             ratios = allocator.allocate_proportional_bandwidth()
-        else: # "MINMAX_DELAY" (默认)
+        elif policy == "GREEDY_CHANNEL":
+            ratios = allocator.allocate_greedy_channel_bandwidth()
+        elif policy == "MINMAX_DELAY":
             ratios, _ = allocator.allocate_minmaxdelay_bandwidth(self.session)
-        # ratios, _ = allocator.allocate_minmaxdelay_bandwidth(self.session)
+        else:
+            raise ValueError(f"Unknown BANDWIDTH_STRATEGY: {policy}")
         return ratios
 
     def _upload_datas(self, batch_choices):
