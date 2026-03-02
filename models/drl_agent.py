@@ -1,3 +1,4 @@
+from models.base_agent import BaseAgent
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -128,7 +129,7 @@ class PrioritizedReplayBuffer:
         return self.size
 
 
-class DRLAgent:
+class DRLAgent(BaseAgent):
     """深度强化学习策略，独立决策DQN"""
 
     def __init__(self, state_dim):

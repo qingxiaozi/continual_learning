@@ -1,12 +1,7 @@
 import numpy as np
-import torch
 from scipy.optimize import minimize
 from typing import List, Optional, Dict, Tuple
-from environment.communication_env import CommunicationSystem
 from config.parameters import Config
-from models.drl_agent import DRLAgent
-from environment.communication_env import CommunicationSystem
-from environment.vehicle_env import VehicleEnvironment
 
 
 class BandwidthAllocator:
@@ -219,14 +214,6 @@ class BandwidthAllocator:
         if result.success:
             t_opt = result.x[0]
             bandwidth_ratios = result.x[1:1+num_vehicles]
-
-            # # 确保数值稳定性
-            # bandwidth_ratios = np.clip(bandwidth_ratios, 0, 1)
-            # total = np.sum(bandwidth_ratios)
-            # if total > 0:
-            #     bandwidth_ratios = bandwidth_ratios / total
-            # else:
-            #     bandwidth_ratios = self.allocate_average_bandwidth()
             bandwidth_ratios = np.clip(result.x[1:1+num_vehicles], 0, 1)
             # 显式强制满足个体上限（防止SLSQP轻微越界）
             if M_max != float('inf') and M_max > 0:
@@ -279,3 +266,44 @@ class BandwidthAllocator:
         return self.comm_system.calculate_transmission_delay(
             upload_decisions, bandwidth_allocations, session_id
         )
+
+    def allocate_greedy_channel_bandwidth(self) -> np.ndarray:
+        """
+        贪婪信道带宽分配 (用于 Baseline: MAB-Greedy-BW)
+        将更多带宽分配给信道条件（SNR）更好的车辆。
+        """
+        if sum(self.batch_choices) == 0:
+            return self.allocate_average_bandwidth()
+
+        snr_values = np.zeros(self.num_vehicles)
+        for v in range(self.num_vehicles):
+            if self.batch_choices[v] == 0:
+                continue
+
+            vehicle = self.vehicle_env._get_vehicle_by_id(v)
+            if not vehicle or vehicle.bs_connection is None:
+                continue
+
+            base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+            if not base_station:
+                continue
+
+            if hasattr(self.comm_system, 'calculate_channel_gain'):
+                channel_gain = self.comm_system.calculate_channel_gain(vehicle, base_station)
+                signal_power = self.comm_system.vehicle_transmit_power * channel_gain
+                noise_interference = self.comm_system.noise_power + self.comm_system.interference_power
+                snr = signal_power / max(noise_interference, 1e-20)
+                snr_values[v] = snr
+            else:
+                distance = np.linalg.norm(vehicle.position - base_station.position)
+                snr_values[v] = 1.0 / max(distance, 1e-6)
+
+        total_snr = np.sum(snr_values)
+        if total_snr > 0:
+            bandwidth_ratios = snr_values / total_snr
+        else:
+            bandwidth_ratios = self.allocate_average_bandwidth()
+
+        # 应用约束
+        bandwidth_ratios = self._apply_constraints(bandwidth_ratios)
+        return bandwidth_ratios
