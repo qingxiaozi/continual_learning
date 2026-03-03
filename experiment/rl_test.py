@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import torch
 import itertools
 import numpy as np
@@ -26,6 +27,7 @@ class AgentFactory:
         elif upload_strategy == "DRL":
             agent = DRLAgent(state_dim)
             agent.load_model("./results/pth/trained_drl_model.pth")
+            agent.set_eval_mode()
             return agent
         else:
             raise ValueError(f"Unknown upload strategy: {upload_strategy}")
@@ -137,14 +139,20 @@ class RLTester:
             self.episode_rewards.append(total_reward)
             self.episode_delays.append(np.mean(step_delays))
 
-        self.report_results()
+        results_dict =self.report_results()
         self.save_results()
+        return results_dict
 
     def report_results(self):
         print("\n================ FINAL PAPER RESULTS ================")
 
         def report(name, values):
             print(f"{name}: {np.mean(values):.4f} ± {np.std(values):.4f}")
+
+        print("\n[System configure]")
+        report("BW", Config.BANDWIDTH_STRATEGY)
+        report("UPLOAD", Config.UPLOAD_STRATEGY)
+        report("TRAIN", Config.TRAINING_STRATEGY)
 
         print("\n[Continual Learning Metrics]")
         report("AA", self.AA_all)
@@ -157,17 +165,18 @@ class RLTester:
         report("Mean Communication Delay", self.episode_delays)
 
     def save_results(self):
-        strategy = Config.UPLOAD_STRATEGY
-        np.save(f"results/npy/{strategy}_AA_steps.npy", np.array(self.AA_steps))
-        np.save(f"results/npy/{strategy}_FM_steps.npy", np.array(self.FM_steps))
-        np.save(f"results/npy/{strategy}_BWT_steps.npy", np.array(self.BWT_steps))
-        np.save(f"results/npy/{strategy}_accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
-        np.save(f"results/npy/{strategy}_AA_all.npy", np.array(self.AA_all))
-        np.save(f"results/npy/{strategy}_FM_all.npy", np.array(self.FM_all))
-        np.save(f"results/npy/{strategy}_BWT_all.npy", np.array(self.BWT_all))
-        np.save(f"results/npy/{strategy}_AIA_all.npy", np.array(self.AIA_all))
-        np.save(f"results/npy/{strategy}_episode_rewards.npy", np.array(self.episode_rewards))
-        np.save(f"results/npy/{strategy}_episode_delays.npy", np.array(self.episode_delays))
+        os.makedirs("results/npy", exist_ok=True)
+        prefix = f"{Config.UPLOAD_STRATEGY}_{Config.BANDWIDTH_STRATEGY}_{Config.TRAINING_STRATEGY}"
+        np.save(f"results/npy/{prefix}_AA_steps.npy", np.array(self.AA_steps))
+        np.save(f"results/npy/{prefix}_FM_steps.npy", np.array(self.FM_steps))
+        np.save(f"results/npy/{prefix}_BWT_steps.npy", np.array(self.BWT_steps))
+        np.save(f"results/npy/{prefix}_accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
+        np.save(f"results/npy/{prefix}_AA_all.npy", np.array(self.AA_all))
+        np.save(f"results/npy/{prefix}_FM_all.npy", np.array(self.FM_all))
+        np.save(f"results/npy/{prefix}_BWT_all.npy", np.array(self.BWT_all))
+        np.save(f"results/npy/{prefix}_AIA_all.npy", np.array(self.AIA_all))
+        np.save(f"results/npy/{prefix}_episode_rewards.npy", np.array(self.episode_rewards))
+        np.save(f"results/npy/{prefix}_episode_delays.npy", np.array(self.episode_delays))
     
 if __name__ == "__main__":
     tester = RLTester()
