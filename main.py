@@ -4,7 +4,7 @@ from config.parameters import Config
 from experiment.rl_env import VehicleEdgeEnv
 
 from models.drl_agent import DRLAgent
-from experiment.rl_test import RLTester
+from experiment.rl_test import RLTester, AgentFactory
 import copy
 
 # ========== 定义所有对比实验 ==========
@@ -61,22 +61,6 @@ EXPERIMENT_CONFIGS = {
         }
     }
 
-# def create_agent(upload_strategy):
-#     if upload_strategy == "STATIC":
-#         return StaticAgent()
-#     elif upload_strategy == "FIXED_RATIO":
-#         return FixedRatioAgent(ratio=0.5)
-#     elif upload_strategy == "RANDOM":
-#         return RandomAgent()
-#     elif upload_strategy == "LOSS_GREEDY":
-#         return LossGreedyAgent()
-#     elif upload_strategy == "DRL":
-#         agent = DRLAgent(state_dim=Config.STATE_DIM, action_dim=Config.NUM_VEHICLES)
-#         agent.load_model("./results/pth/trained_drl_model.pth")
-#         return agent
-#     else:
-#         raise ValueError(f"Unknown upload strategy: {upload_strategy}")
-
 def run_experiment(exp_name, config):
     print(f"\n=== Running Experiment: {exp_name} ===")
     
@@ -87,10 +71,9 @@ def run_experiment(exp_name, config):
     
     # 2. 创建环境和智能体
     env = VehicleEdgeEnv(mode="test")
-    agent = create_agent(Config.UPLOAD_STRATEGY)
     
     # 3. 运行测试
-    tester = RLTester(env, agent)
+    tester = RLTester()
     results = tester.test()
     
     return results
