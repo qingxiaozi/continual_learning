@@ -1,11 +1,12 @@
-# main.py (新增)
-
+import json
+import time
+import os
 from config.parameters import Config
 from experiment.rl_env import VehicleEdgeEnv
 
 from models.drl_agent import DRLAgent
 from experiment.rl_test import RLTester, AgentFactory
-import copy
+
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
@@ -64,30 +65,26 @@ EXPERIMENT_CONFIGS = {
 def run_experiment(exp_name, config):
     print(f"\n=== Running Experiment: {exp_name} ===")
     
-    # 1. 设置配置
-    if config["BW"]: Config.BANDWIDTH_STRATEGY = config["BW"]
-    if config["UPLOAD"]: Config.UPLOAD_STRATEGY = config["UPLOAD"]
-    if config["TRAIN"]: Config.TRAINING_STRATEGY = config["TRAIN"]
+    try:
+        Config.BANDWIDTH_STRATEGY = config["BW"]
+        Config.UPLOAD_STRATEGY = config["UPLOAD"]
+        Config.TRAINING_STRATEGY = config["TRAIN"]
+
+        tester = RLTester()
+        results = tester.test()
     
-    # 2. 创建环境和智能体
-    env = VehicleEdgeEnv(mode="test")
-    
-    # 3. 运行测试
-    tester = RLTester()
-    results = tester.test()
-    
-    return results
+        return results
+    except Exception as e:
+        print(f"Experiment {exp_name} FAILED: {str(e)}")
+
 
 if __name__ == "__main__":
-    all_results = {}
-    
+    output_dir = f"./results/com_exp"
+    os.makedirs(output_dir, exist_ok=True)
     # 运行所有实验
     for exp_name, config in EXPERIMENT_CONFIGS.items():
         results = run_experiment(exp_name, config)
-        all_results[exp_name] = results
-        
-        # 保存结果到文件
-        with open(f"results_{exp_name}.json", "w") as f:
+        with open(f"{output_dir}/results_{exp_name}.json", "w") as f:
             import json
             json.dump(results, f, indent=4)
     
