@@ -2,49 +2,80 @@
 
 from config.parameters import Config
 from experiment.rl_env import VehicleEdgeEnv
-from models.baseline_agents import (
-    StaticAgent, FixedRatioAgent, RandomAgent, LossGreedyAgent
-)
+
 from models.drl_agent import DRLAgent
 from experiment.rl_test import RLTester
 import copy
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-    # 基线
-    "Static": {"BW": None, "UPLOAD": "STATIC", "TRAIN": None},
-    "Naive_Baseline": {"BW": "EQUAL", "UPLOAD": "FIXED_RATIO", "TRAIN": "FIXED_RATIO"},
-    
-    # 带宽消融
-    "Proportional_BW": {"BW": "PROPORTIONAL", "UPLOAD": "FIXED_RATIO", "TRAIN": "FIXED_RATIO"},
-    "Greedy_Channel_BW": {"BW": "GREEDY_CHANNEL", "UPLOAD": "FIXED_RATIO", "TRAIN": "FIXED_RATIO"},
-    
-    # 训练策略消融
-    "New_Only": {"BW": "MINMAX_DELAY", "UPLOAD": "DRL", "TRAIN": "NEW_ONLY"},
-    "Fixed_Ratio_Train": {"BW": "MINMAX_DELAY", "UPLOAD": "DRL", "TRAIN": "FIXED_RATIO"},
-    
-    # 上传策略消融
-    "w_o_DRL": {"BW": "EQUAL", "UPLOAD": "FIXED_RATIO", "TRAIN": "MAB"},
-    
-    # 完整方案
-    "Full_Model": {"BW": "MINMAX_DELAY", "UPLOAD": "DRL", "TRAIN": "MAB"}
-}
+        "Base_Static": {
+            "BW": "EQUAL", 
+            "UPLOAD": "STATIC", 
+            "TRAIN": "NEW_ONLY",
+        },
+        "Base_Uniform": {
+            "BW": "EQUAL", 
+            "UPLOAD": "FIXED_RATIO", 
+            "TRAIN": "FIXED_RATIO",
+        },
+        "Abl_BW_Opt": {
+            "BW": "MINMAX_DELAY", 
+            "UPLOAD": "FIXED_RATIO", 
+            "TRAIN": "FIXED_RATIO",
+        },
+        "Abl_UP_Greedy": {
+            "BW": "EQUAL", 
+            "UPLOAD": "LOSS_GREEDY", 
+            "TRAIN": "FIXED_RATIO",
+        },
+        "Abl_UP_DRL": {
+            "BW": "EQUAL", 
+            "UPLOAD": "DRL", 
+            "TRAIN": "FIXED_RATIO",
+        },
+        "Abl_TR_MAB": {
+            "BW": "EQUAL", 
+            "UPLOAD": "FIXED_RATIO", 
+            "TRAIN": "MAB",
+        },
+        "Abl_NoReplay": {
+            "BW": "EQUAL", 
+            "UPLOAD": "FIXED_RATIO", 
+            "TRAIN": "NEW_ONLY",
+        },
+        "Combo_Comm": {
+            "BW": "MINMAX_DELAY", 
+            "UPLOAD": "DRL", 
+            "TRAIN": "FIXED_RATIO",
+        },
+        "Combo_Learn": {
+            "BW": "EQUAL", 
+            "UPLOAD": "DRL", 
+            "TRAIN": "MAB",
+        },        
+        "Ours_Full": {
+            "BW": "MINMAX_DELAY", 
+            "UPLOAD": "DRL", 
+            "TRAIN": "MAB",
+        }
+    }
 
-def create_agent(upload_strategy):
-    if upload_strategy == "STATIC":
-        return StaticAgent()
-    elif upload_strategy == "FIXED_RATIO":
-        return FixedRatioAgent(ratio=0.5)
-    elif upload_strategy == "RANDOM":
-        return RandomAgent()
-    elif upload_strategy == "LOSS_GREEDY":
-        return LossGreedyAgent()
-    elif upload_strategy == "DRL":
-        agent = DRLAgent(state_dim=Config.STATE_DIM, action_dim=Config.NUM_VEHICLES)
-        agent.load_model("path/to/your/drl_model.pth") # 请替换为您的模型路径
-        return agent
-    else:
-        raise ValueError(f"Unknown upload strategy: {upload_strategy}")
+# def create_agent(upload_strategy):
+#     if upload_strategy == "STATIC":
+#         return StaticAgent()
+#     elif upload_strategy == "FIXED_RATIO":
+#         return FixedRatioAgent(ratio=0.5)
+#     elif upload_strategy == "RANDOM":
+#         return RandomAgent()
+#     elif upload_strategy == "LOSS_GREEDY":
+#         return LossGreedyAgent()
+#     elif upload_strategy == "DRL":
+#         agent = DRLAgent(state_dim=Config.STATE_DIM, action_dim=Config.NUM_VEHICLES)
+#         agent.load_model("./results/pth/trained_drl_model.pth")
+#         return agent
+#     else:
+#         raise ValueError(f"Unknown upload strategy: {upload_strategy}")
 
 def run_experiment(exp_name, config):
     print(f"\n=== Running Experiment: {exp_name} ===")
