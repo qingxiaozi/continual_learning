@@ -7,14 +7,36 @@ from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.metrics import IncrementalMetricsCalculator
 from utils.visualizer import ResultVisualizer
+from models.baseline_agents import (
+    StaticAgent, FixedRatioAgent, RandomAgent, LossGreedyAgent
+)
+
+
+class AgentFactory:
+    @staticmethod
+    def create_agent(upload_strategy,state_dim):
+        if upload_strategy == "STATIC":
+            return StaticAgent()
+        elif upload_strategy == "FIXED_RATIO":
+            return FixedRatioAgent(ratio=0.5)
+        elif upload_strategy == "RANDOM":
+            return RandomAgent()
+        elif upload_strategy == "LOSS_GREEDY":
+            return LossGreedyAgent()
+        elif upload_strategy == "DRL":
+            agent = DRLAgent(state_dim)
+            agent.load_model("./results/pth/trained_drl_model.pth")
+            return agent
+        else:
+            raise ValueError(f"Unknown upload strategy: {upload_strategy}")
 
 
 class RLTester:
-    def __init__(self, model_path="./results/pth/trained_drl_model.pth"):
+    def __init__(self):
         self.env = VehicleEdgeEnv(mode="test")
-        self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES)
-        self.agent.load_model(model_path)
-        self.agent.set_eval_mode()
+        dummy_state = self.env.reset() 
+        state_dim = dummy_state.shape[0]
+        self.agent = AgentFactory.create_agent(Config.UPLOAD_STRATEGY, state_dim)
 
         self.num_episodes = Config.NUM_TEST_EPISODES
         self.max_timesteps = Config.NUM_TESTING_SESSIONS
@@ -54,7 +76,17 @@ class RLTester:
 
             for t in range(self.max_timesteps):
                 available_batches = state[-Config.NUM_VEHICLES:].astype(int).tolist()
-                action = self.agent.select_action(state, available_batches=available_batches)
+
+                if Config.UPLOAD_STRATEGY == "LOSS_GREEDY":
+                    action = self.agent.select_action(
+                        state,
+                        available_batches=available_batches,
+                        global_model=self.env.global_model,
+                        vehicles=self.env.vehicle_env.vehicles
+                    )
+                else:
+                    action = self.agent.select_action(state, available_batches=available_batches)
+
                 next_state, reward, done, info = self.env.step(action)
                 state = next_state
 
@@ -124,20 +156,19 @@ class RLTester:
         report("Mean Reward", self.episode_rewards)
         report("Mean Communication Delay", self.episode_delays)
 
-
     def save_results(self):
-        np.save("results/npy/AA_steps.npy", np.array(self.AA_steps))
-        np.save("results/npy/FM_steps.npy", np.array(self.FM_steps))
-        np.save("results/npy/BWT_steps.npy", np.array(self.BWT_steps))
-        np.save("results/npy/accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
-        np.save("results/npy/AA_all.npy", np.array(self.AA_all))
-        np.save("results/npy/FM_all.npy", np.array(self.FM_all))
-        np.save("results/npy/BWT_all.npy", np.array(self.BWT_all))
-        np.save("results/npy/AIA_all.npy", np.array(self.AIA_all))
-        np.save("results/npy/episode_rewards.npy", np.array(self.episode_rewards))
-        np.save("results/npy/episode_delays.npy", np.array(self.episode_delays))
+        strategy = Config.UPLOAD_STRATEGY
+        np.save(f"results/npy/{strategy}_AA_steps.npy", np.array(self.AA_steps))
+        np.save(f"results/npy/{strategy}_FM_steps.npy", np.array(self.FM_steps))
+        np.save(f"results/npy/{strategy}_BWT_steps.npy", np.array(self.BWT_steps))
+        np.save(f"results/npy/{strategy}_accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
+        np.save(f"results/npy/{strategy}_AA_all.npy", np.array(self.AA_all))
+        np.save(f"results/npy/{strategy}_FM_all.npy", np.array(self.FM_all))
+        np.save(f"results/npy/{strategy}_BWT_all.npy", np.array(self.BWT_all))
+        np.save(f"results/npy/{strategy}_AIA_all.npy", np.array(self.AIA_all))
+        np.save(f"results/npy/{strategy}_episode_rewards.npy", np.array(self.episode_rewards))
+        np.save(f"results/npy/{strategy}_episode_delays.npy", np.array(self.episode_delays))
     
-
 if __name__ == "__main__":
     tester = RLTester()
     tester.test()
