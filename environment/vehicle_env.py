@@ -179,7 +179,7 @@ class VehicleEnvironment:
         # 初始化物理环境
         self._initialize_base_stations()
         self._initialize_environment()
-        self.plot_all_trajectories_and_bs("./results/all_trajectories.png")
+        self.plot_all_trajectories_and_bs("./results/png/all_trajectories.png")
 
     def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png'):
         """绘制所有轨迹"""

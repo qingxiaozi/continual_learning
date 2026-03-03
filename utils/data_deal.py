@@ -64,7 +64,7 @@ for i, row in sampled.iterrows():
     plt.plot(xs, ys, marker='o', markersize=2)
     plt.title(f"Trip {row['TRIP_ID']}\nLength: {row['LENGTH_KM']:.1f}km")
     plt.axis('equal')
-    plt.savefig(f'./results/traj_{i+1}.png', dpi=150, bbox_inches='tight')
+    plt.savefig(f'./results/png/traj_{i+1}.png', dpi=150, bbox_inches='tight')
     plt.close()
 
 print("Done: trajectory.csv saved and 20 plots generated in 'results/' folder.")

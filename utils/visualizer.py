@@ -8,7 +8,7 @@ from datetime import datetime
 class ResultVisualizer:
     """结果可视化类"""
 
-    def __init__(self, save_dir="./results"):
+    def __init__(self, save_dir="./results/png"):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.style_config = {
@@ -317,7 +317,7 @@ class ResultVisualizer:
         data = [AA, FM, BWT, AIA]
         labels = ["AA", "FM", "BWT", "AIA"]
         plt.figure(figsize=(8, 6))
-        plt.boxplot(data, labels=labels)
+        plt.boxplot(data, tick_labels=labels, patch_artist=False)
         plt.ylabel("Metric Value"); plt.title("Episode-level CL Metrics")
         plt.grid(alpha=0.3)
         self._save_fig(filename)

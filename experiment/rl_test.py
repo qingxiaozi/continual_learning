@@ -10,7 +10,7 @@ from utils.visualizer import ResultVisualizer
 
 
 class RLTester:
-    def __init__(self, model_path="./results/trained_drl_model.pth"):
+    def __init__(self, model_path="./results/pth/trained_drl_model.pth"):
         self.env = VehicleEdgeEnv(mode="test")
         self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES)
         self.agent.load_model(model_path)
@@ -126,16 +126,16 @@ class RLTester:
 
 
     def save_results(self):
-        np.save("results/AA_steps.npy", np.array(self.AA_steps))
-        np.save("results/FM_steps.npy", np.array(self.FM_steps))
-        np.save("results/BWT_steps.npy", np.array(self.BWT_steps))
-        np.save("results/accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
-        np.save("results/AA_all.npy", np.array(self.AA_all))
-        np.save("results/FM_all.npy", np.array(self.FM_all))
-        np.save("results/BWT_all.npy", np.array(self.BWT_all))
-        np.save("results/AIA_all.npy", np.array(self.AIA_all))
-        np.save("results/episode_rewards.npy", np.array(self.episode_rewards))
-        np.save("results/episode_delays.npy", np.array(self.episode_delays))
+        np.save("results/npy/AA_steps.npy", np.array(self.AA_steps))
+        np.save("results/npy/FM_steps.npy", np.array(self.FM_steps))
+        np.save("results/npy/BWT_steps.npy", np.array(self.BWT_steps))
+        np.save("results/npy/accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
+        np.save("results/npy/AA_all.npy", np.array(self.AA_all))
+        np.save("results/npy/FM_all.npy", np.array(self.FM_all))
+        np.save("results/npy/BWT_all.npy", np.array(self.BWT_all))
+        np.save("results/npy/AIA_all.npy", np.array(self.AIA_all))
+        np.save("results/npy/episode_rewards.npy", np.array(self.episode_rewards))
+        np.save("results/npy/episode_delays.npy", np.array(self.episode_delays))
     
 
 if __name__ == "__main__":
