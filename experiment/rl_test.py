@@ -145,14 +145,14 @@ class RLTester:
 
     def report_results(self):
         print("\n================ FINAL PAPER RESULTS ================")
+        
+        print("\n[System configure]")
+        print(f"BW: {Config.BANDWIDTH_STRATEGY}")
+        print(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
+        print(f"TRAIN: {Config.TRAINING_STRATEGY}")
 
         def report(name, values):
             print(f"{name}: {np.mean(values):.4f} ± {np.std(values):.4f}")
-
-        print("\n[System configure]")
-        report("BW", Config.BANDWIDTH_STRATEGY)
-        report("UPLOAD", Config.UPLOAD_STRATEGY)
-        report("TRAIN", Config.TRAINING_STRATEGY)
 
         print("\n[Continual Learning Metrics]")
         report("AA", self.AA_all)
