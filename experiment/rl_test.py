@@ -145,13 +145,33 @@ class RLTester:
 
     def report_results(self):
         print("\n================ FINAL PAPER RESULTS ================")
+
+        results = {
+            "config": {
+                "BW": Config.BANDWIDTH_STRATEGY,
+                "UPLOAD": Config.UPLOAD_STRATEGY,
+                "TRAIN": Config.TRAINING_STRATEGY
+            },
+            "metrics": {},
+            "raw_data": {
+                "AA_all": self.AA_all,
+                "FM_all": self.FM_all,
+                "BWT_all": self.BWT_all,
+                "AIA_all": self.AIA_all,
+                "episode_rewards": self.episode_rewards,
+                "episode_delays": self.episode_delays,
+            }
+        }
         
         print("\n[System configure]")
         print(f"BW: {Config.BANDWIDTH_STRATEGY}")
         print(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
         print(f"TRAIN: {Config.TRAINING_STRATEGY}")
 
-        def report(name, values):
+        def report(name, values, category="metrics"):
+            mean_val = float(np.mean(values))
+            std_val = float(np.std(values))
+            results[category][name] = {"mean": mean_val, "std": std_val}
             print(f"{name}: {np.mean(values):.4f} ± {np.std(values):.4f}")
 
         print("\n[Continual Learning Metrics]")
@@ -163,6 +183,9 @@ class RLTester:
         print("\n[System Metrics]")
         report("Mean Reward", self.episode_rewards)
         report("Mean Communication Delay", self.episode_delays)
+
+        return results
+
 
     def save_results(self):
         os.makedirs("results/npy", exist_ok=True)
