@@ -1,20 +1,21 @@
 import json
 import time
 import os
+import pprint
+import traceback
 from config.parameters import Config
 from experiment.rl_env import VehicleEdgeEnv
-
 from models.drl_agent import DRLAgent
 from experiment.rl_test import RLTester, AgentFactory
 
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-        "Base_Static": {
-            "BW": "EQUAL", 
-            "UPLOAD": "STATIC", 
-            "TRAIN": "NEW_ONLY",
-        },
+        # "Base_Static": {
+        #     "BW": "EQUAL", 
+        #     "UPLOAD": "STATIC", 
+        #     "TRAIN": "NEW_ONLY",
+        # },
         "Base_Uniform": {
             "BW": "EQUAL", 
             "UPLOAD": "FIXED_RATIO", 
@@ -76,6 +77,8 @@ def run_experiment(exp_name, config):
         return results
     except Exception as e:
         print(f"Experiment {exp_name} FAILED: {str(e)}")
+        traceback.print_exc()
+        return {"error": str(e), "status": "failed"} 
 
 
 if __name__ == "__main__":
@@ -84,8 +87,8 @@ if __name__ == "__main__":
     # 运行所有实验
     for exp_name, config in EXPERIMENT_CONFIGS.items():
         results = run_experiment(exp_name, config)
-        with open(f"{output_dir}/results_{exp_name}.json", "w") as f:
-            import json
-            json.dump(results, f, indent=4)
+        with open(f"{output_dir}/results_{exp_name}.txt", "w", encoding="utf-8") as f:
+            formatted_text = pprint.pformat(results, width=120, compact=False)
+            f.write(formatted_text + '\n')
     
     print("\n=== All experiments completed! ===")
