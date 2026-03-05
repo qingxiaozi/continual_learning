@@ -42,7 +42,7 @@ class LossGreedyAgent(BaseAgent):
     def __init__(self):
         super().__init__()
         self.local_model = GlobalModel(
-            dataset_name=Config.DATASET_NAMES,
+            dataset_name=Config.CURRENT_DATASET,
             init_mode="random"
         ).to(Config.DEVICE)
 
