@@ -20,8 +20,33 @@ class ContinualLearner:
         current_domain,
         num_epochs,
     ):
-        batches, batch_mapping = self._collect_batches(cache_manager)
+        # 根据 Config.TRAINING_STRATEGY 从缓存中挑选要训练的批次
+        strategy = Config.TRAINING_STRATEGY
+        # 根据策略挑选要训练的批次
+        if strategy == "NEW_ONLY":
+            batches = []
+            for vid in range(Config.NUM_VEHICLES):
+                cache = cache_manager.get_vehicle_cache(vid)
+                batches.extend(cache["new_data"])
+            batch_mapping = None          # 不需要映射和分数
+        elif strategy == "FIXED_RATIO":
+            batches = []
+            for vid in range(Config.NUM_VEHICLES):
+                cache = cache_manager.get_vehicle_cache(vid)
+                old = cache["old_data"]
+                new = cache["new_data"]
+                total = len(old) + len(new)
+                if total > 0:
+                    num_new = int(Config.FIXED_RATIO * total)
+                    batches.extend(new[:num_new])
+                    batches.extend(old[: total - num_new])
+            batch_mapping = None
+        elif strategy == "MAB":
+            batches, batch_mapping = self._collect_batches(cache_manager)
+        else:
+            raise ValueError(f"未知的训练策略: {strategy}")
 
+        # batches, batch_mapping = self._collect_batches(cache_manager)
         if len(batches) == 0:
             return {
                 "loss_before": 1.0,
@@ -32,19 +57,26 @@ class ContinualLearner:
         val_dataset = data_simulator.get_val_dataset(current_domain)
         loss_before = self._compute_loss_on_batches(batches)
 
+        # 如果不是 MAB 策略，把 init_epochs 设为 num_epochs,
+        # trainer 内部就不会进入 selector 采样阶段
+        init_ep = Config.INIT_EPOCHS if strategy == "MAB" else num_epochs
         result = self.trainer.train(
             batches=batches,
             num_epochs=num_epochs,
-            init_epochs=Config.INIT_EPOCHS,
+            init_epochs=init_ep,
             val_dataset=val_dataset,
         )
 
         loss_after = self._compute_loss_on_batches(batches)
-        self._update_cache_quality(
-            cache_manager,
-            batch_mapping,
-            result["selector"],
-        )
+
+        if strategy == "MAB":
+            # 只有 MAB 才更新缓存里对应的质量分数
+            self._update_cache_quality(
+                cache_manager,
+                batch_mapping,
+                result["selector"],
+            )
+            
         return {
             "loss_before": loss_before,
             "loss_after": loss_after,
