@@ -42,7 +42,7 @@ class GlobalModel(nn.Module):
         )
         self.to(self.device)
         print(f"device:{self.device}")
-        print(f"device index:{torch.cuda.current_device()}")
+        # print(f"device index:{torch.cuda.current_device()}")
 
     def reset_parameters(self):
         """"
