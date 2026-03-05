@@ -5,6 +5,7 @@ class Config:
     BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "PROPORTIONAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
     UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "RANDOM", "LOSS_GREEDY", "DRL"]
     TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
+    FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
     NUM_EPISODES = 837  # episode数，根据轨迹数量设置
     NUM_TRAINING_SESSIONS = 21  # train session
