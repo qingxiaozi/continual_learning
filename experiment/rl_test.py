@@ -152,15 +152,7 @@ class RLTester:
                 "UPLOAD": Config.UPLOAD_STRATEGY,
                 "TRAIN": Config.TRAINING_STRATEGY
             },
-            "metrics": {},
-            "raw_data": {
-                "AA_all": self.AA_all,
-                "FM_all": self.FM_all,
-                "BWT_all": self.BWT_all,
-                "AIA_all": self.AIA_all,
-                "episode_rewards": self.episode_rewards,
-                "episode_delays": self.episode_delays,
-            }
+            "metrics": {}
         }
         
         print("\n[System configure]")
