@@ -84,4 +84,4 @@ class LossGreedyAgent(BaseAgent):
                 selected_counts[vid] += 1
                 current_selected_total += 1
 
-        return selected_counts
+        return tuple(selected_counts)
