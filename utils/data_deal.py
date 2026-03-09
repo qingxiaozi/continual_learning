@@ -74,7 +74,7 @@ def split_trajectories_to_segments(
     input_csv: str = './data/PortoTaxi/trajectory.csv',
     train_csv: str = './data/PortoTaxi/train_trajectory.csv',
     test_csv: str = './data/PortoTaxi/test_trajectory.csv',
-    first_segment_km: float = 101.0,
+    first_segment_km: float = 100.0,
     other_segment_km: float = 105.0,
 ):
     """将每条轨迹分割：第一段100km写入训练文件，其余按105km分割写入测试文件。"""
