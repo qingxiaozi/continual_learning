@@ -10,7 +10,7 @@ class Config:
     NUM_EPISODES = 837  # episode数，根据轨迹数量设置
     NUM_TRAINING_SESSIONS = 21  # train session
     TARGET_UPDATE_INTERVAL = 5  # 每10个episode硬更新目标网络
-    NUM_TEST_EPISODES = 70  # 70
+    NUM_TEST_EPISODES = 247  # 70
     NUM_TESTING_SESSIONS = 21
 
     NUM_VEHICLES = 20  # 车辆数
@@ -28,8 +28,6 @@ class Config:
     SHADOWING_STD = 8  # 阴影衰落标准差
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
-
-    # TRAJECTORY_FILE = "trajectory.csv"
 
     # 模型参数
     GOLD_MODEL_ACCURACY = 0.95  # 黄金模型准确率95%
