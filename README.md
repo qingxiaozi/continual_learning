@@ -52,7 +52,7 @@
 ```python
 
 Initialize RL environment (VehicleEdgeEnv)
-Initialize DRL agent (DQN/PPO etc.)
+Initialize DRL agent (DQN)
 For episode in range(NUM_EPISODES):
     state = env.reset()
     for step in range(NUM_SESSIONS):
@@ -90,7 +90,7 @@ for episode in TEST_EPISODES:
 ## 三、评价指标
 1. 持续学习的质量
 AA、AIA、FM、BWT
-1. 系统与通信指标
+2. 系统与通信指标
 每个episode下的reward，平均reward
 每个episode下的通信时延，平均时延
 
