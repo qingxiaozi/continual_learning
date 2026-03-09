@@ -74,10 +74,10 @@ def split_trajectories_to_segments(
     input_csv: str = './data/PortoTaxi/trajectory.csv',
     train_csv: str = './data/PortoTaxi/train_trajectory.csv',
     test_csv: str = './data/PortoTaxi/test_trajectory.csv',
-    segment_km: float = 105.0,
+    first_segment_km: float = 101.0,
+    other_segment_km: float = 105.0,
 ):
-    """将每条轨迹按照指定里程拆分为多个段，
-    第一段写入训练文件，其余段写入测试文件。"""
+    """将每条轨迹分割：第一段100km写入训练文件，其余按105km分割写入测试文件。"""
 
     df_all = pd.read_csv(input_csv)
     train_rows = []
@@ -89,27 +89,61 @@ def split_trajectories_to_segments(
         except Exception:
             continue
 
-        segments = []
-        seg_pts = [pts[0]]
-        seg_len = 0.0
-
-        for p in pts[1:]:
-            d = great_circle(seg_pts[-1][::-1], p[::-1]).km
-            if seg_len + d <= segment_km:
-                seg_pts.append(p)
-                seg_len += d
-            else:
-                segments.append(seg_pts)
-                seg_pts = [seg_pts[-1], p]
-                seg_len = d
-        if seg_pts:
-            segments.append(seg_pts)
-
-        if not segments:
+        if len(pts) < 2:
             continue
 
-        train_rows.append({'TRIP_ID': row['TRIP_ID'], 'POLYLINE': str(segments[0])})
-        for seg in segments[1:]:
+        # 计算轨迹总长度
+        total_length = sum(great_circle(pts[i-1][::-1], pts[i][::-1]).km for i in range(1, len(pts)))
+        if total_length < first_segment_km:
+            continue  # 跳过短轨迹
+
+        # 第一段：100km
+        first_pts = [pts[0]]
+        first_length = 0.0
+        remaining_pts = pts[1:]
+
+        for p in remaining_pts:
+            d = great_circle(first_pts[-1][::-1], p[::-1]).km
+            if first_length + d <= first_segment_km:
+                first_pts.append(p)
+                first_length += d
+            else:
+                break  # 停止第一段
+
+        # 检查第一段长度
+        if len(first_pts) < 2 or first_length < 99:  # 过滤太短的第一段
+            continue
+
+        # 剩余点
+        remaining_pts = pts[len(first_pts)-1:]  # 从第一段最后一个点开始
+
+        # 对剩余部分按105km分割
+        segments = []
+        if remaining_pts:
+            current_pts = [remaining_pts[0]]
+            current_length = 0.0
+            for p in remaining_pts[1:]:
+                d = great_circle(current_pts[-1][::-1], p[::-1]).km
+                if current_length + d <= other_segment_km:
+                    current_pts.append(p)
+                    current_length += d
+                else:
+                    if len(current_pts) >= 2:
+                        seg_length = sum(great_circle(current_pts[i-1][::-1], current_pts[i][::-1]).km for i in range(1, len(current_pts)))
+                        if seg_length >= 100.0:
+                            segments.append(current_pts)
+                    current_pts = [current_pts[-1], p]
+                    current_length = d
+            # 最后一段
+            if len(current_pts) >= 2:
+                seg_length = sum(great_circle(current_pts[i-1][::-1], current_pts[i][::-1]).km for i in range(1, len(current_pts)))
+                if seg_length >= 100.0:
+                    segments.append(current_pts)
+
+        # 第一段给训练
+        train_rows.append({'TRIP_ID': row['TRIP_ID'], 'POLYLINE': str(first_pts)})
+        # 其余段给测试
+        for seg in segments:
             test_rows.append({'TRIP_ID': row['TRIP_ID'], 'POLYLINE': str(seg)})
 
     pd.DataFrame(train_rows)[['TRIP_ID', 'POLYLINE']].to_csv(train_csv, index=False)
