@@ -26,7 +26,7 @@ class VehicleEdgeEnv:
         self.cache_manager = CacheManager()
         self.continual_learner = ContinualLearner(self.global_model, self.gold_model)
         self.vehicle_env = VehicleEnvironment(
-            self.global_model, self.gold_model, self.cache_manager, self.data_simulator
+            self.global_model, self.gold_model, self.cache_manager, self.data_simulator, mode=self.mode
         )
         self.communication_system = CommunicationSystem(self.vehicle_env, self.global_model)
         self.evaluator = ModelEvaluator()
