@@ -153,14 +153,16 @@ class VehicleEnvironment:
     4. 重置环境
     """
 
-    def __init__(self, global_model, gold_model, cache_manager, data_simulator):
+    def __init__(self, global_model, gold_model, cache_manager, data_simulator, mode="train"):
         # 实体集合
         self.vehicles = []  # 车辆对象列表
         self.base_stations = []  # 基站对象列表，字典
         self.current_session = 0  # 当前训练会话编号
         self.environment_time = 0.0  # 环境运行时间(s)
 
-        self.trajectory_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, Config.TRAJECTORY_FILE))
+        # 根据模式选择轨迹文件
+        trajectory_file = "train_trajectory.csv" if mode == "train" else "test_trajectory.csv"
+        self.trajectory_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, trajectory_file))
         self.trajectory_points = None  # 初始为空
         self.trajectory_index = 0  # 轨迹点索引
         self.base_point = [-9.374787, 37.088271]

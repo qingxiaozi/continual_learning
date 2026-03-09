@@ -29,7 +29,7 @@ class Config:
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
 
-    TRAJECTORY_FILE = "trajectory.csv"
+    # TRAJECTORY_FILE = "trajectory.csv"
 
     # 模型参数
     GOLD_MODEL_ACCURACY = 0.95  # 黄金模型准确率95%
