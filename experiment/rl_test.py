@@ -60,6 +60,9 @@ class RLTester:
 
         # Accuracy matrix buffer (paper visualization)
         self.accuracy_matrices = []
+        
+        # 可视化器
+        self.visualizer = ResultVisualizer()
 
     def test(self):
         """测试循环"""
@@ -99,6 +102,21 @@ class RLTester:
                     current_task = self.env.current_domain
                     if current_task not in seen_tasks:
                         seen_tasks.append(current_task)
+                        
+                        # ===== 域切换时调用可视化函数 =====
+                        print(f"\n Visualizing domain shift and data heterogeneity...")
+                        self.visualizer.plot_vehicle_data_heterogeneity(
+                            self.env.data_simulator, 
+                            session=self.env.session,
+                            save_plot=True
+                        )
+                        self.visualizer.plot_tsne_domain_shift(
+                            self.env.global_model,
+                            self.env.data_simulator,
+                            session=self.env.session,
+                            num_samples=500,
+                            save_plot=True
+                        )
 
                     row = []
                     
