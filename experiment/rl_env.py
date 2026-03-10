@@ -217,4 +217,4 @@ class VehicleEdgeEnv:
             available_batches.append(len(vehicle.data_batches))
         state = np.concatenate([state, available_batches], dtype=np.float32)
         return state
-        
+    

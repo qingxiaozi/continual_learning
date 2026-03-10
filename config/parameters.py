@@ -2,7 +2,7 @@ import torch
 
 
 class Config:
-    BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "PROPORTIONAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
+    BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
     UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "RANDOM", "LOSS_GREEDY", "DRL"]
     TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
     FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
@@ -14,10 +14,15 @@ class Config:
     NUM_TESTING_SESSIONS = 21
 
     NUM_VEHICLES = 20  # 车辆数
+    # 模型参数
     NUM_EPOCH = 60  # 训练epoch数
     BATCH_SIZE = 16  # batch size
-    INIT_EPOCHS = 5  # MAB初始探索轮次
+    LEARNING_RATE = 0.001  # 学习率
 
+    # MAB参数
+    INIT_EPOCHS = 5  # MAB初始探索轮次
+    MAB_EXPLORATION_FACTOR = 2.0  # UCB探索因子
+    
     # 通信参数
     BASE_STATION_COVERAGE = 800  # 米，基站覆盖范围（增加到10km以覆盖更多区域）
     BASE_BANDWIDTH = 20e6  # Hz，基础带宽，限制数据上传的速度
@@ -28,14 +33,6 @@ class Config:
     SHADOWING_STD = 8  # 阴影衰落标准差
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
-
-    # 模型参数
-    GOLD_MODEL_ACCURACY = 0.95  # 黄金模型准确率95%
-    LEARNING_RATE = 0.001  # 学习率
-
-    # MAB参数
-    MAB_EXPLORATION_FACTOR = 2.0  # UCB探索因子
-    MAB_MIN_SAMPLES = 5  # 最小样本数
 
     # DRL参数
     DRL_HIDDEN_SIZE = 128  # 神经网络隐藏层的大小
@@ -49,7 +46,6 @@ class Config:
 
     # 缓存参数
     MAX_CACHE_SIZE = 1000  # 边缘服务器的最大缓存批次
-    MIN_CACHE_SIZE = 100  # 边缘服务器的最小缓存批次
     MAX_UPLOAD_BATCHES = 5  # 单阶段最大上传批次
     MAX_LOCAL_BATCHES = 5  # 单个智能车最大缓存批次
 
@@ -85,9 +81,6 @@ class Config:
     TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
     TEST_RATIO = 0.2  # 测试集比例
     VAL_RATIO = 0.2  # 验证集比例
-
-    # 评估参数
-    EVALUATION_FREQUENCY = 5  # 每5个session评估一次
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
