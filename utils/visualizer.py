@@ -3,6 +3,8 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from datetime import datetime
+from sklearn.manifold import TSNE
+from sklearn.preprocessing import StandardScaler
 
 
 class ResultVisualizer:
@@ -262,7 +264,7 @@ class ResultVisualizer:
                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
     def _load_if_exists(self, filename):
-        path = os.path.join(self.save_dir, filename)
+        path = os.path.join(os.path.dirname(self.save_dir), "npy", filename)
         return np.load(path, allow_pickle=True) if os.path.exists(path) else None
 
     def plot_cl_metric_curves(self, AA_steps, FM_steps, BWT_steps, filename="cl_metrics_curve.png"):
@@ -327,6 +329,7 @@ class ResultVisualizer:
         plt.plot(rewards)
         plt.xlabel("Episode"); plt.ylabel("Total Reward")
         plt.title("Episode-level Total Reward")
+        print(f"{filename}")
         self._save_fig(filename)
 
     def plot_episode_delay(self, delays, filename="episode_delay.png"):
@@ -342,37 +345,164 @@ class ResultVisualizer:
         print(f"Saved: {path}")
         plt.close()
 
+    def plot_vehicle_data_heterogeneity(self, data_simulator, session, save_plot=True):
+        """显示车辆-类别样本分布，点大小表示数量"""
+        domain = data_simulator.get_current_domain()
+        key = f"{data_simulator.current_dataset}_{domain}"
+        if key not in data_simulator.vehicle_data_assignments:
+            print(f"No data assignments for {key}")
+            return
+
+        num_classes = data_simulator.dataset_info[data_simulator.current_dataset]["num_classes"]
+        va = data_simulator.vehicle_data_assignments[key]
+        td = data_simulator.train_data_cache[key]
+
+        vehicle_ids, class_ids, sample_counts = [], [], []
+        for vid, idxs in va.items():
+            counts = [0] * num_classes
+            for i in idxs:
+                _, lbl = td[i]
+                counts[lbl] += 1
+            for cls, cnt in enumerate(counts):
+                if cnt:
+                    vehicle_ids.append(vid); class_ids.append(cls); sample_counts.append(cnt)
+
+        if not sample_counts:
+            print(f"No sample data to visualize for session {session}")
+            return
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+        scatter = ax.scatter(
+            vehicle_ids, class_ids,
+            s=[c * 5 + 50 for c in sample_counts],
+            c=sample_counts, cmap="YlOrRd", alpha=0.7,
+            edgecolors="darkred", linewidth=0.8,
+        )
+        ax.set(xlabel="Vehicle ID", ylabel="Class",
+               title=f"Vehicle Data Heterogeneity (Dirichlet Non-IID) - Domain: {domain}, Session {session}")
+        ax.set_xticks(range(data_simulator.num_vehicles))
+        ax.set_yticks(range(num_classes))
+        ax.set_yticklabels([f"C{i}" for i in range(num_classes)], fontsize=9)
+        ax.grid(True, alpha=0.3, linestyle="--")
+        fig.colorbar(scatter, ax=ax, label='Sample Count')
+        plt.tight_layout()
+
+        if save_plot:
+            plot_path = os.path.join(
+                self.save_dir,
+                f"vehicle_data_heterogeneity_domain_{domain}_session_{session}.png",
+            )
+            plt.savefig(plot_path, dpi=150, bbox_inches='tight', facecolor='white')
+            print(f"Vehicle data heterogeneity plot saved to {plot_path}")
+        plt.close()
+
+    def plot_tsne_domain_shift(self, global_model, data_simulator, session, num_samples=500, save_plot=True):
+        """t-SNE 展示已见域间的特征分布差异"""
+        from torch.utils.data import DataLoader
+        import torch
+
+        device = next(global_model.model.parameters()).device
+        global_model.model.eval()
+
+        seen = data_simulator.seen_domains
+        if not seen:
+            print("No domains seen yet")
+            return
+
+        features, labels = [], []
+        for domain in seen:
+            key = f"{data_simulator.current_dataset}_{domain}"
+            dataset = data_simulator.test_data_cache.get(key)
+            if dataset is None:
+                continue
+            loader = DataLoader(dataset, batch_size=64, shuffle=True)
+            collected = 0
+            for imgs, _ in loader:
+                if collected >= num_samples:
+                    break
+                imgs = imgs.to(device)
+                with torch.no_grad():
+                    out = global_model.model(imgs)
+                    if hasattr(out, 'pooler_output'):
+                        feats = out.pooler_output
+                    elif hasattr(out, 'last_hidden_state'):
+                        feats = out.last_hidden_state.mean(dim=1)
+                    else:
+                        feats = out
+                arr = feats.cpu().numpy()
+                take = min(len(arr), num_samples - collected)
+                features.append(arr[:take])
+                labels.extend([domain] * take)
+                collected += take
+
+        if not features:
+            print("No features extracted")
+            return
+
+        all_feats = np.vstack(features)
+        scaled = StandardScaler().fit_transform(all_feats)
+
+        print("Running t-SNE (this may take a while)...")
+        tsne = TSNE(n_components=2, random_state=42,
+                    perplexity=min(30, len(all_feats) - 1), max_iter=1000)
+        emb = tsne.fit_transform(scaled)
+
+        fig, ax = plt.subplots(figsize=(12, 9))
+        colors = plt.cm.tab10(np.linspace(0, 1, len(seen)))
+        for idx, domain in enumerate(seen):
+            mask = np.array(labels) == domain
+            ax.scatter(
+                emb[mask, 0], emb[mask, 1],
+                c=[colors[idx]], label=domain,
+                s=50, alpha=0.6,
+                edgecolors='black', linewidth=0.5,
+            )
+
+        ax.set(xlabel="t-SNE Dimension 1", ylabel="t-SNE Dimension 2",
+               title=f"Domain Shift Visualization (t-SNE) - Session {session}\n"
+                     f"({len(seen)} domains, {len(all_feats)} samples total)")
+        ax.legend(title="Domain", fontsize=10, title_fontsize=11, loc='best', framealpha=0.9)
+        ax.grid(True, alpha=0.3, linestyle='--')
+
+        plt.tight_layout()
+        if save_plot:
+            path = os.path.join(self.save_dir, f"tsne_domain_shift_session_{session}.png")
+            plt.savefig(path, dpi=150, bbox_inches='tight', facecolor='white')
+            print(f"t-SNE domain shift plot saved to {path}")
+        plt.close()
+
+
     def visualize_all(self):
         """加载 results/*.npy 并生成所有可视化图表"""
         # 加载 CL 指标
-        AA_steps = self._load_if_exists("AA_steps.npy")
-        FM_steps = self._load_if_exists("FM_steps.npy")
-        BWT_steps = self._load_if_exists("BWT_steps.npy")
-        acc_matrices = self._load_if_exists("accuracy_matrices.npy")
-        AA_all = self._load_if_exists("AA_all.npy")
-        FM_all = self._load_if_exists("FM_all.npy")
-        BWT_all = self._load_if_exists("BWT_all.npy")
-        AIA_all = self._load_if_exists("AIA_all.npy")
+        # AA_steps = self._load_if_exists("AA_steps.npy")
+        # FM_steps = self._load_if_exists("FM_steps.npy")
+        # BWT_steps = self._load_if_exists("BWT_steps.npy")
+        # acc_matrices = self._load_if_exists("accuracy_matrices.npy")
+        # AA_all = self._load_if_exists("AA_all.npy")
+        # FM_all = self._load_if_exists("FM_all.npy")
+        # BWT_all = self._load_if_exists("BWT_all.npy")
+        # AIA_all = self._load_if_exists("AIA_all.npy")
 
         # 加载系统指标
-        rewards = self._load_if_exists("episode_rewards.npy")
+        rewards = self._load_if_exists("DRL_MINMAX_DELAY_MAB_episode_rewards.npy")
         delays = self._load_if_exists("episode_delays.npy")
 
-        # 绘制 CL 曲线
-        if AA_steps is not None:
-            self.plot_cl_metric_curves(AA_steps, FM_steps, BWT_steps)
+        # # 绘制 CL 曲线
+        # if AA_steps is not None:
+        #     self.plot_cl_metric_curves(AA_steps, FM_steps, BWT_steps)
         
-        # 绘制 Accuracy Matrix（取最后一个 episode 的矩阵）
-        if acc_matrices is not None and len(acc_matrices) > 0:
-            self.plot_accuracy_matrix(acc_matrices)
+        # # 绘制 Accuracy Matrix（取最后一个 episode 的矩阵）
+        # if acc_matrices is not None and len(acc_matrices) > 0:
+        #     self.plot_accuracy_matrix(acc_matrices)
 
-        # 绘制 Boxplot
-        if AA_all is not None:
-            self.plot_episode_boxplot(AA_all, FM_all, BWT_all, AIA_all)
+        # # 绘制 Boxplot
+        # if AA_all is not None:
+        #     self.plot_episode_boxplot(AA_all, FM_all, BWT_all, AIA_all)
 
         # 绘制系统指标
         if rewards is not None:
-            self.plot_episode_reward(rewards)
+            self.plot_episode_reward(rewards, filename="DRL_MINMAX_DELAY_MAB_episode_reward.png")
         if delays is not None:
             self.plot_episode_delay(delays)
 
