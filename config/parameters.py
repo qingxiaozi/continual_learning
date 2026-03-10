@@ -36,10 +36,10 @@ class Config:
 
     # DRL参数
     DRL_HIDDEN_SIZE = 128  # 神经网络隐藏层的大小
-    DRL_LEARNING_RATE = 0.001  # 优化器的学习率
+    DRL_LEARNING_RATE = 0.0001  # 优化器的学习率
     DRL_GAMMA = 0.99  # 折扣因子
     DRL_BUFFER_SIZE = 10000  # 经验回放缓冲区大小
-    DRL_BATCH_SIZE = 8  # batch size
+    DRL_BATCH_SIZE = 32  # batch size
     DRL_EPSILON_START = 0.9
     DRL_EPSILON_END = 0.05
     DRL_EPSILON_DECAY = 80  # epsilon衰减速率
