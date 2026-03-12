@@ -67,63 +67,75 @@ class PrioritizedReplayBuffer:
         self.priorities = np.zeros(capacity, dtype=np.float32)
         self.position = 0
         self.size = 0
+        self._sum_priorities = 0.0  # 保持优先级和，避免每次求和
 
     def push(self, state, actions, reward, next_state, done, td_error=None):
-        """存储经验，带初始优先级"""
+        """存储经验，带初始优先级。
+        返回插入/覆盖的位置索引，便于调用者随后更新该条优先级。
+        如果 td_error 提供为 None，则使用默认优先值 1.0。
+        """
         priority = (abs(td_error) + 1e-5) ** self.alpha if td_error is not None else 1.0
 
         if self.size < self.capacity:
             self.buffer.append((state, actions, reward, next_state, done))
+            self._sum_priorities += priority
         else:
+            # 替换旧条目时调整和
+            old_p = self.priorities[self.position]
             self.buffer[self.position] = (state, actions, reward, next_state, done)
+            self._sum_priorities += priority - old_p
 
-        self.priorities[self.position] = priority
+        idx = self.position
+        self.priorities[idx] = priority
         self.position = (self.position + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
+        return idx
 
     def sample(self, batch_size):
-        """根据优先级采样批次"""
+        """根据优先级采样批次
+
+        返回 tuple:
+            (states, actions, rewards, next_states, dones, indices, weights)
+        如果缓存不足，返回 None。
+        本实现避免了 Python 循环，通过 numpy 索引一次性提取。
+        """
         if self.size < batch_size:
             return None
 
-        # 计算采样概率
+        # 计算采样概率并根据它抽取索引
         priorities = self.priorities[: self.size]
-        probs = priorities / priorities.sum()
-
-        # 根据概率采样索引
+        total_p = self._sum_priorities if self._sum_priorities > 0 else priorities.sum()
+        if total_p == 0:
+            probs = np.ones(self.size, dtype=np.float32) / self.size
+        else:
+            probs = priorities / total_p
         indices = np.random.choice(self.size, batch_size, p=probs)
 
-        # 计算重要性采样权重
-        total = self.size * probs[indices]
-        weights = total**-self.beta
-        weights = weights / weights.max()  # 归一化
-        self.beta = min(1.0, self.beta + self.beta_increment)  # 增加beta
+        # 重要性采样权重
+        weights = (self.size * probs[indices]) ** -self.beta
+        weights /= weights.max()
+        self.beta = min(1.0, self.beta + self.beta_increment)
 
-        # 提取样本
-        states, actions, rewards, next_states, dones = [], [], [], [], []
-        for idx in indices:
-            state, action, reward, next_state, done = self.buffer[idx]
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            next_states.append(next_state)
-            dones.append(done)
+        # 批量提取样本；利用 zip(*) 和 numpy.stack 加速
+        batch = [self.buffer[i] for i in indices]
+        states, actions, rewards, next_states, dones = zip(*batch)
+        states = np.stack(states).astype(np.float32)
+        actions = np.stack(actions).astype(np.int64)
+        rewards = np.stack(rewards).astype(np.float32)
+        next_states = np.stack(next_states).astype(np.float32)
+        dones = np.stack(dones).astype(np.uint8)  # bool -> uint8 避免 torch warning
 
-        return (
-            np.array(states, dtype=np.float32),
-            np.array(actions, dtype=np.int64),
-            np.array(rewards, dtype=np.float32),
-            np.array(next_states, dtype=np.float32),
-            np.array(dones, dtype=np.bool_),
-            indices,
-            weights,
-        )
+        return states, actions, rewards, next_states, dones, indices, weights
 
     def update_priorities(self, indices, td_errors):
-        """更新样本的优先级"""
-        for idx, td_error in zip(indices, td_errors):
-            priority = (abs(td_error) + 1e-5) ** self.alpha
-            self.priorities[idx] = priority
+        """批量更新样本的优先级，使用 numpy 索引避免 Python 循环
+        同时调整内部优先级和，用于快速采样概率计算。
+        """
+        new_prios = (np.abs(td_errors) + 1e-5) ** self.alpha
+        # 旧优先级之和
+        old_prios = self.priorities[indices]
+        self.priorities[indices] = new_prios
+        self._sum_priorities += new_prios.sum() - old_prios.sum()
 
     def __len__(self):
         return self.size
@@ -242,41 +254,39 @@ class DRLAgent(BaseAgent):
         # 批次动作转换为张量 [batch_size, num_vehicles]
         batch_actions = torch.tensor(batch_actions, dtype=torch.long, device=self.device)
 
-        # 收集所有车辆的TD误差
-        batch_td_errors = []
-        total_loss = 0.0
+        # 计算所有车辆的Q值一次
+        # states: [batch_size, state_dim]
+        # q_values: [batch_size, num_vehicles, num_batch_choices]
+        q_values = self.policy_net(states)
 
-        for v in range(self.num_vehicles):
-            # 获取该车辆的动作
-            vehicle_actions = batch_actions[:, v]  # [batch_size]
+        # 选择过的动作
+        # batch_actions: [batch_size, num_vehicles]
+        chosen_q = q_values.gather(2, batch_actions.unsqueeze(2)).squeeze(2)  # [batch_size, num_vehicles]
 
-            # 计算当前Q值
-            current_q = self.policy_net(states)[:, v, :]  # [batch_size, num_batch_choices]
-            chosen_q = current_q.gather(1, vehicle_actions.unsqueeze(1)).squeeze(1)  # [batch_size]
+        # Double DQN：先选动作再评估
+        with torch.no_grad():
+            next_q_policy = self.policy_net(next_states)  # [batch, num_vehicles, num_batch_choices]
+            next_actions = next_q_policy.argmax(dim=2, keepdim=True)  # [batch, num_vehicles, 1]
 
-            # Double DQN：使用policy_net选择动作，target_net评估
-            with torch.no_grad():
-                # 选择下一个状态的最佳动作（根据policy_net）
-                next_q_policy = self.policy_net(next_states)[:, v, :]  # [batch_size, num_batch_choices]
-                next_actions = next_q_policy.argmax(dim=1, keepdim=True)  # [batch_size, 1]
+            next_q_target = self.target_net(next_states)  # [batch, num_vehicles, num_batch_choices]
+            next_max_q = next_q_target.gather(2, next_actions).squeeze(2)  # [batch, num_vehicles]
 
-                # 评估这些动作的Q值（根据target_net）
-                next_q_target = self.target_net(next_states)[:, v, :]  # [batch_size, num_batch_choices]
-                next_max_q = next_q_target.gather(1, next_actions).squeeze(1)  # [batch_size]
+            # 计算目标Q值，注意dones扩展维度并转float
+            target_q = rewards.unsqueeze(1) + self.gamma * next_max_q * (~dones).float().unsqueeze(1)
 
-                # 计算目标Q值
-                target_q = rewards + self.gamma * next_max_q * (~dones)  # [batch_size]
+        # TD误差
+        td_errors = target_q - chosen_q  # [batch, num_vehicles]
+        # 用最大绝对误差更新优先级（与原实现一致）
+        batch_td_errors = td_errors.detach().cpu().numpy()
+        avg_td_errors = np.max(np.abs(batch_td_errors), axis=1)
 
-            # 计算TD误差和损失
-            td_errors = target_q - chosen_q
-            batch_td_errors.append(td_errors.detach().cpu().numpy())
-
-            # 使用重要性采样权重
-            loss = (td_errors ** 2 * weights).mean()
-            total_loss += loss
-
-        # 平均损失
-        loss = total_loss / self.num_vehicles
+        # 损失计算：使用huber并加权
+        huber_loss = torch.nn.functional.smooth_l1_loss(
+            chosen_q,
+            target_q,
+            reduction='none'
+        )  # [batch, num_vehicles]
+        loss = (huber_loss * weights.unsqueeze(1)).mean()
 
         # 优化
         self.optimizer.zero_grad()
@@ -287,8 +297,7 @@ class DRLAgent(BaseAgent):
 
         self.optimizer.step()
 
-        # 更新经验优先级
-        avg_td_errors = np.mean(np.array(batch_td_errors), axis=0)
+        # 更新经验优先级（使用之前计算的每条样本最大绝对TD误差）
         self.memory.update_priorities(indices, avg_td_errors)
 
         # 软更新目标网络
