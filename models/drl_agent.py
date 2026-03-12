@@ -54,88 +54,66 @@ class DRLNetwork(nn.Module):
 
 
 class PrioritizedReplayBuffer:
-    """优先经验回放缓冲区（非均匀采样）"""
-
-    def __init__(
-        self, capacity=Config.DRL_BUFFER_SIZE, alpha=0.6, beta=0.4, beta_increment=0.001
-    ):
+    def __init__(self, capacity=Config.DRL_BUFFER_SIZE, alpha=0.6, beta=0.4, beta_increment=0.001):
         self.capacity = capacity
-        self.alpha = alpha  # 优先级指数
-        self.beta = beta  # 重要性采样权重指数
+        self.alpha = alpha
+        self.beta = beta
         self.beta_increment = beta_increment
         self.buffer = []
         self.priorities = np.zeros(capacity, dtype=np.float32)
         self.position = 0
         self.size = 0
-        self._sum_priorities = 0.0  # 保持优先级和，避免每次求和
 
     def push(self, state, actions, reward, next_state, done, td_error=None):
-        """存储经验，带初始优先级。
-        返回插入/覆盖的位置索引，便于调用者随后更新该条优先级。
-        如果 td_error 提供为 None，则使用默认优先值 1.0。
-        """
         priority = (abs(td_error) + 1e-5) ** self.alpha if td_error is not None else 1.0
-
+        
         if self.size < self.capacity:
             self.buffer.append((state, actions, reward, next_state, done))
-            self._sum_priorities += priority
         else:
-            # 替换旧条目时调整和
-            old_p = self.priorities[self.position]
             self.buffer[self.position] = (state, actions, reward, next_state, done)
-            self._sum_priorities += priority - old_p
 
-        idx = self.position
-        self.priorities[idx] = priority
+        self.priorities[self.position] = priority
         self.position = (self.position + 1) % self.capacity
         self.size = min(self.size + 1, self.capacity)
-        return idx
+        return self.position
 
     def sample(self, batch_size):
-        """根据优先级采样批次
-
-        返回 tuple:
-            (states, actions, rewards, next_states, dones, indices, weights)
-        如果缓存不足，返回 None。
-        本实现避免了 Python 循环，通过 numpy 索引一次性提取。
-        """
         if self.size < batch_size:
             return None
 
-        # 计算采样概率并根据它抽取索引
-        priorities = self.priorities[: self.size]
-        total_p = self._sum_priorities if self._sum_priorities > 0 else priorities.sum()
+        priorities = self.priorities[:self.size]
+        total_p = priorities.sum()
+        
         if total_p == 0:
             probs = np.ones(self.size, dtype=np.float32) / self.size
         else:
             probs = priorities / total_p
+            
+        # 强制归一化，防止浮点误差
+        probs /= probs.sum() 
+
         indices = np.random.choice(self.size, batch_size, p=probs)
 
-        # 重要性采样权重
         weights = (self.size * probs[indices]) ** -self.beta
         weights /= weights.max()
         self.beta = min(1.0, self.beta + self.beta_increment)
 
-        # 批量提取样本；利用 zip(*) 和 numpy.stack 加速
         batch = [self.buffer[i] for i in indices]
         states, actions, rewards, next_states, dones = zip(*batch)
-        states = np.stack(states).astype(np.float32)
-        actions = np.stack(actions).astype(np.int64)
-        rewards = np.stack(rewards).astype(np.float32)
-        next_states = np.stack(next_states).astype(np.float32)
-        dones = np.stack(dones).astype(np.uint8)  # bool -> uint8 避免 torch warning
-
-        return states, actions, rewards, next_states, dones, indices, weights
+        
+        return (
+            np.stack(states).astype(np.float32),
+            np.stack(actions).astype(np.int64),
+            np.stack(rewards).astype(np.float32),
+            np.stack(next_states).astype(np.float32),
+            np.stack(dones).astype(np.uint8),
+            indices,
+            weights
+        )
 
     def update_priorities(self, indices, td_errors):
-        """批量更新样本的优先级，使用 numpy 索引避免 Python 循环
-        同时调整内部优先级和，用于快速采样概率计算。
-        """
         new_prios = (np.abs(td_errors) + 1e-5) ** self.alpha
-        # 旧优先级之和
-        old_prios = self.priorities[indices]
         self.priorities[indices] = new_prios
-        self._sum_priorities += new_prios.sum() - old_prios.sum()
 
     def __len__(self):
         return self.size
