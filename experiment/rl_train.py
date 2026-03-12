@@ -18,7 +18,7 @@ class RLTrainer:
 
         wandb.init(
             project="Vehicle-Edge-DRL", 
-            name=f"Run_Ep{Config.NUM_EPISODES}",
+            name=f"Run_Episodes_{Config.NUM_EPISODES}",
             config={
                 "num_episodes": self.num_episodes,
                 "max_timesteps": self.max_timesteps,
@@ -60,8 +60,8 @@ class RLTrainer:
 
                 if loss is not None:
                     wandb.log({
-                        "loss/raw": loss,
-                        "step/global": global_step
+                        "DRL train loss": loss,
+                        "global step": global_step
                     })
 
                 total_reward += reward
@@ -76,10 +76,10 @@ class RLTrainer:
             # 记录 Episode 级汇总 (仅 Reward, Delay, Epsilon)
             wandb.log({
                 "episode": episode + 1,
-                "reward/total": total_reward,
-                "metrics/avg_delay": total_delay / max(t + 1, 1),
-                "params/epsilon": self.agent._get_epsilon(),
-                "step/global": global_step
+                "DRL reward": total_reward,
+                "DRL avg_delay": total_delay / max(t + 1, 1),
+                "DRL epsilon": self.agent._get_epsilon(),
+                "global step": global_step
             })
 
             # 下面两行可以不要，先放着吧
