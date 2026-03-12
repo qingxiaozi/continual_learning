@@ -155,7 +155,7 @@ class VehicleEdgeEnv:
     def _calculate_reward(self, comm, train, total_samples):
         loss_reduction = train.get("loss_before", 1.0) - train.get("loss_after", 1.0)
         delay = comm["total_delay"]
-        return loss_reduction / (delay + 1e-3) * (total_samples + 1e-3) if delay > 0 and total_samples > 0 else 0.0
+        return loss_reduction / ((delay + 1e-3) * (total_samples + 1e-3)) if delay > 0 and total_samples > 0 else 0.0
     
     def _update_session_environment(self):
         """更新会话和环境状态"""
