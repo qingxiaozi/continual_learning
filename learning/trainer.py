@@ -92,11 +92,11 @@ class EpochTrainer:
             inputs, targets = self._prepare_batch(batch)
 
             # ===== loss before =====
-            # with torch.no_grad():
-            #     outputs_before = self.model(inputs)
-            #     loss_before = criterion(
-            #         outputs_before, targets
-            #     )
+            with torch.no_grad():
+                outputs_before = self.model(inputs)
+                loss_before = criterion(
+                    outputs_before, targets
+                )
             # ===== update =====
             outputs = self.model(inputs)
             loss = self.loss_fn(outputs, targets, self.model)
@@ -116,7 +116,7 @@ class EpochTrainer:
                 )
 
             if use_mab:
-                reward = - loss_after.item()
+                reward = loss_before.item() - loss_after.item()
                 selector.update(idx, reward)
 
         return total_loss / max(num_steps, 1)
