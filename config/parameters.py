@@ -3,7 +3,7 @@ import torch
 
 class Config:
     BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
-    UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "RANDOM", "LOSS_GREEDY", "DRL"]
+    UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "LOSS_GREEDY", "DRL"]
     TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
     FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
@@ -43,6 +43,8 @@ class Config:
     DRL_EPSILON_START = 0.9
     DRL_EPSILON_END = 0.05
     DRL_EPSILON_DECAY = 80  # epsilon衰减速率
+    DRL_TARGET_UPDATE_EVERY = 100  # 目标网络更新频率
+    DRL_TAU = 0.005  # 软更新参数
 
     # 缓存参数
     MAX_CACHE_SIZE = 1000  # 边缘服务器的最大缓存批次
@@ -84,3 +86,10 @@ class Config:
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 车辆环境参数
+    PPP_RADIUS = 200  # PPP生成半径（米）
+    PPP_LAMBDA = 0.001  # 单位面积车辆密度（辆/平方米）
+    PPP_LAMBDA_BS = 3  # 单位面积基站密度（个/平方公里）
+    MIN_BS_DISTANCE = 500.0  # 宏基站最小间距（米）
+    VEHICLE_SPEED_FACTOR = 20.0  # 车辆速度因子（m/s），用于计算移动距离
