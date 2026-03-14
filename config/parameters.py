@@ -1,4 +1,5 @@
 import torch
+import random
 
 
 class Config:
@@ -99,15 +100,15 @@ class Config:
     MIN_BS_DISTANCE = 500.0  # 宏基站最小间距（米）
     VEHICLE_SPEED_FACTOR = 20.0  # 车辆速度因子（m/s），用于计算移动距离
 
-@staticmethod
-def set_seed():
-    """设置全局种子以保证实验可复现"""
-    if seed is None:
-        seed = Config.RANDOM_SEED
-    random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+    @staticmethod
+    def set_seed(seed=None):
+        """设置全局种子以保证实验可复现"""
+        if seed is None:
+            seed = Config.RANDOM_SEED
+        random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
