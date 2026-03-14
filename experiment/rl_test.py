@@ -1,5 +1,6 @@
 from collections import defaultdict
 import os
+import wandb
 import torch
 import itertools
 import numpy as np
@@ -68,6 +69,20 @@ class RLTester:
         """测试循环"""
         print("testing...")
 
+        run_name = f"{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}"
+        self.wandb_run = wandb.init(
+            project="Vehicle-Edge-CL-Testing",
+            name=run_name,
+            config={
+                "upload_strategy": Config.UPLOAD_STRATEGY,
+                "bandwidth_strategy": Config.BANDWIDTH_STRATEGY,
+                "training_strategy": Config.TRAINING_STRATEGY,
+                "num_episodes": self.num_episodes,
+                "max_timesteps": self.max_timesteps
+            },
+            reinit=True  # 允许在同一个进程中多次 init
+        )
+
         for episode in range(self.num_episodes):
             print(f"\n===== Test Episode {episode+1}/{self.num_episodes} =====")
             state = self.env.reset()
@@ -103,20 +118,20 @@ class RLTester:
                     if current_task not in seen_tasks:
                         seen_tasks.append(current_task)
                         
-                        # ===== 域切换时调用可视化函数 =====
-                        print(f"\n Visualizing domain shift and data heterogeneity...")
-                        self.visualizer.plot_vehicle_data_heterogeneity(
-                            self.env.data_simulator, 
-                            session=self.env.session,
-                            save_plot=True
-                        )
-                        self.visualizer.plot_tsne_domain_shift(
-                            self.env.global_model,
-                            self.env.data_simulator,
-                            session=self.env.session,
-                            num_samples=500,
-                            save_plot=True
-                        )
+                        # # ===== 域切换时调用可视化函数 =====
+                        # print(f"\n Visualizing domain shift and data heterogeneity...")
+                        # self.visualizer.plot_vehicle_data_heterogeneity(
+                        #     self.env.data_simulator, 
+                        #     session=self.env.session,
+                        #     save_plot=True
+                        # )
+                        # self.visualizer.plot_tsne_domain_shift(
+                        #     self.env.global_model,
+                        #     self.env.data_simulator,
+                        #     session=self.env.session,
+                        #     num_samples=500,
+                        #     save_plot=True
+                        # )
 
                     row = []
                     
@@ -157,8 +172,27 @@ class RLTester:
             self.episode_rewards.append(total_reward)
             self.episode_delays.append(np.mean(step_delays))
 
+            # Log to wandb for each episode
+            self.wandb_run.log({
+                "episode": episode,
+                "episode_reward": total_reward,
+                "episode_delay": np.mean(step_delays),
+                "episode_AA": final_metrics["AA"],
+                "episode_FM": final_metrics["FM"],
+                "episode_BWT": final_metrics["BWT"],
+                "episode_AIA": AIA
+            })
+
         results_dict =self.report_results()
         self.save_results()
+
+        wandb.log({
+            "CL_Curves/AA_Steps": self.AA_steps,
+            "CL_Curves/FM_Steps": self.FM_steps,
+            "CL_Curves/BWT_Steps": self.BWT_steps
+        })
+        self.wandb_run.finish()
+        
         return results_dict
 
     def report_results(self):
