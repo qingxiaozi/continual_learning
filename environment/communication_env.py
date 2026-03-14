@@ -36,9 +36,9 @@ class CommunicationSystem:
         self.batch_size = Config.BATCH_SIZE  # samples per batch
 
         # 计算参数
-        self.c_golden = 2e6  # 黄金模型处理一个样本的计算周期数，1
-        self.c_global = 5e6  # 全局模型处理一个样本的计算周期数，1
-        self.C_edge = 2e10  # C，边缘服务器计算能力（Cycles/s），20GHZ
+        self.c_golden = Config.GOLDEN_MODEL_CYCLES  # 黄金模型处理一个样本的计算周期数
+        self.c_global = Config.GLOBAL_MODEL_CYCLES  # 全局模型处理一个样本的计算周期数
+        self.C_edge = Config.EDGE_COMPUTE_CAPACITY  # C，边缘服务器计算能力（Cycles/s）
 
         # 训练参数
         self.training_epochs = Config.NUM_EPOCH  # E，训练轮次

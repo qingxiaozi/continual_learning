@@ -10,6 +10,7 @@ class EpochTrainer:
     """训练器，负责模型step训练过程"""
 
     def __init__(self, model, gold_model):
+        Config.set_seed()
         self.model = model
         self.gold_model = gold_model
         self.device = Config.DEVICE

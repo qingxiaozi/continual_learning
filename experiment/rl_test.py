@@ -37,6 +37,7 @@ class AgentFactory:
 
 class RLTester:
     def __init__(self):
+        Config.set_seed()
         self.env = VehicleEdgeEnv(mode="test")
         dummy_state = self.env.reset() 
         state_dim = dummy_state.shape[0]

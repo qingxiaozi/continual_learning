@@ -2,6 +2,8 @@ import torch
 
 
 class Config:
+    RANDOM_SEED = 42  # 随机种子，用于可复现实验
+    
     BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
     UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "LOSS_GREEDY", "DRL"]
     TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
@@ -33,6 +35,9 @@ class Config:
     SHADOWING_STD = 8  # 阴影衰落标准差
     INTERFERENCE_POWER = 1e-11  # 干扰功率
     REFERENCE_GAIN = 1e-3  # 参考距离（1m)处的路径增益
+    GOLDEN_MODEL_CYCLES = 2e6  # 黄金模型处理一个样本的计算周期数
+    GLOBAL_MODEL_CYCLES = 5e6  # 全局模型处理一个样本的计算周期数
+    EDGE_COMPUTE_CAPACITY = 2e10  # 边缘服务器计算能力（Cycles/s），20GHz
 
     # DRL参数
     DRL_HIDDEN_SIZE = 128  # 神经网络隐藏层的大小
@@ -93,3 +98,16 @@ class Config:
     PPP_LAMBDA_BS = 3  # 单位面积基站密度（个/平方公里）
     MIN_BS_DISTANCE = 500.0  # 宏基站最小间距（米）
     VEHICLE_SPEED_FACTOR = 20.0  # 车辆速度因子（m/s），用于计算移动距离
+
+@staticmethod
+def set_seed():
+    """设置全局种子以保证实验可复现"""
+    if seed is None:
+        seed = Config.RANDOM_SEED
+    random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
