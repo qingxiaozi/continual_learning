@@ -127,7 +127,7 @@ class DRLAgent(BaseAgent):
         self.num_vehicles = Config.NUM_VEHICLES
         self.num_batch_choices = Config.MAX_UPLOAD_BATCHES + 1
         # 网络
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = Config.DEVICE
         self.policy_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
         self.target_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
         self.policy_net.to(self.device)
@@ -308,5 +308,5 @@ class DRLAgent(BaseAgent):
         if torch.cuda.is_available():
             checkpoint = torch.load(path)
         else:
-            checkpoint = torch.load(path, map_location=torch.device('cpu'))
+            checkpoint = torch.load(path, map_location=Config.DEVICE)
         self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
