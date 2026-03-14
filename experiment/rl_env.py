@@ -1,4 +1,3 @@
-from xml.parsers.expat import model
 from learning.evaluator import ModelEvaluator
 import torch
 import random
