@@ -168,9 +168,9 @@ class VehicleEnvironment:
         self.base_point = [-9.374787, 37.088271]
 
         # PPP参数
-        self.ppp_radius = 200  # PPP生成半径（米）
-        self.ppp_lambda = 0.001  # 单位面积车辆密度（辆/平方米）
-        self.ppp_lambda_bs = 3 # 单位面积基站密度（个/平方公里）
+        self.ppp_radius = Config.PPP_RADIUS
+        self.ppp_lambda = Config.PPP_LAMBDA
+        self.ppp_lambda_bs = Config.PPP_LAMBDA_BS
 
         # 初始化数据环境
         self.data_simulator = data_simulator
@@ -274,8 +274,8 @@ class VehicleEnvironment:
         # ========= 1. 所有轨迹点 → UTM =========
         lons, lats = zip(*points)
         traj_utm = self._convert_to_cartesian(lons, lats)
-        LAMBDA_MACRO = self.ppp_lambda_bs / 1e6       # 3 BS / km² → BS / m²
-        MIN_BS_DISTANCE = 500.0        # 宏基站最小间距（m）
+        LAMBDA_MACRO = Config.PPP_LAMBDA_BS / 1e6       # 3 BS / km² → BS / m²
+        MIN_BS_DISTANCE = Config.MIN_BS_DISTANCE
 
         # ========= 3. 沿轨迹缓冲区生成 PPP 候选基站 =========
         bs_candidates = []
@@ -456,7 +456,7 @@ class VehicleEnvironment:
             print(f"车辆已行驶至终点")
             return
 
-        distance = 20.0 * time_delta
+        distance = Config.VEHICLE_SPEED_FACTOR * time_delta
         idx, accumulated = self.trajectory_index, 0.0
 
         # 累加距离找到目标点
