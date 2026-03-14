@@ -127,5 +127,5 @@ class EpochTrainer:
         else:
             x = batch
             with torch.no_grad():
-                y = self.gold_model(x).argmax(dim=1)
+                y = self.gold_model.model(x).argmax(dim=1)
         return x.to(self.device), y.to(self.device)
