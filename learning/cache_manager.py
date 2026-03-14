@@ -68,22 +68,24 @@ class CacheManager:
         total_size = len(cache["old_data"]) + len(cache["new_data"])
 
         if total_size > self.max_size:
-            # 移除质量最低的旧数据
             excess = total_size - self.max_size
+            has_mapping = isinstance(cache["batch_mapping"], list) and len(cache["batch_mapping"]) > 0
+
             if cache["quality_scores"] and len(cache["old_data"]) > 0:
-                # 基于质量评分移除
                 quality_indices = np.argsort(cache["quality_scores"])[:excess]
                 for idx in sorted(quality_indices, reverse=True):
                     if idx < len(cache["old_data"]):
                         cache["old_data"].pop(idx)
                         cache["quality_scores"].pop(idx)
+                        if has_mapping and idx < len(cache["batch_mapping"]):
+                            cache["batch_mapping"].pop(idx)
             else:
-                # 随机移除
                 remove_count = min(excess, len(cache["old_data"]))
                 cache["old_data"] = cache["old_data"][remove_count:]
-                # 同时移除对应的质量评分
                 if cache["quality_scores"]:
                     cache["quality_scores"] = cache["quality_scores"][remove_count:]
+                if has_mapping:
+                    cache["batch_mapping"] = cache["batch_mapping"][remove_count:]
 
             print(
                 f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
@@ -103,8 +105,15 @@ class CacheManager:
             return
 
         cache = self.caches[vehicle_id]
+        num_new = len(cache["new_data"])
+        if num_new == 0:
+            return
+        
         cache["old_data"].extend(cache["new_data"])
         cache["new_data"] = []
+        cache["quality_scores"].extend([0.0] * num_new)
+        if isinstance(cache["batch_mapping"], list):
+            cache["batch_mapping"].extend([None] * num_new)
 
     def get_cache_stats(self):
         """获取缓存统计信息"""
