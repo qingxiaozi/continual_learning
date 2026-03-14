@@ -1,7 +1,10 @@
+import logging
 import numpy as np
 from scipy.optimize import minimize
 from typing import List, Optional, Dict, Tuple
 from config.parameters import Config
+
+logger = logging.getLogger(__name__)
 
 
 class BandwidthAllocator:
@@ -144,7 +147,7 @@ class BandwidthAllocator:
 
         except Exception as e:
             # 如果优化失败，回退到按K值比例分配
-            print(f"优化失败: {e}, 使用按比例分配")
+            logger.warning(f"优化失败: {e}, 使用按比例分配")
             total_K = np.sum(K_values)
             if total_K > 0:
                 bandwidth_ratios = K_values / total_K

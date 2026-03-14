@@ -1,9 +1,12 @@
 from learning.evaluator import ModelEvaluator
+import logging
 import torch
 import random
 import numpy as np
 from torch.utils.data import DataLoader
 from config.parameters import Config
+
+logger = logging.getLogger(__name__)
 from environment.communication_env import CommunicationSystem
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 from environment.vehicle_env import VehicleEnvironment
@@ -174,7 +177,7 @@ class VehicleEdgeEnv:
         # 为车辆生成新数据
         available_batches = self._refresh_vehicle_data()
         self.current_domain = current_domain
-        print(f"\n 环境更新完成 - 当前域: {current_domain}")
+        logger.info(f"\n 环境更新完成 - 当前域: {current_domain}")
 
         return available_batches
 

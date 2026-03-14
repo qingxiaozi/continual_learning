@@ -1,5 +1,7 @@
+import logging
 import numpy as np
 from config.parameters import Config
+logger = logging.getLogger(__name__)
 
 
 class CacheManager:
@@ -46,7 +48,7 @@ class CacheManager:
             if len(quality_scores) == len(cache["old_data"]):
                 cache["quality_scores"] = quality_scores
             else:
-                print(f"警告: 车辆 {vehicle_id} 质量评分数量不匹配")
+                logger.warning(f"车辆 {vehicle_id} 质量评分数量不匹配")
                 # 如果数量不匹配，只更新前min(len, len)个
                 min_len = min(len(quality_scores), len(cache["old_data"]))
                 cache["quality_scores"] = quality_scores[:min_len]
@@ -87,7 +89,7 @@ class CacheManager:
                 if has_mapping:
                     cache["batch_mapping"] = cache["batch_mapping"][remove_count:]
 
-            print(
+            logger.debug(
                 f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
                 f"剩余 {len(cache['old_data'])} 个旧批次, {len(cache['quality_scores'])} 个质量评分"
             )
@@ -130,4 +132,4 @@ class CacheManager:
     def reset(self):
         """重置缓存管理器"""
         self.caches = {}
-        print("缓存重置完成")
+        logger.debug("缓存重置完成")

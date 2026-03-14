@@ -1,3 +1,4 @@
+import logging
 import os
 import torch
 import torch.nn as nn
@@ -7,6 +8,8 @@ from config.parameters import Config
 from config.paths import Paths
 from environment.dataSimu_env import DomainIncrementalDataSimulator
 from torchvision.models import resnet18, ResNet18_Weights
+
+logger = logging.getLogger(__name__)
 
 
 class GoldModel:
@@ -21,7 +24,7 @@ class GoldModel:
 
         if os.path.exists(self.model_path):
             self.load_model()
-            print(f"加载已训练的黄金模型: {self.model_path}")
+            logger.info(f"加载已训练的黄金模型: {self.model_path}")
         else:
             print(
                 f"未找到预训练黄金模型，需要先进行微调,运行fine_tune(train_dataset, val_dataset)函数即可"
@@ -85,10 +88,10 @@ class GoldModel:
             train_dataset：训练数据集
             val_dataset：验证数据集（可选）
         """
-        print(f"开始微调黄金模型，数据集：{self.dataset_name}")
-        print(f"类别数：{self.num_classes}")
-        print(f"训练集样本数：{len(train_dataset)}")
-        print(f"测试集样本数：{len(val_dataset)}")
+        logger.info(f"开始微调黄金模型，数据集：{self.dataset_name}")
+        logger.info(f"类别数：{self.num_classes}")
+        logger.info(f"训练集样本数：{len(train_dataset)}")
+        logger.info(f"测试集样本数：{len(val_dataset)}")
 
         self.fine_tune_epochs = 45
         self.learning_rate = Config.LEARNING_RATE
@@ -161,7 +164,7 @@ class GoldModel:
             )
 
             if val_loader:
-                print(f", Val Acc: {val_accuracy:.2f}%")
+                logger.info(f", Val Acc: {val_accuracy:.2f}%")
 
                 if val_accuracy > best_val_accuracy:
                     best_val_accuracy = val_accuracy
@@ -171,11 +174,11 @@ class GoldModel:
 
         if not val_loader:
             self.save_model()
-        print(f"黄金模型微调完成，保存到: {self.model_path}")
+        logger.info(f"黄金模型微调完成，保存到: {self.model_path}")
 
         if val_loader:
             final_val_accuracy = self.evaluate(val_loader)
-            print(f"最终验证准确率: {final_val_accuracy:.2f}%")
+            logger.info(f"最终验证准确率: {final_val_accuracy:.2f}%")
 
     def save_model(self):
         """保存模型"""
@@ -224,14 +227,14 @@ if __name__ == "__main__":
     train_dataset, val_dataset = torch.utils.data.random_split(
         full_train_dataset, [train_size, val_size]
     )
-    print(data_simulator.current_dataset)
+    logger.info(data_simulator.current_dataset)
     golden_model = GoldModel(data_simulator.current_dataset)
         # 如果模型未加载（即文件不存在），则自动进行微调
     if not os.path.exists(golden_model.model_path):
-        print("开始自动微调黄金模型...")
+        logger.info("开始自动微调黄金模型...")
         golden_model.fine_tune(train_dataset, val_dataset)
     else:
-        print("黄金模型已存在，跳过训练。")
+        logger.info("黄金模型已存在，跳过训练。")
         # # 可选：验证一下加载的模型性能
         # val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
         # final_val_acc = golden_model.evaluate(val_loader)

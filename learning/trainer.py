@@ -1,7 +1,10 @@
+import logging
 import torch
 from learning.losses import ElasticNetLoss
 from learning.mab_selector import MABDataSelector
 from config.parameters import Config
+
+logger = logging.getLogger(__name__)
 from learning.evaluator import ModelEvaluator
 from torch.utils.data import DataLoader
 
@@ -27,7 +30,7 @@ class EpochTrainer:
 
     def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=5):
         """训练模型"""
-        print(f"training......")
+        logger.info(f"training......")
         selector = MABDataSelector(num_arms=len(batches))
         best_state = self.model.state_dict()
         best_val = float("inf")
@@ -66,7 +69,7 @@ class EpochTrainer:
 
                     if patience_cnt >= patience:
                         break
-            print(log_msg)
+            logger.info(log_msg)
         self.model.load_state_dict(best_state)
 
         return {

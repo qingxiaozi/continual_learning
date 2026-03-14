@@ -126,7 +126,7 @@ class DomainIncrementalDataSimulator:
             distribution = np.random.dirichlet(alpha)
             self.class_distributions[class_idx] = distribution
 
-        print(f"初始化{num_vehicles}辆车的数据分配")
+        logger.info(f"初始化{num_vehicles}辆车的数据分配")
 
     def get_current_domain(self):
         """
@@ -148,7 +148,7 @@ class DomainIncrementalDataSimulator:
         # 自动管理seen_domains
         if new_domain not in self.seen_domains:
             self.seen_domains.append(new_domain)
-            print(f"新域 {new_domain} 已加入已见域")
+            logger.info(f"新域 {new_domain} 已加入已见域")
 
         # 域是否发生变化
         domain_changed = (old_domain != new_domain)

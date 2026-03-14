@@ -1,8 +1,11 @@
+import logging
 import torch
 import wandb
 import numpy as np
 from config.parameters import Config
 from config.paths import Paths
+
+logger = logging.getLogger(__name__)
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.visualizer import ResultVisualizer
@@ -34,7 +37,7 @@ class RLTrainer:
                 "buffer_size": Config.DRL_BUFFER_SIZE,
             }
         )
-        print(f"WandB 监控已启动: {wandb.run.url}")
+        logger.info(f"WandB 监控已启动: {wandb.run.url}")
 
     def train(self):
         """训练循环"""
@@ -90,9 +93,9 @@ class RLTrainer:
             # 定期更新目标网络
             if episode % Config.TARGET_UPDATE_INTERVAL == 0:
                 self.agent.hard_update_target_network()
-                print(f"已更新目标网络 (Episode {episode+1})")
+                logger.info(f"已更新目标网络 (Episode {episode+1})")
 
-            print(f"Episode {episode + 1}/{self.num_episodes}, Total Reward: {total_reward:.4f}")
+            logger.info(f"Episode {episode + 1}/{self.num_episodes}, Total Reward: {total_reward:.4f}")
 
         # 训练完成后保存模型
         self.agent.save_model(Paths.TRAINED_DRL_MODEL_PATH)

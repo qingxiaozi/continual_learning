@@ -1,4 +1,5 @@
 from collections import defaultdict
+import logging
 import os
 import wandb
 import torch
@@ -6,6 +7,8 @@ import itertools
 import numpy as np
 from config.parameters import Config
 from config.paths import Paths
+
+logger = logging.getLogger(__name__)
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.metrics import IncrementalMetricsCalculator
@@ -69,7 +72,7 @@ class RLTester:
 
     def test(self):
         """测试循环"""
-        print("testing...")
+        logger.info("testing...")
 
         run_name = f"{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}"
         self.wandb_run = wandb.init(
@@ -86,7 +89,7 @@ class RLTester:
         )
 
         for episode in range(self.num_episodes):
-            print(f"\n===== Test Episode {episode+1}/{self.num_episodes} =====")
+            logger.info(f"\n===== Test Episode {episode+1}/{self.num_episodes} =====")
             state = self.env.reset()
             total_reward = 0
             step_delays = []
@@ -198,7 +201,7 @@ class RLTester:
         return results_dict
 
     def report_results(self):
-        print("\n================ FINAL PAPER RESULTS ================")
+        logger.info("\n================ FINAL PAPER RESULTS ================")
 
         results = {
             "config": {
@@ -209,10 +212,10 @@ class RLTester:
             "metrics": {}
         }
         
-        print("\n[System configure]")
-        print(f"BW: {Config.BANDWIDTH_STRATEGY}")
-        print(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
-        print(f"TRAIN: {Config.TRAINING_STRATEGY}")
+        logger.info("\n[System configure]")
+        logger.info(f"BW: {Config.BANDWIDTH_STRATEGY}")
+        logger.info(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
+        logger.info(f"TRAIN: {Config.TRAINING_STRATEGY}")
 
         def report(name, values, category="metrics"):
             mean_val = float(np.mean(values))
@@ -220,13 +223,13 @@ class RLTester:
             results[category][name] = {"mean": mean_val, "std": std_val}
             print(f"{name}: {np.mean(values):.4f} ± {np.std(values):.4f}")
 
-        print("\n[Continual Learning Metrics]")
+        logger.info("\n[Continual Learning Metrics]")
         report("AA", self.AA_all)
         report("FM", self.FM_all)
         report("BWT", self.BWT_all)
         report("AIA", self.AIA_all)
 
-        print("\n[System Metrics]")
+        logger.info("\n[System Metrics]")
         report("Mean Reward", self.episode_rewards)
         report("Mean Communication Delay", self.episode_delays)
 

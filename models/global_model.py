@@ -1,3 +1,4 @@
+import logging
 import os
 import torch
 import torch.nn as nn
@@ -6,6 +7,8 @@ from config.parameters import Config
 from config.paths import Paths
 from learning.evaluator import ModelEvaluator
 from torch.utils.data import DataLoader
+
+logger = logging.getLogger(__name__)
 
 class GlobalModel(nn.Module):
     """
@@ -41,7 +44,7 @@ class GlobalModel(nn.Module):
             self.model.fc.in_features, self.num_classes
         )
         self.to(self.device)
-        print(f"device:{self.device}")
+        logger.info(f"device:{self.device}")
         # print(f"device index:{torch.cuda.current_device()}")
 
     def reset_parameters(self):
@@ -56,7 +59,7 @@ class GlobalModel(nn.Module):
         elif self.init_mode == "random":
             pass  # 已是随机初始化
         else:
-            print("未找到预训练全局模型，使用随机初始化")
+            logger.info("未找到预训练全局模型，使用随机初始化")
 
     def get_state(self):
         """用于 RL / 联邦同步"""

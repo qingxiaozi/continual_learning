@@ -1,7 +1,10 @@
+import logging
 import numpy as np
 import torch
 from config.parameters import Config
 from config.paths import Paths
+
+logger = logging.getLogger(__name__)
 from collections import defaultdict
 from pyproj import Transformer, CRS
 import matplotlib.pyplot as plt
@@ -537,18 +540,18 @@ class VehicleEnvironment:
                 state.extend([confidence, test_loss, quality_score])
 
             except Exception as e:
-                print(f"Error getting state for vehicle {vehicle.id}: {e}")
+                logger.debug(f"Error getting state for vehicle {vehicle.id}: {e}")
                 state.extend([0.5, 1.0, 0])
 
         return np.array(state, dtype=np.float32)
 
     def reset(self):
         """重置环境"""
-        print("重置车辆环境...")
+        logger.debug("重置车辆环境...")
         self.environment_time = 0.0
         self.trajectory_index = 0
         self._initialize_environment()
-        print("环境重置完成")
+        logger.debug("环境重置完成")
 
 if __name__ == "__main__":
     """测试车辆位置更新"""
