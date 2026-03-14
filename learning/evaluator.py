@@ -16,7 +16,7 @@ class ModelEvaluator:
             model: PyTorch 模型
             dataloader: 包含 (inputs, labels) 的 DataLoader
         Returns:
-            dict: {"accuracy": float, "loss": float}
+            tuple: (accuracy: float, loss: float)
         """
         model.eval()
         total_loss = 0.0
@@ -32,7 +32,9 @@ class ModelEvaluator:
                 _, predicted = torch.max(outputs, 1)
                 correct_predictions += (predicted == labels).sum().item()
                 total_samples += inputs.size(0)
-
+                
+        if total_samples ==0:
+            return 0.0, 0.0
         average_loss = total_loss / total_samples
         accuracy = correct_predictions / total_samples
 
