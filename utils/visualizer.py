@@ -5,12 +5,13 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
+from config.paths import Paths
 
 
 class ResultVisualizer:
     """结果可视化类"""
 
-    def __init__(self, save_dir="./results/png"):
+    def __init__(self, save_dir=Paths.RESULTS_PNG_DIR):
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
         self.style_config = {

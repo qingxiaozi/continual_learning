@@ -2,6 +2,7 @@ import torch
 import wandb
 import numpy as np
 from config.parameters import Config
+from config.paths import Paths
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.visualizer import ResultVisualizer
@@ -94,9 +95,9 @@ class RLTrainer:
             print(f"Episode {episode + 1}/{self.num_episodes}, Total Reward: {total_reward:.4f}")
 
         # 训练完成后保存模型
-        self.agent.save_model("./results/pth/trained_drl_model.pth")
+        self.agent.save_model(Paths.TRAINED_DRL_MODEL_PATH)
         artifact = wandb.Artifact("final-drl-model", type="model")
-        artifact.add_file("./results/pth/trained_drl_model.pth")
+        artifact.add_file(Paths.TRAINED_DRL_MODEL_PATH)
         wandb.log_artifact(artifact)
         wandb.finish()
 

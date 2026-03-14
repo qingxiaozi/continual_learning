@@ -4,6 +4,7 @@ import os
 import pprint
 import traceback
 from config.parameters import Config
+from config.paths import Paths
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from experiment.rl_test import RLTester, AgentFactory
@@ -82,7 +83,7 @@ def run_experiment(exp_name, config):
 
 
 if __name__ == "__main__":
-    output_dir = f"./results/com_exp"
+    output_dir = Paths.RESULTS_COM_EXP_DIR
     os.makedirs(output_dir, exist_ok=True)
     # 运行所有实验
     for exp_name, config in EXPERIMENT_CONFIGS.items():

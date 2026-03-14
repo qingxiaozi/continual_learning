@@ -5,6 +5,7 @@ import torch
 import itertools
 import numpy as np
 from config.parameters import Config
+from config.paths import Paths
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.metrics import IncrementalMetricsCalculator
@@ -27,7 +28,7 @@ class AgentFactory:
             return LossGreedyAgent()
         elif upload_strategy == "DRL":
             agent = DRLAgent(state_dim)
-            agent.load_model("./results/pth/trained_drl_model.pth")
+            agent.load_model(Paths.TRAINED_DRL_MODEL_PATH)
             agent.set_eval_mode()
             return agent
         else:
@@ -232,18 +233,18 @@ class RLTester:
 
 
     def save_results(self):
-        os.makedirs("results/npy", exist_ok=True)
+        os.makedirs(Paths.RESULTS_NPY_DIR, exist_ok=True)
         prefix = f"{Config.UPLOAD_STRATEGY}_{Config.BANDWIDTH_STRATEGY}_{Config.TRAINING_STRATEGY}"
-        np.save(f"results/npy/{prefix}_AA_steps.npy", np.array(self.AA_steps))
-        np.save(f"results/npy/{prefix}_FM_steps.npy", np.array(self.FM_steps))
-        np.save(f"results/npy/{prefix}_BWT_steps.npy", np.array(self.BWT_steps))
-        np.save(f"results/npy/{prefix}_accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
-        np.save(f"results/npy/{prefix}_AA_all.npy", np.array(self.AA_all))
-        np.save(f"results/npy/{prefix}_FM_all.npy", np.array(self.FM_all))
-        np.save(f"results/npy/{prefix}_BWT_all.npy", np.array(self.BWT_all))
-        np.save(f"results/npy/{prefix}_AIA_all.npy", np.array(self.AIA_all))
-        np.save(f"results/npy/{prefix}_episode_rewards.npy", np.array(self.episode_rewards))
-        np.save(f"results/npy/{prefix}_episode_delays.npy", np.array(self.episode_delays))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_AA_steps.npy", np.array(self.AA_steps))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_FM_steps.npy", np.array(self.FM_steps))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_BWT_steps.npy", np.array(self.BWT_steps))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_accuracy_matrices.npy", np.array(self.accuracy_matrices, dtype=object))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_AA_all.npy", np.array(self.AA_all))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_FM_all.npy", np.array(self.FM_all))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_BWT_all.npy", np.array(self.BWT_all))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_AIA_all.npy", np.array(self.AIA_all))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_episode_rewards.npy", np.array(self.episode_rewards))
+        np.save(f"{Paths.RESULTS_NPY_DIR}/{prefix}_episode_delays.npy", np.array(self.episode_delays))
     
 if __name__ == "__main__":
     tester = RLTester()
