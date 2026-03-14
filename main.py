@@ -90,33 +90,21 @@ def run_experiment(exp_name, config):
 
 
 if __name__ == "__main__":
-    import concurrent.futures
-    import multiprocessing
-    
     output_dir = Paths.RESULTS_COM_EXP_DIR
     os.makedirs(output_dir, exist_ok=True)
     
-    def run_and_save(args):
-        exp_name, config = args
-        results = run_experiment(exp_name, config)
+    for exp_name, config in EXPERIMENT_CONFIGS.items():
+        Config.BANDWIDTH_STRATEGY = config["BW"]
+        Config.UPLOAD_STRATEGY = config["UPLOAD"]
+        Config.TRAINING_STRATEGY = config["TRAIN"]
+        
+        tester = RLTester()
+        results = tester.test()
+        
         with open(f"{output_dir}/results_{exp_name}.txt", "w", encoding="utf-8") as f:
             formatted_text = pprint.pformat(results, width=120, compact=False)
             f.write(formatted_text + '\n')
-        return exp_name, results
-    
-    # 运行所有实验（8个进程并行）
-    with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
-        futures = {
-            executor.submit(run_and_save, (exp_name, config)): exp_name 
-            for exp_name, config in EXPERIMENT_CONFIGS.items()
-        }
         
-        for future in concurrent.futures.as_completed(futures):
-            exp_name = futures[future]
-            try:
-                future.result()
-                logger.info(f"Experiment {exp_name} completed")
-            except Exception as e:
-                logger.error(f"Experiment {exp_name} failed: {e}")
+        logger.info(f"Experiment {exp_name} completed")
     
     logger.info("\n=== All experiments completed! ===")
