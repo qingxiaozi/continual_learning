@@ -91,8 +91,8 @@ class GoldModel:
         print(f"测试集样本数：{len(val_dataset)}")
 
         self.fine_tune_epochs = 45
-        self.learning_rate = 0.001
-        self.batch_size = 32
+        self.learning_rate = Config.LEARNING_RATE
+        self.batch_size = Config.BATCH_SIZE
 
         train_loader = DataLoader(
             train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4

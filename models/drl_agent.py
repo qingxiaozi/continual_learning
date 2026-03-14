@@ -147,8 +147,8 @@ class DRLAgent(BaseAgent):
         # 超参数
         self.gamma = Config.DRL_GAMMA
         self.batch_size = Config.DRL_BATCH_SIZE
-        self.update_target_every = 100
-        self.tau = 0.005  # 软更新参数
+        self.update_target_every = Config.DRL_TARGET_UPDATE_EVERY
+        self.tau = Config.DRL_TAU
 
         # epsilon-greedy参数
         self.epsilon_start = Config.DRL_EPSILON_START
@@ -310,6 +310,3 @@ class DRLAgent(BaseAgent):
         else:
             checkpoint = torch.load(path, map_location=torch.device('cpu'))
         self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
-        # self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
-        # self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        # self.steps_done = checkpoint.get("steps_done", 0)
