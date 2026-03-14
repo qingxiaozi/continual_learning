@@ -83,13 +83,31 @@ def run_experiment(exp_name, config):
 
 
 if __name__ == "__main__":
+    import concurrent.futures
+    
     output_dir = Paths.RESULTS_COM_EXP_DIR
     os.makedirs(output_dir, exist_ok=True)
-    # 运行所有实验
-    for exp_name, config in EXPERIMENT_CONFIGS.items():
+    
+    def run_and_save(exp_name, config):
         results = run_experiment(exp_name, config)
         with open(f"{output_dir}/results_{exp_name}.txt", "w", encoding="utf-8") as f:
             formatted_text = pprint.pformat(results, width=120, compact=False)
             f.write(formatted_text + '\n')
+        return exp_name, results
     
-    print("\n=== All experiments completed! ===")
+    # 运行所有实验（8个线程并行）
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {
+            executor.submit(run_and_save, exp_name, config): exp_name 
+            for exp_name, config in EXPERIMENT_CONFIGS.items()
+        }
+        
+        for future in concurrent.futures.as_completed(futures):
+            exp_name = futures[future]
+            try:
+                future.result()
+                logger.info(f"Experiment {exp_name} completed")
+            except Exception as e:
+                logger.error(f"Experiment {exp_name} failed: {e}")
+    
+    logger.info("\n=== All experiments completed! ===")
