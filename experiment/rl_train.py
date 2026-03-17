@@ -21,7 +21,7 @@ class RLTrainer:
         self.episode_rewards = []
 
         wandb.init(
-            project="Vehicle-Edge-DRL", 
+            project=f"Vehicle-Edge-DRL_{Config.CURRENT_DATASET}", 
             name=f"Run_Episodes_{Config.NUM_EPISODES}",
             config={
                 "num_episodes": self.num_episodes,
@@ -98,9 +98,9 @@ class RLTrainer:
             logger.info(f"Episode {episode + 1}/{self.num_episodes}, Total Reward: {total_reward:.4f}")
 
         # 训练完成后保存模型
-        self.agent.save_model(Paths.TRAINED_DRL_MODEL_PATH)
+        self.agent.save_model(Paths.get_drl_model_path())
         artifact = wandb.Artifact("final-drl-model", type="model")
-        artifact.add_file(Paths.TRAINED_DRL_MODEL_PATH)
+        artifact.add_file(Paths.get_drl_model_path())
         wandb.log_artifact(artifact)
         wandb.finish()
 
