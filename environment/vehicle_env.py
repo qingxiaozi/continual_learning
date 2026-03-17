@@ -488,7 +488,7 @@ class VehicleEnvironment:
             if nearest_bs and len(nearest_bs["connected_vehicles"]) < nearest_bs["capacity"]:
                 vehicle.set_bs_connection(nearest_bs["id"])
                 nearest_bs["connected_vehicles"].append(vehicle.id)
-                print(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
+                logger.info(f"Vehicle {vehicle.id} connected to Base Station {nearest_bs['id']}")
             else:
                 vehicle.set_bs_connection(None)
 
