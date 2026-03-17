@@ -31,7 +31,7 @@ class AgentFactory:
             return LossGreedyAgent()
         elif upload_strategy == "DRL":
             agent = DRLAgent(state_dim)
-            agent.load_model(Paths.TRAINED_DRL_MODEL_PATH)
+            agent.load_model(Paths.get_drl_model_path())
             agent.set_eval_mode()
             return agent
         else:
@@ -76,7 +76,7 @@ class RLTester:
 
         run_name = f"{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}"
         self.wandb_run = wandb.init(
-            project="Vehicle-Edge-CL-Testing",
+            project=f"Vehicle-Edge-CL-Testing_{Config.CURRENT_DATASET}",
             name=run_name,
             config={
                 "upload_strategy": Config.UPLOAD_STRATEGY,

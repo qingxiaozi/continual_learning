@@ -90,7 +90,7 @@ def run_experiment(exp_name, config):
 
 
 if __name__ == "__main__":
-    output_dir = Paths.RESULTS_COM_EXP_DIR
+    output_dir = Paths.get_dataset_dir("com_exp")
     os.makedirs(output_dir, exist_ok=True)
     
     for exp_name, config in EXPERIMENT_CONFIGS.items():
