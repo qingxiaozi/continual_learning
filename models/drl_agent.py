@@ -122,7 +122,7 @@ class PrioritizedReplayBuffer:
 class DRLAgent(BaseAgent):
     """深度强化学习策略，独立决策DQN"""
 
-    def __init__(self, state_dim, use_multi_gpu=False):
+    def __init__(self, state_dim):
         self.state_dim = state_dim
         self.num_vehicles = Config.NUM_VEHICLES
         self.num_batch_choices = Config.MAX_UPLOAD_BATCHES + 1
@@ -130,13 +130,6 @@ class DRLAgent(BaseAgent):
         self.device = Config.DEVICE
         self.policy_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
         self.target_net = DRLNetwork(state_dim, self.num_vehicles, self.num_batch_choices)
-        
-        # 多GPU支持
-        self.use_multi_gpu = use_multi_gpu and torch.cuda.device_count() > 1
-        if self.use_multi_gpu:
-            self.policy_net = torch.nn.DataParallel(self.policy_net)
-            self.target_net = torch.nn.DataParallel(self.target_net)
-        
         self.policy_net.to(self.device)
         self.target_net.to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -200,12 +193,7 @@ class DRLAgent(BaseAgent):
         state_tensor = torch.tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
 
         with torch.no_grad():
-            q_values = self.policy_net(state_tensor)
-            # 处理 DataParallel 输出：取第一个 GPU 的结果
-            if self.use_multi_gpu:
-                q_values = q_values[0].squeeze(0)  # [num_vehicles, num_batch_choices]
-            else:
-                q_values = q_values.squeeze(0)  # [num_vehicles, num_batch_choices]
+            q_values = self.policy_net(state_tensor).squeeze(0)  # [num_vehicles, num_batch_choices]
 
         batch_choices = []
         for v in range(self.num_vehicles):
@@ -246,12 +234,8 @@ class DRLAgent(BaseAgent):
 
         # 计算所有车辆的Q值一次
         # states: [batch_size, state_dim]
-        # q_values: [batch_size, num_vehicles, num_batch_choices] 或 [num_gpus, batch_size, ...] (DataParallel)
+        # q_values: [batch_size, num_vehicles, num_batch_choices]
         q_values = self.policy_net(states)
-        
-        # 处理 DataParallel 输出
-        if self.use_multi_gpu:
-            q_values = q_values[0]  # [batch_size, num_vehicles, num_batch_choices]
 
         # 选择过的动作
         # batch_actions: [batch_size, num_vehicles]
@@ -261,14 +245,8 @@ class DRLAgent(BaseAgent):
         with torch.no_grad():
             next_q_policy = self.policy_net(next_states)  # [batch, num_vehicles, num_batch_choices]
             next_actions = next_q_policy.argmax(dim=2, keepdim=True)  # [batch, num_vehicles, 1]
-            
-            if self.use_multi_gpu:
-                next_q_policy = next_q_policy[0]
 
             next_q_target = self.target_net(next_states)  # [batch, num_vehicles, num_batch_choices]
-            if self.use_multi_gpu:
-                next_q_target = next_q_target[0]
-                
             next_max_q = next_q_target.gather(2, next_actions).squeeze(2)  # [batch, num_vehicles]
 
             # 计算目标Q值，注意dones扩展维度并转float
@@ -318,13 +296,9 @@ class DRLAgent(BaseAgent):
 
     def save_model(self, path):
         """保存模型"""
-        # 如果使用多GPU，取原始网络的状态字典（去除module.前缀）
-        policy_state = self.policy_net.module.state_dict() if self.use_multi_gpu else self.policy_net.state_dict()
-        target_state = self.target_net.module.state_dict() if self.use_multi_gpu else self.target_net.state_dict()
-        
         torch.save({
-            "policy_net_state_dict": policy_state,
-            "target_net_state_dict": target_state,
+            "policy_net_state_dict": self.policy_net.state_dict(),
+            "target_net_state_dict": self.target_net.state_dict(),
             "optimizer_state_dict": self.optimizer.state_dict(),
             "steps_done": self.steps_done,
         }, path)
@@ -336,4 +310,3 @@ class DRLAgent(BaseAgent):
         else:
             checkpoint = torch.load(path, map_location=Config.DEVICE)
         self.policy_net.load_state_dict(checkpoint["policy_net_state_dict"])
-        self.target_net.load_state_dict(checkpoint["target_net_state_dict"])
