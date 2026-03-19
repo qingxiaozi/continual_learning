@@ -10,7 +10,7 @@ class Config:
     TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
     FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
-    NUM_EPISODES = 1120  # episode数，office31:837; digit10:1120; domainnet:1680
+    NUM_EPISODES = 837  # episode数，office31:837; digit10:1120; domainnet:1680
     NUM_TRAINING_SESSIONS = 28  # train session，office31:21; digit10:28; domainnet:42
     TARGET_UPDATE_INTERVAL = 5  # 每5个episode硬更新目标网络
     NUM_TEST_EPISODES = 200  # 200
