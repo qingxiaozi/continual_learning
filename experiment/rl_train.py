@@ -12,16 +12,6 @@ import numpy as np
 from config.parameters import Config
 from config.paths import Paths
 
-# 启用 cuDNN benchmark 加速
-torch.backends.cudnn.benchmark = True
-
-# 设置多GPU并行
-if torch.cuda.device_count() > 1:
-    print(f"Using {torch.cuda.device_count()} GPUs for training!")
-    USE_MULTI_GPU = True
-else:
-    USE_MULTI_GPU = False
-
 logger = logging.getLogger(__name__)
 from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
@@ -31,7 +21,7 @@ from utils.visualizer import ResultVisualizer
 class RLTrainer:
     def __init__(self):
         self.env = VehicleEdgeEnv(mode="train")
-        self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES, use_multi_gpu=USE_MULTI_GPU)
+        self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES)
         self.visualizer = ResultVisualizer()
         self.num_episodes = Config.NUM_EPISODES
         self.max_timesteps = Config.NUM_TRAINING_SESSIONS
@@ -59,7 +49,6 @@ class RLTrainer:
     def train(self):
         """训练循环"""
         global_step = 0  # 全局步数，用于 X 轴对齐
-        training_interval = 4  # 每隔 4 个 step 训练一次
         
         for episode in range(self.num_episodes):
             state = self.env.reset()
@@ -77,15 +66,14 @@ class RLTrainer:
                 # 存储经验
                 self.agent.store_experience(state, action, reward, next_state, done)
 
-                # 每隔 4 个 step 优化一次模型
-                if (global_step + 1) % training_interval == 0:
-                    loss = self.agent.optimize_model()
+                # 优化模型
+                loss = self.agent.optimize_model()
 
-                    if loss is not None:
-                        wandb.log({
-                            "DRL train loss": loss,
-                            "global step": global_step
-                        })
+                if loss is not None:
+                    wandb.log({
+                        "DRL train loss": loss,
+                        "global step": global_step
+                    })
 
                 total_reward += reward
                 if 'comm' in info:
