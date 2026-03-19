@@ -77,6 +77,8 @@ class Config:
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
     # 数据路径
     DATA_BASE_PATH = "./data"
+    USE_SAMPLED_DATA = True  # 是否使用采样数据集
+    SAMPLED_DATA_PATH = "./data/digit10_sample"  # 采样数据集路径
     # 数据集特定参数
     OFFICE31_CLASSES = 31
     DIGIT10_CLASSES = 10

@@ -51,7 +51,7 @@ class DomainIncrementalDataSimulator:
             "digit10": {
                 "num_classes": Config.DIGIT10_CLASSES,
                 "domains": ["mnist", "emnist", "usps", "svhn"],
-                "base_path": os.path.join(Config.DATA_BASE_PATH, "digit10"),
+                "base_path": Config.SAMPLED_DATA_PATH if Config.USE_SAMPLED_DATA else os.path.join(Config.DATA_BASE_PATH, "digit10"),
                 "dataset_class": Digit10Dataset,
             },
             "domainnet": {
