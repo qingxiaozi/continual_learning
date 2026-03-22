@@ -39,4 +39,4 @@ class Paths:
     @staticmethod
     def get_drl_model_path():
         dataset_name = Config.CURRENT_DATASET
-        return os.path.join(Paths.RESULTS_PTH_DIR, f"trained_drl_model_{dataset_name}.pth")
+        return os.path.join(Paths.RESULTS_PTH_DIR, dataset_name, f"trained_drl_model_{dataset_name}.pth")
