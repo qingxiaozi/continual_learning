@@ -72,6 +72,25 @@ EXPERIMENT_CONFIGS = {
         }
     }
 
+import multiprocessing as mp
+
+# 必须在任何多进程代码或 CUDA 初始化之前调用
+mp.set_start_method('spawn', force=True)
+
+    
+def run_and_save(exp_name, config):
+    Config.BANDWIDTH_STRATEGY = config["BW"]
+    Config.UPLOAD_STRATEGY = config["UPLOAD"]
+    Config.TRAINING_STRATEGY = config["TRAIN"]
+        
+    tester = RLTester()
+    results = tester.test()
+
+    with open(f"{output_dir}/results_{exp_name}.txt", "w", encoding="utf-8") as f:
+        formatted_text = pprint.pformat(results, width=120, compact=False)
+        f.write(formatted_text + '\n')
+    return exp_name, results
+
 def run_experiment(exp_name, config):
     print(f"\n=== Running Experiment: {exp_name} ===")
     
@@ -93,25 +112,13 @@ def run_experiment(exp_name, config):
 if __name__ == "__main__":
     import concurrent.futures
     import multiprocessing
+    ctx = mp.get_context('spawn')
     
     output_dir = Paths.RESULTS_COM_EXP_DIR
     os.makedirs(output_dir, exist_ok=True)
     
-    def run_and_save(exp_name, config):
-        Config.BANDWIDTH_STRATEGY = config["BW"]
-        Config.UPLOAD_STRATEGY = config["UPLOAD"]
-        Config.TRAINING_STRATEGY = config["TRAIN"]
-        
-        tester = RLTester()
-        results = tester.test()
-
-        with open(f"{output_dir}/results_{exp_name}.txt", "w", encoding="utf-8") as f:
-            formatted_text = pprint.pformat(results, width=120, compact=False)
-            f.write(formatted_text + '\n')
-        return exp_name, results
-    
     # 运行所有实验（8个进程并行）
-    with concurrent.futures.ProcessPoolExecutor(max_workers=16) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=16, mp_context=ctx) as executor:
         futures = {
             executor.submit(run_and_save, exp_name, config): exp_name 
             for exp_name, config in EXPERIMENT_CONFIGS.items()
