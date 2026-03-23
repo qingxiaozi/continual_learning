@@ -78,7 +78,7 @@ import multiprocessing as mp
 mp.set_start_method('spawn', force=True)
 
     
-def run_and_save(exp_name, config):
+def run_and_save(exp_name, config, output_dir):
     Config.BANDWIDTH_STRATEGY = config["BW"]
     Config.UPLOAD_STRATEGY = config["UPLOAD"]
     Config.TRAINING_STRATEGY = config["TRAIN"]
@@ -114,13 +114,13 @@ if __name__ == "__main__":
     import multiprocessing
     ctx = mp.get_context('spawn')
     
-    output_dir = Paths.RESULTS_COM_EXP_DIR
+    output_dir = Paths.get_dataset_dir('com_exp')
     os.makedirs(output_dir, exist_ok=True)
     
     # 运行所有实验（8个进程并行）
     with concurrent.futures.ProcessPoolExecutor(max_workers=16, mp_context=ctx) as executor:
         futures = {
-            executor.submit(run_and_save, exp_name, config): exp_name 
+            executor.submit(run_and_save, exp_name, config, output_dir): exp_name 
             for exp_name, config in EXPERIMENT_CONFIGS.items()
         }
         
