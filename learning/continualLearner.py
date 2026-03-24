@@ -106,6 +106,7 @@ class ContinualLearner:
         等价于 main.py 中 _compute_weighted_loss_on_uploaded_data
         """
         total_loss = 0.0
+        total_samples = 0
         criterion = torch.nn.CrossEntropyLoss()
 
         self.model.eval()
@@ -123,9 +124,10 @@ class ContinualLearner:
                 loss = criterion(outputs, targets)
                 #所有batch上的“样本级总交叉熵损失”
                 total_loss += loss.item() * inputs.shape[0]
+                total_samples += inputs.shape[0]
 
         self.model.train()
-        return total_loss if total_loss > 0 else 1.0
+        return total_loss / total_samples if total_samples > 0 else 1.0
 
     def _update_cache_quality(self, cache_manager, batch_mapping, mab_selector):
         quality_scores = mab_selector.get_quality_scores()
