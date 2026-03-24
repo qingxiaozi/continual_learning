@@ -28,24 +28,11 @@ class GlobalModel(nn.Module):
         self.num_classes = self._get_num_classes(dataset_name)
         self.device = Config.DEVICE
         self.init_mode = init_mode
-
         self.model_path = os.path.join(
             Paths.RESULTS_DIR, f"global_model_{dataset_name}.pth"
         )
 
         self.reset_parameters()
-    
-    def forward(self, x):
-        return self.model(x)
-    
-    def _build_model(self):
-        self.model = models.resnet18(pretrained=False)
-        self.model.fc = nn.Linear(
-            self.model.fc.in_features, self.num_classes
-        )
-        self.to(self.device)
-        logger.info(f"device:{self.device}")
-        # print(f"device index:{torch.cuda.current_device()}")
 
     def reset_parameters(self):
         """"
@@ -60,13 +47,17 @@ class GlobalModel(nn.Module):
             pass  # 已是随机初始化
         else:
             logger.info("未找到预训练全局模型，使用随机初始化")
-
-    def get_state(self):
-        """用于 RL / 联邦同步"""
-        return {k: v.detach().cpu() for k, v in self.model.state_dict().items()}
-
-    def set_state(self, state_dict):
-        self.model.load_state_dict(state_dict)
+    
+    def _build_model(self):
+        self.model = models.resnet18(pretrained=False)
+        self.model.fc = nn.Linear(
+            self.model.fc.in_features, self.num_classes
+        )
+        self.to(self.device)
+        logger.info(f"device:{self.device}")
+        
+    def forward(self, x):
+        return self.model(x)
 
     def _get_num_classes(self, dataset):
         return {

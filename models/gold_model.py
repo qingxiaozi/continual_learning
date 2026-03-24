@@ -23,12 +23,14 @@ class GoldModel:
         )
 
         if os.path.exists(self.model_path):
-            self.load_model()
-            logger.info(f"加载已训练的黄金模型: {self.model_path}")
+            try:
+                self.load_model()
+                logger.info(f"加载已训练的黄金模型: {self.model_path}")
+            except Exception as e:
+                logger.error(f"加载黄金模型失败: {e}")
+                logger.info("将使用随机初始化的模型")
         else:
-            print(
-                f"未找到预训练黄金模型，需要先进行微调,运行fine_tune(train_dataset, val_dataset)函数即可"
-            )
+            logger.warning(f"未找到黄金模型: {self.model_path}，需要先进行微调")
 
     # 添加 eval方法
     def eval(self):
@@ -46,7 +48,6 @@ class GoldModel:
     def _initialize_model(self):
         """初始化ResNet18模型"""
         model = models.resnet18(weights=None)
-
         # 冻结前面的层（可选，根据数据量决定）
         # self._freeze_layers(model)
         num_features = model.fc.in_features
@@ -59,27 +60,6 @@ class GoldModel:
         """加载模型"""
         checkpoint = torch.load(self.model_path, map_location=self.device)
         self.model.load_state_dict(checkpoint["model_state_dict"])
-
-    def label_data(self, dataloader, confidence_threshold=0.8):
-        self.model.eval()
-        labeled_data = []
-
-        with torch.no_grad():
-            for batch in dataloader:
-                inputs = batch[0] if isinstance(batch, (list, tuple)) else batch
-                inputs = inputs.to(self.device)
-
-                outputs = self.model(inputs)
-                probs = torch.softmax(outputs, dim=1)
-                conf, preds = probs.max(dim=1)
-
-                mask = conf > confidence_threshold
-                if mask.any():
-                    labeled_data.append(
-                        (inputs[mask].cpu(), preds[mask].cpu())
-                    )
-
-        return labeled_data
 
     def fine_tune(self, train_dataset, val_dataset=None):
         """
