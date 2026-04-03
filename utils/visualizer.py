@@ -1,19 +1,27 @@
 import os
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
 from datetime import datetime
 from sklearn.manifold import TSNE
 from sklearn.preprocessing import StandardScaler
+from config.parameters import Config
 from config.paths import Paths
+
+plt.rcParams['figure.facecolor'] = 'white'
+plt.rcParams['axes.facecolor'] = 'white'
+plt.rcParams['axes.grid'] = False
+plt.rcParams['legend.frameon'] = False
 
 
 class ResultVisualizer:
     """结果可视化类"""
 
-    def __init__(self, save_dir=Paths.RESULTS_PNG_DIR):
+    def __init__(self, save_dir=None):
+        if save_dir is None:
+            save_dir = Paths.get_dataset_dir("png")
         self.save_dir = save_dir
-        os.makedirs(save_dir, exist_ok=True)
+        os.makedirs(self.save_dir, exist_ok=True)
         self.style_config = {
             'colors': {'AA': '#1f77b4', 'AIA': '#2ca02c', 'FM': '#d62728', 'BWT': '#ff7f0e'},
             'markers': {'AA': 'o', 'AIA': 's', 'FM': '^', 'BWT': 'D'},
@@ -45,7 +53,6 @@ class ResultVisualizer:
             elastic_epochs = range(1, len(epoch_elastic_losses) + 1)
             plt.plot(elastic_epochs, epoch_elastic_losses, "g-", linewidth=2, label="Elastic Loss", marker='^', markersize=4)
 
-        # 动态设置标题
         labels = ["Training"]
         if val_losses and len(val_losses) > 0:
             labels.append("Validation")
@@ -59,7 +66,6 @@ class ResultVisualizer:
         plt.legend(fontsize=10)
         plt.xticks(epochs)
 
-        # 自动调整 y 轴范围
         all_losses = list(epoch_losses)
         if val_losses and len(val_losses) > 0:
             all_losses.extend(val_losses[:len(epoch_losses)])
@@ -68,7 +74,7 @@ class ResultVisualizer:
 
         if len(all_losses) > 1:
             loss_min, loss_max = min(all_losses), max(all_losses)
-            margin = (loss_max - loss_min) * 0.1 or 0.1  # 避免除零
+            margin = (loss_max - loss_min) * 0.1 or 0.1
             plt.ylim(loss_min - margin, loss_max + margin)
 
         if save_plot:
@@ -79,10 +85,7 @@ class ResultVisualizer:
         plt.close()
 
     def plot_data_heterogeneity(self, data_simulator, session, save_plot=True):
-        """
-        绘制数据异质性示意图
-        """
-        # 获取数据
+        """绘制数据异质性示意图"""
         domain = data_simulator.get_current_domain()
         domain_key = f"{data_simulator.current_dataset}_{domain}"
 
@@ -93,7 +96,6 @@ class ResultVisualizer:
         vehicle_assignments = data_simulator.vehicle_data_assignments[domain_key]
         train_dataset = data_simulator.train_data_cache[domain_key]
 
-        # 统计样本数量
         vehicle_class_counts = {}
         for vehicle_id, indices in vehicle_assignments.items():
             class_counts = [0] * num_classes
@@ -102,7 +104,6 @@ class ResultVisualizer:
                 class_counts[label] += 1
             vehicle_class_counts[vehicle_id] = class_counts
 
-        # 准备绘图数据
         vehicle_ids, class_ids, sample_counts = [], [], []
         for vehicle_id in range(data_simulator.num_vehicles):
             if vehicle_id in vehicle_class_counts:
@@ -131,7 +132,6 @@ class ResultVisualizer:
             linewidth=0.5,
         )
 
-        # 图表设置
         ax.set_title(f"Data Distribution - Session {session}", fontsize=11, pad=8)
         ax.set_xlabel("Vehicle ID", fontsize=9)
         ax.set_ylabel("Class", fontsize=9)
@@ -152,51 +152,8 @@ class ResultVisualizer:
 
         plt.close()
 
-    def _print_heterogeneity_statistics(self, vehicle_class_counts, domain, session):
-        """打印数据异质性统计信息"""
-        print(f"\n=== Session {session} - {domain} 数据异质性统计 ===")
-
-        total_samples = 0
-        class_coverage = {}  # 每个类别被多少车辆覆盖
-
-        for vehicle_id, class_counts in vehicle_class_counts.items():
-            vehicle_total = sum(class_counts.values())
-            total_samples += vehicle_total
-
-            # 统计每个类别的覆盖情况
-            for class_id, count in class_counts.items():
-                if count > 0:
-                    class_coverage[class_id] = class_coverage.get(class_id, 0) + 1
-
-            print(
-                f"车辆 {vehicle_id}: {vehicle_total} 个样本, 覆盖 {sum(1 for c in class_counts.values() if c > 0)} 个类别"
-            )
-
-        # 计算异质性指标
-        vehicle_totals = [
-            sum(counts.values()) for counts in vehicle_class_counts.values()
-        ]
-        heterogeneity_std = np.std(vehicle_totals) if vehicle_totals else 0
-
-        print(f"\n总体统计:")
-        print(f"总样本数: {total_samples}")
-        print(f"平均每车样本数: {np.mean(vehicle_totals):.1f}")
-        print(f"样本数标准差: {heterogeneity_std:.1f} (异质性指标)")
-        print(
-            f"类别覆盖情况: 平均每个类别被 {np.mean(list(class_coverage.values())):.1f} 辆车覆盖"
-        )
-        print("====================================\n")
-
-    def plot_sample_count_evolution(self, session_history: list[dict[str, any]]) -> plt.figure:
-        """
-        绘制样本数随session的变化
-
-        Args:
-            session_history: 会话历史记录列表
-
-        Returns:
-            matplotlib Figure对象
-        """
+    def plot_sample_count_evolution(self, session_history):
+        """绘制样本数随session的变化"""
         if not session_history:
             print("没有数据可绘制")
             return None
@@ -206,9 +163,8 @@ class ResultVisualizer:
 
         fig, ax = plt.subplots(figsize=self.style_config['figsize'])
 
-        # 绘制柱状图
         bars = ax.bar(sessions, total_samples,
-                     color=self.style_config['colors']['samples'],
+                     color=self.style_config.get('colors', {}).get('samples', '#1f77b4'),
                      alpha=0.7,
                      edgecolor='black',
                      linewidth=1)
@@ -217,16 +173,14 @@ class ResultVisualizer:
         ax.set_xlabel('Session', fontsize=12)
         ax.set_ylabel('Number of Samples', fontsize=12)
 
-        # 在柱子上添加数值标签
         for bar in bars:
             height = bar.get_height()
-            if height > 0:  # 只在有样本的时候显示
+            if height > 0:
                 ax.text(bar.get_x() + bar.get_width()/2., height,
                        f'{int(height):,}',
                        ha='center', va='bottom',
                        fontsize=9, fontweight='bold')
 
-        # 添加累积样本数的折线图（次坐标轴）
         if len(total_samples) > 1:
             ax2 = ax.twinx()
             cumulative_samples = np.cumsum(total_samples)
@@ -239,7 +193,6 @@ class ResultVisualizer:
             ax2.set_ylabel('Cumulative Samples', fontsize=12, color='red')
             ax2.tick_params(axis='y', labelcolor='red')
 
-            # 合并图例
             lines, labels = ax.get_legend_handles_labels()
             lines2, labels2 = ax2.get_legend_handles_labels()
             ax.legend(lines + lines2, labels + labels2, loc='upper left')
@@ -249,23 +202,10 @@ class ResultVisualizer:
         plt.tight_layout()
         return fig
 
-    def _add_trend_line(self, ax, x, y, color):
-        """在图上添加趋势线"""
-        if len(x) >= 3:
-            z = np.polyfit(x, y, 1)
-            p = np.poly1d(z)
-            ax.plot(x, p(x), "--", color=color, alpha=0.5, linewidth=1.5)
-
-            # 显示趋势斜率
-            slope = z[0]
-            trend_text = "↑ Improving" if slope > 0.001 else "↓ Declining" if slope < -0.001 else "→ Stable"
-            ax.text(0.02, 0.95, f"Trend: {trend_text}",
-                   transform=ax.transAxes,
-                   fontsize=8,
-                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-
-    def _load_if_exists(self, filename):
-        path = os.path.join(os.path.dirname(self.save_dir), "npy", filename)
+    def _load_if_exists(self, filename, base_dir=None):
+        if base_dir is None:
+            base_dir = os.path.dirname(self.save_dir)
+        path = os.path.join(base_dir, "npy", filename)
         return np.load(path, allow_pickle=True) if os.path.exists(path) else None
 
     def plot_cl_metric_curves(self, AA_steps, FM_steps, BWT_steps, filename="cl_metrics_curve.png"):
@@ -472,42 +412,142 @@ class ResultVisualizer:
             print(f"t-SNE domain shift plot saved to {path}")
         plt.close()
 
-
     def visualize_all(self):
-        """加载 results/*.npy 并生成所有可视化图表"""
-        # 加载 CL 指标
-        # AA_steps = self._load_if_exists("AA_steps.npy")
-        # FM_steps = self._load_if_exists("FM_steps.npy")
-        # BWT_steps = self._load_if_exists("BWT_steps.npy")
-        # acc_matrices = self._load_if_exists("accuracy_matrices.npy")
-        # AA_all = self._load_if_exists("AA_all.npy")
-        # FM_all = self._load_if_exists("FM_all.npy")
-        # BWT_all = self._load_if_exists("BWT_all.npy")
-        # AIA_all = self._load_if_exists("AIA_all.npy")
-
-        # 加载系统指标
-        rewards = self._load_if_exists("DRL_MINMAX_DELAY_MAB_episode_rewards.npy")
-        delays = self._load_if_exists("episode_delays.npy")
-
-        # # 绘制 CL 曲线
-        # if AA_steps is not None:
-        #     self.plot_cl_metric_curves(AA_steps, FM_steps, BWT_steps)
+        """加载 results/npy/{dataset}/npy_1/*.npy 并生成所有可视化图表"""
+        dataset_name = Config.CURRENT_DATASET
+        base_npy_dir = Paths.get_dataset_dir("npy")
+        base_npy_dir = os.path.join(base_npy_dir, "npy_1")
         
-        # # 绘制 Accuracy Matrix（取最后一个 episode 的矩阵）
-        # if acc_matrices is not None and len(acc_matrices) > 0:
-        #     self.plot_accuracy_matrix(acc_matrices)
+        legend_mapping = {
+            'DRL_EQUAL_FIXED_RATIO': 'Abl_UP_DRL',
+            'DRL_MINMAX_DELAY_FIXED_RATIO': 'OURS FULL',
+            'DRL_EQUAL_LOSS_GREEDY_FIXED_RATIO': 'Abl_UP_G',
+            'FIXED_RATIO_EQUAL_FIXED_RATIO': 'BASE',
+            'FIXED_RATIO_EQUAL_NEW_ONLY': 'Abl_TR_NEW',
+            'FIXED_RATIO_MINMAX_DELAY_FIXED_RATIO': 'Abl_BW',
+            'LOSS_GREEDY_EQUAL_FIXED_RATIO': 'AbI_UP_G',
+        }
+        
+        if not os.path.exists(base_npy_dir):
+            print(f"目录不存在: {base_npy_dir}")
+            return
+        
+        all_files = []
+        for root, dirs, files in os.walk(base_npy_dir):
+            for f in files:
+                if f.endswith('.npy'):
+                    all_files.append((root, f))
+        
+        if not all_files:
+            print(f"没有找到npy文件: {base_npy_dir}")
+            return
+        
+        prefixes = set()
+        file_map = {}
+        
+        for root, f in all_files:
+            fname = f.replace('.npy', '')
+            parts = fname.split('_')
+            
+            if fname.endswith('_all'):
+                metric_name = parts[-2] if len(parts) >= 2 else None
+                if metric_name in ['AA', 'AIA', 'FM', 'BWT']:
+                    prefix = '_'.join(parts[:-2])
+                    key = (prefix, metric_name)
+                    file_map[key] = os.path.join(root, f)
+                    prefixes.add(prefix)
+            elif fname.endswith('_episode_rewards') or fname.endswith('_episode_delays'):
+                suffix = 'rewards' if 'rewards' in fname else 'delays'
+                prefix = '_'.join(parts[:-2])
+                key = (prefix, suffix)
+                file_map[key] = os.path.join(root, f)
+                prefixes.add(prefix)
+        
+        prefixes = sorted(list(prefixes))
+        print(f"找到 {len(prefixes)} 个实验: {prefixes}")
+        
+        metrics = ['AA', 'AIA', 'FM', 'BWT']
+        system_metrics = [('rewards', 'Reward'), ('delays', 'Delay')]
+        
+        colors = plt.cm.tab10(np.linspace(0, 1, len(prefixes)))
+        markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', 'h']
+        
+        output_dir = Paths.get_dataset_dir("png")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        for metric in metrics:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+            plotted = False
+            for idx, prefix in enumerate(prefixes):
+                if prefix not in legend_mapping:
+                    continue
+                    
+                key = (prefix, metric)
+                if key in file_map:
+                    filepath = file_map[key]
+                    try:
+                        data = np.load(filepath)
+                        if len(data) > 0:
+                            x = np.arange(len(data))
+                            ax.plot(x, data, label=legend_mapping[prefix], color=colors[idx], 
+                                   marker=markers[idx % len(markers)], markersize=2, linewidth=1.5, alpha=0.8)
+                            plotted = True
+                    except Exception as e:
+                        print(f"加载失败 {filepath}: {e}")
+            
+            if plotted:
+                ax.set_xlabel('Episode', fontsize=14)
+                ax.set_ylabel(metric, fontsize=14)
+                ax.set_title(f'{metric} on {dataset_name.upper()}', fontsize=16, fontweight='bold')
+                ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize=9, frameon=False)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                
+                output_path = os.path.join(output_dir, f"{metric} on {dataset_name}.png")
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close()
+                print(f"保存: {output_path}")
+        
+        for metric, title in system_metrics:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+            plotted = False
+            for idx, prefix in enumerate(prefixes):
+                if prefix not in legend_mapping:
+                    continue
+                    
+                key = (prefix, metric)
+                if key in file_map:
+                    filepath = file_map[key]
+                    try:
+                        data = np.load(filepath)
+                        if len(data) > 0:
+                            x = np.arange(len(data))
+                            ax.plot(x, data, label=legend_mapping[prefix], color=colors[idx],
+                                   marker=markers[idx % len(markers)], markersize=2, linewidth=1.5, alpha=0.8)
+                            plotted = True
+                    except Exception as e:
+                        print(f"加载失败 {filepath}: {e}")
+            
+            if plotted:
+                ax.set_xlabel('Episode', fontsize=14)
+                ax.set_ylabel(title, fontsize=14)
+                ax.set_title(f'{title} on {dataset_name.upper()}', fontsize=16, fontweight='bold')
+                ax.legend(loc='center left', bbox_to_anchor=(1.0, 0.5), fontsize=9, frameon=False)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                
+                output_path = os.path.join(output_dir, f"{title} on {dataset_name}.png")
+                plt.tight_layout(rect=[0, 0, 0.85, 1])
+                plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
+                plt.close()
+                print(f"保存: {output_path}")
+        
+        print(f"\n{dataset_name.upper()} 可视化完成！共生成 6 张图")
+        print(f"图片保存在: {output_dir}")
 
-        # # 绘制 Boxplot
-        # if AA_all is not None:
-        #     self.plot_episode_boxplot(AA_all, FM_all, BWT_all, AIA_all)
-
-        # 绘制系统指标
-        if rewards is not None:
-            self.plot_episode_reward(rewards, filename="DRL_MINMAX_DELAY_MAB_episode_reward.png")
-        if delays is not None:
-            self.plot_episode_delay(delays)
-
-        print("All visualizations completed.")
 
 if __name__ == "__main__":
     vis = ResultVisualizer()

@@ -97,7 +97,7 @@ class VehicleEdgeEnv:
         return next_state, reward, done, info
 
     def evaluate_model(self, domain):
-        dataset = self.data_simulator.get_val_dataset(domain)
+        dataset = self.data_simulator.get_test_dataset(domain)
         loader = DataLoader(dataset, batch_size=Config.BATCH_SIZE)
         acc, loss = self.evaluator.evaluate_model(self.global_model.model, loader)
         return acc
