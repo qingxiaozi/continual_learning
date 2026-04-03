@@ -40,7 +40,7 @@ class Paths:
     def get_drl_model_path():
         dataset_name = Config.CURRENT_DATASET
         model_dir = os.path.join(Paths.RESULTS_PTH_DIR, dataset_name)
-        model_filename = f"trained_drl_model_{dataset_name}.pth"
+        model_filename = f"trained_drl_model_{dataset_name}_1.pth"
         full_path = os.path.join(model_dir, model_filename)
         os.makedirs(model_dir, exist_ok=True)        
         return full_path
