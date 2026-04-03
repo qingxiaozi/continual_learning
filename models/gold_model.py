@@ -73,7 +73,7 @@ class GoldModel:
         logger.info(f"训练集样本数：{len(train_dataset)}")
         logger.info(f"测试集样本数：{len(val_dataset)}")
 
-        self.fine_tune_epochs = 45
+        self.fine_tune_epochs = 100
         self.learning_rate = Config.LEARNING_RATE
         self.batch_size = Config.BATCH_SIZE
 
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     golden_model = GoldModel(data_simulator.current_dataset)
         # 如果模型未加载（即文件不存在），则自动进行微调
     if not os.path.exists(golden_model.model_path):
-        logger.info("开始自动微调黄金模型...")
+        print("开始自动微调黄金模型...")
         golden_model.fine_tune(train_dataset, val_dataset)
     else:
         logger.info("黄金模型已存在，跳过训练。")
