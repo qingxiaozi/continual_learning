@@ -90,7 +90,7 @@ class Config:
     # 测试策略参数
     TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
     TEST_RATIO = 0.2  # 测试集比例
-    VAL_RATIO = 0.2  # 验证集比例
+    VAL_RATIO = 0.1  # 验证集比例
 
     # 设备
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
