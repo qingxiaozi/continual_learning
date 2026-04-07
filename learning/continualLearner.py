@@ -54,7 +54,7 @@ class ContinualLearner:
                 "actual_epochs": 0,
             }
 
-        val_dataset = data_simulator.get_val_dataset(current_domain)
+        val_datasets = data_simulator.get_cumulative_val_datasets()
         loss_before = self._compute_loss_on_batches(batches)
 
         # 如果不是 MAB 策略，把 init_epochs 设为 num_epochs,
@@ -64,7 +64,7 @@ class ContinualLearner:
             batches=batches,
             num_epochs=num_epochs,
             init_epochs=init_ep,
-            val_dataset=val_dataset,
+            val_dataset=val_datasets,
         )
 
         loss_after = self._compute_loss_on_batches(batches)
@@ -122,7 +122,6 @@ class ContinualLearner:
                 targets = targets.to(device)
                 outputs = self.model(inputs)
                 loss = criterion(outputs, targets)
-                #所有batch上的“样本级总交叉熵损失”
                 total_loss += loss.item() * inputs.shape[0]
                 total_samples += inputs.shape[0]
 
