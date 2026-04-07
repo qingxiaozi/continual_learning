@@ -19,7 +19,7 @@ class Config:
     NUM_VEHICLES = 20  # 车辆数
     # 模型参数
     NUM_EPOCH = 10  # 训练epoch数
-    BATCH_SIZE = 32  # batch size
+    BATCH_SIZE = 8  # batch size
     LEARNING_RATE = 0.001  # 学习率
 
     # MAB参数
