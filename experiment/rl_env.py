@@ -53,6 +53,8 @@ class VehicleEdgeEnv:
         self.cache_manager.reset()
         self.current_domain = self.data_simulator.get_current_domain()
         self.session = 0
+        # 预加载第一个子数据集，使 step 0 可以训练
+        self.data_simulator.update_session_dataset(0)
 
         return self._get_state()
 
@@ -122,7 +124,8 @@ class VehicleEdgeEnv:
     def _upload_datas(self, batch_choices):
         for vehicle_id, n in enumerate(batch_choices):
             vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
-            selected = random.sample(vehicle.data_batches, n) if n > 0 else []
+            actual_n = min(n, len(vehicle.data_batches)) if n > 0 else 0
+            selected = random.sample(vehicle.data_batches, actual_n) if actual_n > 0 else []
             vehicle.set_uploaded_data(selected)
         return
 
@@ -155,18 +158,37 @@ class VehicleEdgeEnv:
         return total
 
     def _calculate_reward(self, comm, train, total_samples):
-        loss_before = train.get("loss_before", 1.0)
-        loss_after = train.get("loss_after", 1.0)
-        delay = comm["total_delay"]
-        # print(f"DEBUG: lossbefore: {loss_before}, lossafter: {loss_after}, before-after: {loss_before - loss_after}")
-        loss_reduction = (loss_before - loss_after) / (loss_before + 1e-6)
-        if total_samples == 0:
-            return -0.2
-        reward = loss_reduction - 0.02 * delay
-        return reward
-        # loss_reduction = train.get("loss_before", 1.0) - train.get("loss_after", 1.0)
+        # # 原有的奖励计算方式（已注释）
+        # loss_before = train.get("loss_before", 1.0)
+        # loss_after = train.get("loss_after", 1.0)
         # delay = comm["total_delay"]
-        # return loss_reduction / ((delay + 1e-3) * (total_samples + 1e-3)) if delay > 0 and total_samples > 0 else -0.1
+        # loss_reduction = (loss_before - loss_after) / (loss_before + 1e-6)
+        # if total_samples == 0:
+        #     return -0.2
+        # reward = loss_reduction - 0.02 * delay
+        # return reward
+        
+        # ========================================
+        # 新的奖励计算方式：在所有已加载子数据集上计算测试准确率
+        # ========================================
+        delay = comm["total_delay"]
+        
+        # 获取所有已加载子数据集的测试集
+        cumulative_test_datasets = self.data_simulator.get_cumulative_test_datasets()
+        
+        # 计算所有子数据集的平均准确率
+        test_acc = 0.0
+        if cumulative_test_datasets:
+            for (domain, sub_idx), test_dataset in cumulative_test_datasets.items():
+                loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE)
+                acc, _ = self.evaluator.evaluate_model(self.global_model.model, loader)
+                test_acc += acc
+            test_acc /= len(cumulative_test_datasets)
+        
+        # 奖励 = 测试准确率 - 延迟惩罚
+        reward = test_acc - 0.02 * delay
+        
+        return reward
     
     def _update_session_environment(self):
         """更新会话和环境状态"""
