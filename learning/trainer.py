@@ -29,7 +29,11 @@ class EpochTrainer:
         )
 
     def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=5):
-        """训练模型"""
+        """训练模型
+
+        Args:
+            val_dataset: {(domain, sub_idx): Dataset} 格式的字典
+        """
         logger.info(f"training......")
         selector = MABDataSelector(num_arms=len(batches))
         best_state = self.model.state_dict()
@@ -47,15 +51,7 @@ class EpochTrainer:
             log_msg = f"[Epoch {epoch+1}/{num_epochs}] train_loss={train_loss:.4f}"
 
             if val_dataset is not None:
-                val_loader = DataLoader(
-                    val_dataset,
-                    batch_size=Config.BATCH_SIZE,
-                    shuffle=False,
-                )
-                _, val_loss = ModelEvaluator().evaluate_model(
-                    self.model, val_loader
-                )
-
+                val_loss = self._compute_val_loss(val_dataset)
                 log_msg += f", val_loss={val_loss:.4f}"
 
                 if val_loss < best_val:
@@ -76,6 +72,17 @@ class EpochTrainer:
             "actual_epochs": actual_epochs,
             "selector": selector,
         }
+
+    def _compute_val_loss(self, val_datasets):
+        """计算所有累积验证子数据集的加权平均损失"""
+        total_loss = 0.0
+        total_samples = 0
+        for (domain, sub_idx), dataset in val_datasets.items():
+            loader = DataLoader(dataset, batch_size=Config.BATCH_SIZE, shuffle=False)
+            _, val_loss = ModelEvaluator().evaluate_model(self.model, loader)
+            total_loss += val_loss * len(dataset)
+            total_samples += len(dataset)
+        return total_loss / total_samples if total_samples > 0 else float("inf")
 
         
     def _train_one_epoch(self, batches, selector, use_mab):
