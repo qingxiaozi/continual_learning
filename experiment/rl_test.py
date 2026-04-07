@@ -101,10 +101,12 @@ class RLTester:
             total_reward = 0
             step_delays = []
 
-            seen_tasks  = []
-            accuracy_history = defaultdict(list)
+            seen_tasks = []
+            accuracy_history = {}
             acc_matrix = []
             AA_curve, FM_curve, BWT_curve = [], [], []
+
+            cached_loaders = {}
 
             for t in range(self.max_timesteps):
                 available_batches = state[-Config.NUM_VEHICLES:].astype(int).tolist()
@@ -125,54 +127,51 @@ class RLTester:
                 total_reward += reward
                 step_delays.append(info["comm"]["t_total_comm"])
 
-                if (t + 1) % self.domain_interval == 0:
-                    current_task = self.env.current_domain
-                    if current_task not in seen_tasks:
-                        seen_tasks.append(current_task)
-                        
-                        # # ===== 域切换时调用可视化函数 =====
-                        # print(f"\n Visualizing domain shift and data heterogeneity...")
-                        # self.visualizer.plot_vehicle_data_heterogeneity(
-                        #     self.env.data_simulator, 
-                        #     session=self.env.session,
-                        #     save_plot=True
-                        # )
-                        # self.visualizer.plot_tsne_domain_shift(
-                        #     self.env.global_model,
-                        #     self.env.data_simulator,
-                        #     session=self.env.session,
-                        #     num_samples=500,
-                        #     save_plot=True
-                        # )
+                current_domain = self.env.current_domain
+                current_sub_idx = self.env.data_simulator._get_current_sub_domain_idx()
+                current_task = (current_domain, current_sub_idx)
 
-                    row = []
-                    
-                    for d in seen_tasks:
-                        acc = self.env.evaluate_model(d)
-                        row.append(acc)
-                        accuracy_history[d].append(acc)
+                if current_task not in seen_tasks:
+                    seen_tasks.append(current_task)
 
-                    acc_matrix.append(row)
+                cumulative_datasets = self.env.data_simulator.get_cumulative_test_datasets()
 
-                    metrics = IncrementalMetricsCalculator.compute_metrics(
-                        seen_tasks, accuracy_history
-                    )
+                row = []
+                for task in seen_tasks:
+                    if task not in cached_loaders and task in cumulative_datasets:
+                        test_dataset = cumulative_datasets[task]
+                        cached_loaders[task] = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE)
 
-                    AA_curve.append(metrics["AA"])
-                    FM_curve.append(metrics["FM"])
-                    BWT_curve.append(metrics["BWT"])
+                    if task in cached_loaders:
+                        acc, _ = self.env.evaluator.evaluate_model(self.env.global_model.model, cached_loaders[task])
+                    else:
+                        acc = 0.0
+                    row.append(acc)
+                    if task not in accuracy_history:
+                        accuracy_history[task] = []
+                    accuracy_history[task].append(acc)
+
+                acc_matrix.append(row)
+
+                metrics = IncrementalMetricsCalculator.compute_metrics(
+                    seen_tasks, accuracy_history
+                )
+
+                AA_curve.append(metrics["AA"])
+                FM_curve.append(metrics["FM"])
+                BWT_curve.append(metrics["BWT"])
 
                 if done:
                     break
 
-            final_metrics = IncrementalMetricsCalculator.compute_metrics(
-                seen_tasks, accuracy_history
-            )
+            final_aa = AA_curve[-1] if AA_curve else 0.0
+            final_fm = FM_curve[-1] if FM_curve else 0.0
+            final_bwt = BWT_curve[-1] if BWT_curve else 0.0
             AIA = IncrementalMetricsCalculator.compute_aia(AA_curve)
 
-            self.AA_all.append(final_metrics["AA"])
-            self.FM_all.append(final_metrics["FM"])
-            self.BWT_all.append(final_metrics["BWT"])
+            self.AA_all.append(final_aa)
+            self.FM_all.append(final_fm)
+            self.BWT_all.append(final_bwt)
             self.AIA_all.append(AIA)
 
             self.AA_steps.append(AA_curve)
@@ -180,18 +179,16 @@ class RLTester:
             self.BWT_steps.append(BWT_curve)
             self.accuracy_matrices.append(acc_matrix)
 
-            # ===== System metrics =====
             self.episode_rewards.append(total_reward)
             self.episode_delays.append(np.mean(step_delays))
 
-            # Log to wandb for each episode
             self.wandb_run.log({
                 "episode": episode,
                 "episode_reward": total_reward,
                 "episode_delay": np.mean(step_delays),
-                "episode_AA": final_metrics["AA"],
-                "episode_FM": final_metrics["FM"],
-                "episode_BWT": final_metrics["BWT"],
+                "episode_AA": final_aa,
+                "episode_FM": final_fm,
+                "episode_BWT": final_bwt,
                 "episode_AIA": AIA
             })
 
