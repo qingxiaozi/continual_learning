@@ -12,51 +12,51 @@ class IncrementalMetricsCalculator:
     不保存状态，只提供计算函数
     """
     @staticmethod
-    def compute_metrics(seen_domains, accuracy_history):
+    def compute_metrics(seen_tasks, accuracy_history):
         """
         计算增量学习的核心指标：AA, FM, BWT
 
+        根据论文公式：
+        - a_{k,j} = 在第 k 个任务学完后，在第 j 个任务测试集上的准确率
+        - AA_k = (1/k) * sum(a_{k,j}) for j in [1,k] = 当前所有已见任务的平均准确率
+        - FM_k = (1/(k-1)) * sum(max_acc_j - a_{k,j}) for j in [1,k-1] = 遗忘率
+        - BWT_k = (1/(k-1)) * sum(a_{k,j} - a_{j,j}) for j in [1,k-1] = 后向迁移
+
         Args:
-            seen_domains: 已见领域列表
-            accuracy_history: 准确率历史字典，格式为 {domain: [acc_session1, acc_session2, ...]}
+            seen_tasks: 已见任务列表 [(domain, sub_idx), ...]
+            accuracy_history: 准确率历史字典，格式为 {(domain, sub_idx): [acc1, acc2, ...]}
 
         Returns:
             dict: 包含 k, AA, FM, BWT 的字典
         """
-        k = len(seen_domains)
+        k = len(seen_tasks)
         if k == 0:
-            return {"k": 0}
+            return {"k": 0, "AA": 0.0, "FM": 0.0, "BWT": 0.0}
 
-        # 当前各域的最新准确率
-        current_accuracies = {
-            domain: accuracy_history[domain][-1]
-            for domain in seen_domains
-            if domain in accuracy_history and accuracy_history[domain]
-        }
+        current_accuracies = {}
+        for task in seen_tasks:
+            if task in accuracy_history and accuracy_history[task]:
+                current_accuracies[task] = accuracy_history[task][-1]
 
-        # 1. Average Accuracy (AA_k)
         aa_k = np.mean(list(current_accuracies.values())) if current_accuracies else 0.0
 
-        # 2. Forgetting Measure (FM_k)
         fm_k = 0.0
         if k > 1:
             forgetting_vals = []
-            for domain in seen_domains[:-1]:
-                if domain in accuracy_history and len(accuracy_history[domain]) >= 2:
-                    prev_accuracies = accuracy_history[domain][:-1]
-                    max_acc = max(prev_accuracies)
-                    current_acc = accuracy_history[domain][-1]
+            for task in seen_tasks[:-1]:
+                if task in accuracy_history and len(accuracy_history[task]) >= 1:
+                    max_acc = max(accuracy_history[task])
+                    current_acc = accuracy_history[task][-1]
                     forgetting_vals.append(max_acc - current_acc)
             fm_k = np.mean(forgetting_vals) if forgetting_vals else 0.0
 
-        # 3. Backward Transfer (BWT_k)
         bwt_k = 0.0
         if k > 1:
             bwt_vals = []
-            for domain in seen_domains[:-1]:
-                if domain in accuracy_history and len(accuracy_history[domain]) >= 2:
-                    first_acc = accuracy_history[domain][0]
-                    current_acc = accuracy_history[domain][-1]
+            for i, task in enumerate(seen_tasks[:-1]):
+                if task in accuracy_history and len(accuracy_history[task]) >= 1:
+                    first_acc = accuracy_history[task][0]
+                    current_acc = accuracy_history[task][-1]
                     bwt_vals.append(current_acc - first_acc)
             bwt_k = np.mean(bwt_vals) if bwt_vals else 0.0
 
