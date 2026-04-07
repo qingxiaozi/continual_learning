@@ -84,6 +84,36 @@ class ResultVisualizer:
 
         plt.close()
 
+    def plot_accuracy_curve(
+        self,
+        val_accuracies,
+        save_plot=True,
+        plot_name="accuracy_curve.png"
+    ):
+        """绘制验证准确率曲线"""
+        plt.figure(figsize=(10, 6))
+
+        epochs = range(1, len(val_accuracies) + 1)
+        plt.plot(epochs, val_accuracies, "b-", linewidth=2, label="Validation Accuracy", marker='o', markersize=4)
+
+        plt.title("Validation Accuracy", fontsize=14, fontweight="bold")
+        plt.xlabel("Epoch", fontsize=12)
+        plt.ylabel("Accuracy (%)", fontsize=12)
+        plt.legend(fontsize=10)
+        plt.xticks(epochs)
+
+        if len(val_accuracies) > 1:
+            acc_min, acc_max = min(val_accuracies), max(val_accuracies)
+            margin = (acc_max - acc_min) * 0.1 or 1.0
+            plt.ylim(acc_min - margin, acc_max + margin)
+
+        if save_plot:
+            plot_path = os.path.join(self.save_dir, plot_name)
+            plt.savefig(plot_path, dpi=300, bbox_inches="tight")
+            print(f"验证准确率曲线已保存至: {plot_path}")
+
+        plt.close()
+
     def plot_data_heterogeneity(self, data_simulator, session, save_plot=True):
         """绘制数据异质性示意图"""
         domain = data_simulator.get_current_domain()

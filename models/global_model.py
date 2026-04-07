@@ -86,84 +86,155 @@ class GlobalModel(nn.Module):
 
     def pretrain_on_all_domains(
         self,
-        train_dataset,
-        val_dataset=None,
-        epochs=50,
+        data_simulator,
+        domains,
+        epochs=45,
         lr=1e-3,
-        batch_size=32,
+        batch_size=64,
     ):
         device = self.device
         self._build_model()
 
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=batch_size,
-            shuffle=True,
-            num_workers=4,
-        )
+        visualizer_path = Paths.get_visualizer_path()
+        visualizer_path = visualizer_path.replace("\\", "/")
+        os.makedirs(os.path.dirname(visualizer_path), exist_ok=True) if os.path.dirname(visualizer_path) else None
 
-        val_loader = (
-            DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
-            if val_dataset
-            else None
-        )
+        os.makedirs(Paths.RESULTS_DIR, exist_ok=True)
 
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        criterion = nn.CrossEntropyLoss()
-        evaluator = ModelEvaluator()
+        for domain in domains:
+            data_simulator._preload_domain_data(domain)
+            domain_key = data_simulator._get_domain_key(domain)
+            init_data = data_simulator.init_domain_cache.get(domain_key)
 
-        best_acc = 0.0
+            if init_data is None:
+                logger.warning(f"Domain {domain} init data not found, skipping...")
+                continue
 
-        for epoch in range(epochs):
-            self.train()
-            total_loss = 0.0
+            train_dataset = init_data["train"]
+            val_dataset = init_data["val"]
 
-            for x, y in train_loader:
-                x, y = x.to(device), y.to(device)
-
-                optimizer.zero_grad()
-                out = self(x)
-                loss = criterion(out, y)
-                loss.backward()
-                optimizer.step()
-
-                total_loss += loss.item()
-
-            print(
-                f"[Pretrain] Epoch {epoch+1}/{epochs} "
-                f"Train Loss: {total_loss/len(train_loader):.4f}"
+            train_loader = DataLoader(
+                train_dataset,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=0,
+            )
+            val_loader = DataLoader(
+                val_dataset,
+                batch_size=batch_size,
+                shuffle=False,
+                num_workers=0,
             )
 
-            if val_loader:
-                val_acc, val_loss = evaluator.evaluate_model(self, val_loader)
+            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+            criterion = nn.CrossEntropyLoss()
+
+            best_acc = 0.0
+            train_losses = []
+            val_losses = []
+            val_accuracies = []
+
+            for epoch in range(epochs):
+                self.train()
+                total_loss = 0.0
+
+                for x, y in train_loader:
+                    x, y = x.to(device), y.to(device)
+                    optimizer.zero_grad()
+                    out = self(x)
+                    loss = criterion(out, y)
+                    loss.backward()
+                    optimizer.step()
+                    total_loss += loss.item()
+
+                avg_train_loss = total_loss / len(train_loader)
+                train_losses.append(avg_train_loss)
+
+                self.eval()
+                val_loss = 0.0
+                correct = 0
+                total = 0
+                with torch.no_grad():
+                    for x, y in val_loader:
+                        x, y = x.to(device), y.to(device)
+                        out = self(x)
+                        loss = criterion(out, y)
+                        val_loss += loss.item()
+                        _, predicted = out.max(1)
+                        total += y.size(0)
+                        correct += predicted.eq(y).sum().item()
+
+                avg_val_loss = val_loss / len(val_loader)
+                val_acc = 100.0 * correct / total
+                val_losses.append(avg_val_loss)
+                val_accuracies.append(val_acc)
+
                 print(
-                    f"[Pretrain] Val Acc: {val_acc:.4f}, Val Loss: {val_loss:.4f}"
+                    f"[Pretrain {domain}] Epoch {epoch+1}/{epochs} "
+                    f"Train Loss: {avg_train_loss:.4f} "
+                    f"Val Loss: {avg_val_loss:.4f} "
+                    f"Val Acc: {val_acc:.2f}%"
                 )
 
                 if val_acc > best_acc:
                     best_acc = val_acc
-                    self.save_pretrained()
-            else:
-                self.save_pretrained()
 
-# # ==================== 使用示例 ====================
-# if __name__ == "__main__":
-#     data_simulator = DomainIncrementalDataSimulator()
-#     train_datasets = []
-#     for domain in data_simulator.domain_sequences[data_simulator.current_dataset]:
-#         domain_data = data_simulator._load_domain_data(domain)
-#         train_datasets.append(domain_data)
+            self.save_pretrained()
 
-#     full_train_dataset = torch.utils.data.ConcatDataset(train_datasets)
-#     train_size = int(0.8 * len(full_train_dataset))
-#     val_size = len(full_train_dataset) - train_size
-#     train_dataset, val_dataset = torch.utils.data.random_split(full_train_dataset, [train_size, val_size])
+            from utils.visualizer import ResultVisualizer
+            visualizer = ResultVisualizer(save_dir=os.path.dirname(visualizer_path) or "./")
 
-#     model = GlobalModel(data_simulator.current_dataset)
-#     if not model.load_model():
-#         model.fine_tune(train_dataset, val_dataset)
-#     else:
-#         print("模型已存在，无需训练。")
-#         val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
-#         final_val_acc = model.evaluate(val_loader)
-#         print(f"已加载模型的验证准确率: {final_val_acc:.2f}%")
+            loss_plot_name = f"training_loss_{domain}.png"
+            visualizer.plot_training_loss(
+                epoch_losses=train_losses,
+                val_losses=val_losses,
+                save_plot=True,
+                plot_name=loss_plot_name,
+            )
+
+            acc_plot_name = f"accuracy_curve_{domain}.png"
+            visualizer.plot_accuracy_curve(
+                val_accuracies=val_accuracies,
+                save_plot=True,
+                plot_name=acc_plot_name,
+            )
+
+            print(f"[Pretrain {domain}] Best Val Acc: {best_acc:.2f}%, Model saved.")
+
+        print(f"[Pretrain] All domains trained. Model saved to {self.model_path}")
+
+
+def pretrain_initial_models():
+    """预训练各域初始模型的入口函数"""
+    from config.parameters import Config
+    from environment.dataSimu_env import DomainIncrementalDataSimulator
+
+    print("\n=== Pretraining Initial Models ===")
+    Config.set_seed()
+
+    data_simulator = DomainIncrementalDataSimulator()
+    domains = Config.DOMAIN_SEQUENCES[Config.CURRENT_DATASET]
+    print(f"Dataset: {Config.CURRENT_DATASET}")
+    print(f"Domains: {domains}")
+    print(f"Batch size: 64, Epochs: 45")
+    print("-" * 50)
+
+    model = GlobalModel(dataset_name=Config.CURRENT_DATASET)
+    model.pretrain_on_all_domains(
+        data_simulator=data_simulator,
+        domains=domains,
+        epochs=45,
+        batch_size=64,
+    )
+
+    print("-" * 50)
+    print(f"All initial models trained!")
+    print(f"Models saved to: results/global_model_{Config.CURRENT_DATASET}.pth")
+    return True
+
+
+if __name__ == "__main__":
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    pretrain_initial_models()
