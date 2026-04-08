@@ -50,9 +50,15 @@ class GlobalModel(nn.Module):
     
     def _build_model(self):
         self.model = models.resnet18(pretrained=False)
-        self.model.fc = nn.Linear(
-            self.model.fc.in_features, self.num_classes
-        )
+        if self.dataset_name == "office31":
+            self.model.fc = nn.Sequential(
+                nn.Dropout(p=0.5),
+                nn.Linear(self.model.fc.in_features, self.num_classes)
+            )
+        else:
+            self.model.fc = nn.Linear(
+                self.model.fc.in_features, self.num_classes
+            )
         self.to(self.device)
         logger.info(f"device:{self.device}")
         
@@ -88,8 +94,8 @@ class GlobalModel(nn.Module):
         self,
         data_simulator,
         domains,
-        epochs=45,
-        lr=1e-3,
+        epochs=15,  # 15 epochs for digit10, 30 epochs for office31, 45 epochs for domainnet
+        lr=1e-4,  # office31: 1e-4, digit10: 1e-3, domainnet: 1e-2
         batch_size=64,
     ):
         device = self.device
@@ -101,6 +107,8 @@ class GlobalModel(nn.Module):
 
         os.makedirs(Paths.RESULTS_DIR, exist_ok=True)
 
+        train_datasets = []
+        val_datasets = []
         for domain in domains:
             data_simulator._preload_domain_data(domain)
             domain_key = data_simulator._get_domain_key(domain)
@@ -110,96 +118,98 @@ class GlobalModel(nn.Module):
                 logger.warning(f"Domain {domain} init data not found, skipping...")
                 continue
 
-            train_dataset = init_data["train"]
-            val_dataset = init_data["val"]
+            train_datasets.append(init_data["train"])
+            val_datasets.append(init_data["val"])
 
-            train_loader = DataLoader(
-                train_dataset,
-                batch_size=batch_size,
-                shuffle=True,
-                num_workers=0,
-            )
-            val_loader = DataLoader(
-                val_dataset,
-                batch_size=batch_size,
-                shuffle=False,
-                num_workers=0,
-            )
+        from torch.utils.data import ConcatDataset
+        combined_train_dataset = ConcatDataset(train_datasets)
+        combined_val_dataset = ConcatDataset(val_datasets)
 
-            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-            criterion = nn.CrossEntropyLoss()
+        train_loader = DataLoader(
+            combined_train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0,
+        )
+        val_loader = DataLoader(
+            combined_val_dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            num_workers=0,
+        )
 
-            best_acc = 0.0
-            train_losses = []
-            val_losses = []
-            val_accuracies = []
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        criterion = nn.CrossEntropyLoss()
 
-            for epoch in range(epochs):
-                self.train()
-                total_loss = 0.0
+        best_acc = 0.0
+        train_losses = []
+        val_losses = []
+        val_accuracies = []
 
-                for x, y in train_loader:
+        for epoch in range(epochs):
+            self.train()
+            total_loss = 0.0
+
+            for x, y in train_loader:
+                x, y = x.to(device), y.to(device)
+                optimizer.zero_grad()
+                out = self(x)
+                loss = criterion(out, y)
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            avg_train_loss = total_loss / len(train_loader)
+            train_losses.append(avg_train_loss)
+
+            self.eval()
+            val_loss = 0.0
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for x, y in val_loader:
                     x, y = x.to(device), y.to(device)
-                    optimizer.zero_grad()
                     out = self(x)
                     loss = criterion(out, y)
-                    loss.backward()
-                    optimizer.step()
-                    total_loss += loss.item()
+                    val_loss += loss.item()
+                    _, predicted = out.max(1)
+                    total += y.size(0)
+                    correct += predicted.eq(y).sum().item()
 
-                avg_train_loss = total_loss / len(train_loader)
-                train_losses.append(avg_train_loss)
+            avg_val_loss = val_loss / len(val_loader)
+            val_acc = 100.0 * correct / total
+            val_losses.append(avg_val_loss)
+            val_accuracies.append(val_acc)
 
-                self.eval()
-                val_loss = 0.0
-                correct = 0
-                total = 0
-                with torch.no_grad():
-                    for x, y in val_loader:
-                        x, y = x.to(device), y.to(device)
-                        out = self(x)
-                        loss = criterion(out, y)
-                        val_loss += loss.item()
-                        _, predicted = out.max(1)
-                        total += y.size(0)
-                        correct += predicted.eq(y).sum().item()
-
-                avg_val_loss = val_loss / len(val_loader)
-                val_acc = 100.0 * correct / total
-                val_losses.append(avg_val_loss)
-                val_accuracies.append(val_acc)
-
-                print(
-                    f"[Pretrain {domain}] Epoch {epoch+1}/{epochs} "
-                    f"Train Loss: {avg_train_loss:.4f} "
-                    f"Val Loss: {avg_val_loss:.4f} "
-                    f"Val Acc: {val_acc:.2f}%"
-                )
-
-                if val_acc > best_acc:
-                    best_acc = val_acc
-
-            self.save_pretrained()
-
-            from utils.visualizer import ResultVisualizer
-            visualizer = ResultVisualizer(save_dir=os.path.dirname(visualizer_path) or "./")
-
-            loss_plot_name = f"training_loss_{domain}.png"
-            visualizer.plot_training_loss(
-                epoch_losses=train_losses,
-                val_losses=val_losses,
-                save_plot=True,
-                plot_name=loss_plot_name,
+            print(
+                f"[Pretrain All Domains] Epoch {epoch+1}/{epochs} "
+                f"Train Loss: {avg_train_loss:.4f} "
+                f"Val Loss: {avg_val_loss:.4f} "
+                f"Val Acc: {val_acc:.2f}%"
             )
 
-            acc_plot_name = f"accuracy_curve_{domain}.png"
-            visualizer.plot_accuracy_curve(
-                val_accuracies=val_accuracies,
-                save_plot=True,
-                plot_name=acc_plot_name,
-            )
+            if val_acc > best_acc:
+                best_acc = val_acc
 
-            print(f"[Pretrain {domain}] Best Val Acc: {best_acc:.2f}%, Model saved.")
+        self.save_pretrained()
+
+        from utils.visualizer import ResultVisualizer
+        visualizer = ResultVisualizer(save_dir=os.path.dirname(visualizer_path) or "./")
+
+        loss_plot_name = f"{self.dataset_name}_training_loss_all_domains.png"
+        visualizer.plot_training_loss(
+            epoch_losses=train_losses,
+            val_losses=val_losses,
+            save_plot=True,
+            plot_name=loss_plot_name,
+        )
+
+        acc_plot_name = f"{self.dataset_name}_accuracy_curve_all_domains.png"
+        visualizer.plot_accuracy_curve(
+            val_accuracies=val_accuracies,
+            save_plot=True,
+            plot_name=acc_plot_name,
+        )
 
         print(f"[Pretrain] All domains trained. Model saved to {self.model_path}")
 
@@ -216,15 +226,16 @@ def pretrain_initial_models():
     domains = Config.DOMAIN_SEQUENCES[Config.CURRENT_DATASET]
     print(f"Dataset: {Config.CURRENT_DATASET}")
     print(f"Domains: {domains}")
-    print(f"Batch size: 64, Epochs: 45")
+    # print(f"Batch size: 64, Epochs: 45")
     print("-" * 50)
 
     model = GlobalModel(dataset_name=Config.CURRENT_DATASET)
     model.pretrain_on_all_domains(
         data_simulator=data_simulator,
         domains=domains,
-        epochs=45,
-        batch_size=64,
+        epochs=25,  # 10 for digit10, 10 for office31, 25 epochs for domainnet
+        lr=1e-3,  # office31: 1e-4, digit10: 5e-4, domainnet: 1e-3
+        batch_size=128,
     )
 
     print("-" * 50)
