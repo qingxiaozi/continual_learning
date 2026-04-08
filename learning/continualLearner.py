@@ -30,17 +30,7 @@ class ContinualLearner:
                 batches.extend(cache["new_data"])
             batch_mapping = None          # 不需要映射和分数
         elif strategy == "FIXED_RATIO":
-            batches = []
-            for vid in range(Config.NUM_VEHICLES):
-                cache = cache_manager.get_vehicle_cache(vid)
-                old = cache["old_data"]
-                new = cache["new_data"]
-                total = len(old) + len(new)
-                if total > 0:
-                    num_new = int(Config.FIXED_RATIO * total)
-                    batches.extend(new[:num_new])
-                    batches.extend(old[: total - num_new])
-            batch_mapping = None
+            batches, batch_mapping = self._collect_batches(cache_manager)
         elif strategy == "MAB":
             batches, batch_mapping = self._collect_batches(cache_manager)
         else:
