@@ -59,7 +59,7 @@ class Config:
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
-    CURRENT_DATASET = "office31"
+    CURRENT_DATASET = "domainnet"
     # 域增量学习参数
     DOMAIN_SEQUENCES = {
         "office31": ["amazon", "webcam", "dslr"],
@@ -77,7 +77,7 @@ class Config:
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
     # 数据路径
     DATA_BASE_PATH = "./data"
-    USE_SAMPLED_DATA = False  # 是否使用采样数据集
+    USE_SAMPLED_DATA = True  # 是否使用采样数据集
     SAMPLED_DATA_PATH = "./data/domainnet_sample"  # 采样数据集路径
     # 数据集特定参数
     OFFICE31_CLASSES = 31
