@@ -102,7 +102,7 @@ class DomainIncrementalDataSimulator:
     - 每个域有5个子集，sub_idx在域内循环 [0, 1, 2, 3, 4]
     """
 
-    NUM_CLASSES = {"office31": 31, "digit10": 10, "domainnet": 126}
+    NUM_CLASSES = {"office31": 31, "digit10": 10, "domainnet": 345}
     DOMAINS = {
         "office31": ["amazon", "webcam", "dslr"],
         "digit10": ["mnist", "emnist", "usps", "svhn"],
@@ -111,7 +111,7 @@ class DomainIncrementalDataSimulator:
     BASE_PATH = {
         "office31": os.path.join(Config.DATA_BASE_PATH, "office-31"),
         "digit10": Config.SAMPLED_DATA_PATH if Config.USE_SAMPLED_DATA else os.path.join(Config.DATA_BASE_PATH, "digit10"),
-        "domainnet": os.path.join(Config.DATA_BASE_PATH, "domainnet"),
+        "domainnet": Config.SAMPLED_DATA_PATH if Config.USE_SAMPLED_DATA else os.path.join(Config.DATA_BASE_PATH, "domainnet"),
     }
 
     TRAIN_TRANSFORM = transforms.Compose([
