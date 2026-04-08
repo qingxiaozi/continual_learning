@@ -233,9 +233,9 @@ def pretrain_initial_models():
     model.pretrain_on_all_domains(
         data_simulator=data_simulator,
         domains=domains,
-        epochs=25,  # 10 for digit10, 10 for office31, 25 epochs for domainnet
-        lr=1e-3,  # office31: 1e-4, digit10: 5e-4, domainnet: 1e-3
-        batch_size=128,
+        epochs=10,  # 10 for digit10, 10 for office31, 10 epochs for domainnet
+        lr=1e-4,  # office31: 1e-4, digit10: 5e-4, domainnet: 1e-4
+        batch_size=64,
     )
 
     print("-" * 50)
