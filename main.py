@@ -21,57 +21,71 @@ from torch.utils.data import DataLoader
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-        # "Base_Static": {
-        #     "BW": "EQUAL", 
-        #     "UPLOAD": "STATIC", 
-        #     "TRAIN": "NEW_ONLY",
-        # },
         "Base_Uniform": {
-            "BW": "EQUAL", 
-            "UPLOAD": "FIXED_RATIO", 
+            "BW": "EQUAL",
+            "UPLOAD": "FIXED_RATIO",
             "TRAIN": "FIXED_RATIO",
+            "env_group": "group_uniform",
         },
         "Abl_BW_Opt": {
-            "BW": "MINMAX_DELAY", 
-            "UPLOAD": "FIXED_RATIO", 
+            "BW": "MINMAX_DELAY",
+            "UPLOAD": "FIXED_RATIO",
             "TRAIN": "FIXED_RATIO",
+            "env_group": "group_uniform",
         },
         "Abl_UP_Greedy": {
-            "BW": "EQUAL", 
-            "UPLOAD": "LOSS_GREEDY", 
+            "BW": "EQUAL",
+            "UPLOAD": "LOSS_GREEDY",
             "TRAIN": "FIXED_RATIO",
+            "env_group": "group_greedy",
         },
         "Abl_UP_DRL": {
-            "BW": "EQUAL", 
-            "UPLOAD": "DRL", 
+            "BW": "EQUAL",
+            "UPLOAD": "DRL",
             "TRAIN": "FIXED_RATIO",
+            "env_group": "group_drl",
         },
         "Abl_TR_MAB": {
-            "BW": "EQUAL", 
-            "UPLOAD": "FIXED_RATIO", 
+            "BW": "EQUAL",
+            "UPLOAD": "FIXED_RATIO",
             "TRAIN": "MAB",
+            "env_group": "group_mab",
         },
         "Abl_NoReplay": {
-            "BW": "EQUAL", 
-            "UPLOAD": "FIXED_RATIO", 
+            "BW": "EQUAL",
+            "UPLOAD": "FIXED_RATIO",
             "TRAIN": "NEW_ONLY",
+            "env_group": "group_noreplay",
         },
         "Combo_Comm": {
-            "BW": "MINMAX_DELAY", 
-            "UPLOAD": "DRL", 
+            "BW": "MINMAX_DELAY",
+            "UPLOAD": "DRL",
             "TRAIN": "FIXED_RATIO",
+            "env_group": "group_drl",
         },
         "Combo_Learn": {
-            "BW": "EQUAL", 
-            "UPLOAD": "DRL", 
+            "BW": "EQUAL",
+            "UPLOAD": "DRL",
             "TRAIN": "MAB",
-        },        
+            "env_group": "group_combo",
+        },
         "Ours_Full": {
-            "BW": "MINMAX_DELAY", 
-            "UPLOAD": "DRL", 
+            "BW": "MINMAX_DELAY",
+            "UPLOAD": "DRL",
             "TRAIN": "MAB",
+            "env_group": "group_combo",
         }
     }
+
+# 环境分组 → 相同随机种子（同一组内物理环境完全相同）
+ENV_GROUP_SEEDS = {
+    "group_uniform": 42,
+    "group_greedy": 43,
+    "group_drl": 44,
+    "group_mab": 45,
+    "group_noreplay": 46,
+    "group_combo": 47,
+}
 
 import multiprocessing as mp
 
@@ -80,10 +94,14 @@ mp.set_start_method('spawn', force=True)
 
     
 def run_and_save(exp_name, config, output_dir):
+    env_group = config.get("env_group", exp_name)
+    seed = ENV_GROUP_SEEDS.get(env_group, 42)
+
     Config.BANDWIDTH_STRATEGY = config["BW"]
     Config.UPLOAD_STRATEGY = config["UPLOAD"]
     Config.TRAINING_STRATEGY = config["TRAIN"]
-        
+    Config.set_seed(seed)
+
     tester = RLTester()
     results = tester.test()
 
