@@ -12,6 +12,7 @@ import wandb
 import torch
 import itertools
 import numpy as np
+from torch.utils.data import DataLoader
 from config.parameters import Config
 from config.paths import Paths
 
@@ -81,7 +82,7 @@ class RLTester:
         """测试循环"""
         logger.info("testing...")
 
-        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}_reward_1"
+        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}_reward_3"
         self.wandb_run = wandb.init(
             project=f"Vehicle-Edge-CL-Testing_{Config.CURRENT_DATASET}",
             name=run_name,

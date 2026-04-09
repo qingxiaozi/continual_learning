@@ -172,3 +172,30 @@ Greedy_Channel_BW：带宽按照贪婪策略分配，数据按照固定比例上
 3. 模型优化。从回放缓冲区随机采样一个批次的经验，使用策略网络计算当前状态-动作对的Q值，使用目标网络计算下一个状态最大的Q值，根据贝尔曼方程计算目标Q值。使用均方误差损失函数计算当前Q值和目标Q值之间的差值，并通过优化器更新策略网络。
 4. 保存和加载模型，包括策略网络、目标网络和优化器的状态字典。
 
+## 七、实验结果
+### 损失变化/时间
+rl模型：【奖励为损失变化/时间】
+/home/ruiqinghe/workspace/continual_learning/results/pth/office31/trained_drl_model_office31_0.pth
+/home/ruiqinghe/workspace/continual_learning/results/pth/digit10/trained_drl_model_digit10_0.pth
+测试结果：【在验证集上测试】
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/office31/reward_0
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/digit10/reward_0
+/home/ruiqinghe/workspace/continual_learning/results/npy/office31/npy_0
+/home/ruiqinghe/workspace/continual_learning/results/npy/digit10/npy_0
+
+### 损失变化-时间
+rl模型：【奖励为损失变化-时间】
+/home/ruiqinghe/workspace/continual_learning/results/pth/office31/trained_drl_model_office31_1.pth
+/home/ruiqinghe/workspace/continual_learning/results/pth/digit10/trained_drl_model_digit10_1.pth
+
+测试结果：【在验证集上测试】
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/office31/reward_1
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/digit10/reward_1
+/home/ruiqinghe/workspace/continual_learning/results/npy/office31/npy_1
+/home/ruiqinghe/workspace/continual_learning/results/npy/digit10/npy_1
+
+测试结果：【在测试集上测试】
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/office31/reward_2
+/home/ruiqinghe/workspace/continual_learning/results/com_exp/digit10/reward_2
+/home/ruiqinghe/workspace/continual_learning/results/npy/office31/npy_2
+/home/ruiqinghe/workspace/continual_learning/results/npy/digit10/npy_2
