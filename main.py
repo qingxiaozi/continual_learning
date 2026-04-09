@@ -110,23 +110,6 @@ def run_and_save(exp_name, config, output_dir):
         f.write(formatted_text + '\n')
     return exp_name, results
 
-def run_experiment(exp_name, config):
-    print(f"\n=== Running Experiment: {exp_name} ===")
-    
-    try:
-        Config.BANDWIDTH_STRATEGY = config["BW"]
-        Config.UPLOAD_STRATEGY = config["UPLOAD"]
-        Config.TRAINING_STRATEGY = config["TRAIN"]
-
-        tester = RLTester()
-        results = tester.test()
-    
-        return results
-    except Exception as e:
-        print(f"Experiment {exp_name} FAILED: {str(e)}")
-        traceback.print_exc()
-        return {"error": str(e), "status": "failed"} 
-
 
 if __name__ == "__main__":
     import concurrent.futures
@@ -136,13 +119,13 @@ if __name__ == "__main__":
     output_dir = Paths.get_dataset_dir('com_exp')
     os.makedirs(output_dir, exist_ok=True)
     
-    # 运行所有实验（8个进程并行）
-    with concurrent.futures.ProcessPoolExecutor(max_workers=16, mp_context=ctx) as executor:
+    # 运行所有实验（最多6个进程并行）
+    with concurrent.futures.ProcessPoolExecutor(max_workers=6, mp_context=ctx) as executor:
         futures = {
-            executor.submit(run_and_save, exp_name, config, output_dir): exp_name 
+            executor.submit(run_and_save, exp_name, config, output_dir): exp_name
             for exp_name, config in EXPERIMENT_CONFIGS.items()
         }
-        
+
         for future in concurrent.futures.as_completed(futures):
             exp_name = futures[future]
             try:
