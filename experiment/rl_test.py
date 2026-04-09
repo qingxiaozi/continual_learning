@@ -81,7 +81,7 @@ class RLTester:
         """测试循环"""
         logger.info("testing...")
 
-        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}_reward_3"
+        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}_reward_4"
         self.wandb_run = wandb.init(
             project=f"Vehicle-Edge-CL-Testing_{Config.CURRENT_DATASET}",
             name=run_name,
