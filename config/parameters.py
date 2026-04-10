@@ -7,7 +7,7 @@ class Config:
     
     BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
     UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "LOSS_GREEDY", "DRL"]
-    TRAINING_STRATEGY = "MAB"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
+    TRAINING_STRATEGY = "FIXED_RATIO"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
     FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
     NUM_EPISODES = 600  # episode数，office31:600; digit10:1120; domainnet:1680

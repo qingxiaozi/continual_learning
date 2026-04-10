@@ -7,22 +7,22 @@ from config.parameters import Config
 random.seed(Config.RANDOM_SEED)
 
 # 数据集路径
-SOURCE_BASE = "./data/digit10"
-TARGET_BASE = "./data/digit10_sample"
+SOURCE_BASE = "./data/domainnet"
+TARGET_BASE = "./data/domainnet_sample"
 
 # 每个域采样数量
-SAMPLES_PER_DOMAIN = 10350
+SAMPLES_PER_DOMAIN = 3000
 
 # digit10 的域
-# DOMAINS = [
-#             "clipart",
-#             "infograph",
-#             "painting",
-#             "quickdraw",
-#             "real",
-#             "sketch",
-#         ]
-DOMAINS = ["mnist", "emnist", "usps", "svhn"]
+DOMAINS = [
+            "clipart",
+            "infograph",
+            "painting",
+            "quickdraw",
+            "real",
+            "sketch",
+        ]
+# DOMAINS = ["mnist", "emnist", "usps", "svhn"]
 
 def sample_domain_data(domain_name):
     """从一个域中采样数据"""
@@ -91,7 +91,7 @@ def main():
     # 检查源目录
     if not os.path.exists(SOURCE_BASE):
         print(f"错误: 源目录不存在: {SOURCE_BASE}")
-        print("请先下载 digit10 数据集")
+        print("请先下载 domainnet 数据集")
         return
     
     # 为每个域采样
