@@ -536,12 +536,23 @@ class VehicleEnvironment:
                 # 3. 获取质量评分 - 从缓存管理器中获取
                 quality_score = vehicle.update_quality_scores(self.cache_manager)
 
+                # 4. 计算到基站的归一化距离
+                if vehicle.bs_connection is not None:
+                    bs = self._get_base_station_by_id(vehicle.bs_connection)
+                    if bs:
+                        distance = np.linalg.norm(vehicle.position - bs["utm_position"])
+                        normalized_distance = min(distance / Config.BASE_STATION_COVERAGE, 1.0)
+                    else:
+                        normalized_distance = 1.0
+                else:
+                    normalized_distance = 1.0
+
                 # 添加到状态向量
-                state.extend([confidence, test_loss, quality_score])
+                state.extend([confidence, test_loss, quality_score, normalized_distance])
 
             except Exception as e:
                 logger.debug(f"Error getting state for vehicle {vehicle.id}: {e}")
-                state.extend([0.5, 1.0, 0])
+                state.extend([0.5, 1.0, 0, 1.0])
 
         return np.array(state, dtype=np.float32)
 
