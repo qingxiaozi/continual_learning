@@ -20,8 +20,9 @@ from utils.visualizer import ResultVisualizer
 
 class RLTrainer:
     def __init__(self):
+        Config.set_seed(44)
         self.env = VehicleEdgeEnv(mode="train")
-        self.agent = DRLAgent(state_dim=4 * Config.NUM_VEHICLES)
+        self.agent = DRLAgent(state_dim=5 * Config.NUM_VEHICLES)
         self.visualizer = ResultVisualizer()
         self.num_episodes = Config.NUM_EPISODES
         self.max_timesteps = Config.NUM_TRAINING_SESSIONS
@@ -33,7 +34,7 @@ class RLTrainer:
             config={
                 "num_episodes": self.num_episodes,
                 "max_timesteps": self.max_timesteps,
-                "state_dim": 4 * Config.NUM_VEHICLES,
+                "state_dim": 5 * Config.NUM_VEHICLES,
                 "learning_rate": Config.DRL_LEARNING_RATE,
                 "gamma": Config.DRL_GAMMA,
                 "batch_size": Config.DRL_BATCH_SIZE,
