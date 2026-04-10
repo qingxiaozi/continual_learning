@@ -47,12 +47,38 @@ class CommunicationSystem:
         self.model = global_model
         self.model_param_bits = sum(p.numel() for p in self.model.parameters()) * 8  # 单位：bit
 
+        # 信道增益缓存（每个step采样一次）
+        self._channel_cache = {}
+
     def _get_vehicle(self, vid):
         return self.vehicle_env._get_vehicle_by_id(vid) if self.vehicle_env else None
 
     def _get_bs(self, bs_id):
         return self.vehicle_env._get_base_station_by_id(bs_id) if self.vehicle_env else None
-    
+
+    def snapshot_channel(self):
+        """为当前step采样一次所有(车辆,基站)对的信道增益并缓存"""
+        if not self.vehicle_env:
+            return
+        self._channel_cache.clear()
+        for vehicle in self.vehicle_env.vehicles:
+            if vehicle.bs_connection is None:
+                continue
+            bs = self._get_bs(vehicle.bs_connection)
+            if not bs:
+                continue
+            cache_key = (vehicle.id, bs["id"])
+            d = max(np.linalg.norm(vehicle.position - bs["utm_position"]), 1.0)
+            path_loss = self.g0 * (d ** (-self.alpha))
+            shadowing_db = np.random.normal(0, self.shadowing_std)
+            shadowing_linear = 10 ** (shadowing_db / 10)
+            gain = path_loss * shadowing_linear
+            self._channel_cache[cache_key] = gain
+
+    def clear_channel_cache(self):
+        """清空信道增益缓存"""
+        self._channel_cache.clear()
+
     def calculate_channel_gain(self, vehicle, base_station):
         """
         计算信道增益 g_v^s
@@ -65,15 +91,19 @@ class CommunicationSystem:
         """
         if not vehicle or not base_station:
             return 0.0
-        # 计算距离
+
+        cache_key = (vehicle.id, base_station["id"])
+        if cache_key in self._channel_cache:
+            return self._channel_cache[cache_key]
+
         d = max(np.linalg.norm(vehicle.position - base_station["utm_position"]), 1.0)
-        # 计算路径损耗部分: G_0 * (d_v^s)^{-α}
         path_loss = self.g0 * (d ** (-self.alpha))
-        # 生成阴影衰落 ξ (对数正态分布)
         shadowing_db = np.random.normal(0, self.shadowing_std)
         shadowing_linear = 10 ** (shadowing_db / 10)
 
-        return path_loss * shadowing_linear
+        gain = path_loss * shadowing_linear
+        self._channel_cache[cache_key] = gain
+        return gain
 
     def calculate_uplink_rate(self, vehicle, base_station, beta):
         """
