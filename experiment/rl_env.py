@@ -75,6 +75,8 @@ class VehicleEdgeEnv:
             info: dict
         """
         batch_choices = action
+        self.communication_system.snapshot_channel()
+
         # 1. 执行动作，分配带宽，上传数据，更新缓存
         bandwidth_ratios = self._allocate_bandwidth(batch_choices)
         self._upload_datas(batch_choices)
@@ -89,6 +91,7 @@ class VehicleEdgeEnv:
 
         # 4. 计算奖励
         reward = self._calculate_reward(comm_results, training_results, total_samples)
+        self.communication_system.clear_channel_cache()
         # 5. 更新环境
         self._update_session_environment()
         next_state = self._get_state()
