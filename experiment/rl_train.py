@@ -22,7 +22,7 @@ class RLTrainer:
     def __init__(self):
         Config.set_seed(44)
         self.env = VehicleEdgeEnv(mode="train")
-        self.agent = DRLAgent(state_dim=5 * Config.NUM_VEHICLES)
+        self.agent = DRLAgent(state_dim=6 * Config.NUM_VEHICLES)
         self.visualizer = ResultVisualizer()
         self.num_episodes = Config.NUM_EPISODES
         self.max_timesteps = Config.NUM_TRAINING_SESSIONS
@@ -34,7 +34,7 @@ class RLTrainer:
             config={
                 "num_episodes": self.num_episodes,
                 "max_timesteps": self.max_timesteps,
-                "state_dim": 5 * Config.NUM_VEHICLES,
+                "state_dim": 6 * Config.NUM_VEHICLES,
                 "learning_rate": Config.DRL_LEARNING_RATE,
                 "gamma": Config.DRL_GAMMA,
                 "batch_size": Config.DRL_BATCH_SIZE,
@@ -57,7 +57,7 @@ class RLTrainer:
             total_delay = 0.0
 
             for t in range(self.max_timesteps):
-                available_batches = state[-Config.NUM_VEHICLES:].astype(int).tolist()
+                available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
                 # 选择动作
                 action = self.agent.select_action(state, available_batches)
                 
