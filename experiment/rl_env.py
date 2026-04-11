@@ -38,11 +38,12 @@ class VehicleEdgeEnv:
         self.state_dim = dummy_state.shape[0]
         self.last_comm_metrics = {
             "transmission_delay": 0.0,
-            "labeling_delay": 0.0,      
+            "labeling_delay": 0.0,
             "retraining_delay": 0.0,
             "broadcast_delay": 0.0,
             "total_delay": 0.0
         }
+        self._prev_per_task_acc = {}
 
     def reset(self):
         """重置环境，开始新的episode"""
@@ -53,6 +54,7 @@ class VehicleEdgeEnv:
         self.cache_manager.reset()
         self.current_domain = self.data_simulator.get_current_domain()
         self.session = 0
+        self._prev_per_task_acc = {}
         # 预加载第一个子数据集，使 step 0 可以训练
         self.data_simulator.update_session_dataset(0)
 
@@ -144,7 +146,7 @@ class VehicleEdgeEnv:
         )
     
     def _calculate_delay(self, batch_choices, bandwidth_ratios, training_results, total_samples):
-        include_broadcast = (self.mode == "test")
+        include_broadcast = True
         return self.communication_system.calculate_total_training_delay(
             upload_decisions=[(i, n) for i, n in enumerate(batch_choices) if n > 0],
             bandwidth_allocations={i: r for i, r in enumerate(bandwidth_ratios) if r > 0},
@@ -161,36 +163,43 @@ class VehicleEdgeEnv:
         return total
 
     def _calculate_reward(self, comm, train, total_samples):
-        # # 原有的奖励计算方式（已注释）
-        # loss_before = train.get("loss_before", 1.0)
-        # loss_after = train.get("loss_after", 1.0)
-        # delay = comm["total_delay"]
-        # loss_reduction = (loss_before - loss_after) / (loss_before + 1e-6)
-        # if total_samples == 0:
-        #     return -0.2
-        # reward = loss_reduction - 0.02 * delay
-        # return reward
-        
-        # ========================================
-        # 新的奖励计算方式：在所有已加载子数据集上计算测试准确率
-        # ========================================
         delay = comm["total_delay"]
-        
-        # 获取所有已加载子数据集的测试集
+
         cumulative_test_datasets = self.data_simulator.get_cumulative_test_datasets()
-        
-        # 计算所有子数据集的平均准确率
-        test_acc = 0.0
+
+        cur_acc = {}
         if cumulative_test_datasets:
             for (domain, sub_idx), test_dataset in cumulative_test_datasets.items():
                 loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE)
                 acc, _ = self.evaluator.evaluate_model(self.global_model.model, loader)
-                test_acc += acc
-            test_acc /= len(cumulative_test_datasets)
-        
-        # 奖励 = 测试准确率 - 延迟惩罚
-        reward = test_acc - 0.02 * delay
-        
+                cur_acc[(domain, sub_idx)] = acc
+
+        if not self._prev_per_task_acc:
+            self._prev_per_task_acc = cur_acc.copy()
+            baseline = sum(cur_acc.values()) / len(cur_acc) if cur_acc else 0.0
+            return baseline - 0.1 * delay
+
+        common_tasks = set(self._prev_per_task_acc.keys()) & set(cur_acc.keys())
+        new_tasks = set(cur_acc.keys()) - set(self._prev_per_task_acc.keys())
+
+        delta_acc = 0.0
+        if common_tasks:
+            delta_sum = sum(cur_acc[t] - self._prev_per_task_acc[t] for t in common_tasks)
+            delta_acc = delta_sum / len(common_tasks)
+
+        if new_tasks:
+            new_task_bonus = sum(cur_acc[t] for t in new_tasks) / len(new_tasks) * 0.1
+            delta_acc += new_task_bonus
+
+        forgetting = 0.0
+        if common_tasks:
+            forget_sum = sum(max(self._prev_per_task_acc[t] - cur_acc[t], 0) for t in common_tasks)
+            forgetting = forget_sum / len(common_tasks)
+
+        reward = delta_acc - 2.0 * forgetting - 0.1 * delay
+
+        self._prev_per_task_acc = cur_acc.copy()
+
         return reward
     
     def _update_session_environment(self):
@@ -247,10 +256,15 @@ class VehicleEdgeEnv:
     def _get_state(self):
         """获取当前环境状态表示"""
         state = self.vehicle_env.get_environment_state()
-        # 获取每辆车当前可用批次数量
         available_batches = []
+        cache_old_ratios = []
         for vehicle in self.vehicle_env.vehicles:
             available_batches.append(len(vehicle.data_batches))
-        state = np.concatenate([state, available_batches], dtype=np.float32)
+            cache = self.cache_manager.get_vehicle_cache(vehicle.id)
+            n_old = len(cache.get("old_data", []))
+            n_new = len(cache.get("new_data", []))
+            total = n_old + n_new
+            cache_old_ratios.append(n_old / total if total > 0 else 0.0)
+        state = np.concatenate([state, available_batches, cache_old_ratios], dtype=np.float32)
         return state
     

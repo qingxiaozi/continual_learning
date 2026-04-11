@@ -1,5 +1,6 @@
 import torch
 import random
+import numpy as np
 
 
 class Config:
@@ -48,7 +49,7 @@ class Config:
     DRL_BATCH_SIZE = 32  # batch size
     DRL_EPSILON_START = 0.9
     DRL_EPSILON_END = 0.05
-    DRL_EPSILON_DECAY = 80  # epsilon衰减速率
+    DRL_EPSILON_DECAY = 2000  # epsilon衰减速率
     DRL_TARGET_UPDATE_EVERY = 100  # 目标网络更新频率
     DRL_TAU = 0.005  # 软更新参数
 
@@ -108,6 +109,7 @@ class Config:
         if seed is None:
             seed = Config.RANDOM_SEED
         random.seed(seed)
+        np.random.seed(seed)
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(seed)
