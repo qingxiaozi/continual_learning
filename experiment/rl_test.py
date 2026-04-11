@@ -109,7 +109,7 @@ class RLTester:
             cached_loaders = {}
 
             for t in range(self.max_timesteps):
-                available_batches = state[-Config.NUM_VEHICLES:].astype(int).tolist()
+                available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
 
                 if Config.UPLOAD_STRATEGY == "LOSS_GREEDY":
                     action = self.agent.select_action(
