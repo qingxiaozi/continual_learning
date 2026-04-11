@@ -446,16 +446,16 @@ class ResultVisualizer:
         """加载 results/npy/{dataset}/npy_1/*.npy 并生成所有可视化图表"""
         dataset_name = Config.CURRENT_DATASET
         base_npy_dir = Paths.get_dataset_dir("npy")
-        base_npy_dir = os.path.join(base_npy_dir, "npy_2")
+        base_npy_dir = os.path.join(base_npy_dir, "npy_6")
         
         legend_mapping = {
             'DRL_EQUAL_FIXED_RATIO': 'Abl_UP_DRL',
-            'DRL_MINMAX_DELAY_FIXED_RATIO': 'OURS FULL',
-            'DRL_EQUAL_LOSS_GREEDY_FIXED_RATIO': 'Abl_UP_G',
+            'DRL_MINMAX_DELAY_FIXED_RATIO': 'OURS',
+            # 'DRL_EQUAL_LOSS_GREEDY_FIXED_RATIO': 'Abl_UP_Greedy',
             'FIXED_RATIO_EQUAL_FIXED_RATIO': 'BASE',
-            'FIXED_RATIO_EQUAL_NEW_ONLY': 'Abl_TR_NEW',
-            'FIXED_RATIO_MINMAX_DELAY_FIXED_RATIO': 'Abl_BW',
-            'LOSS_GREEDY_EQUAL_FIXED_RATIO': 'AbI_UP_G',
+            'FIXED_RATIO_EQUAL_NEW_ONLY': 'Abl_NoReplay',
+            'FIXED_RATIO_MINMAX_DELAY_FIXED_RATIO': 'Abl_BW_Opt',
+            'LOSS_GREEDY_EQUAL_FIXED_RATIO': 'AbI_UP_Greedy',
         }
         
         if not os.path.exists(base_npy_dir):
@@ -506,7 +506,7 @@ class ResultVisualizer:
         os.makedirs(output_dir, exist_ok=True)
         
         for metric in metrics:
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(12, 6))
             
             plotted = False
             for idx, prefix in enumerate(prefixes):
@@ -527,22 +527,23 @@ class ResultVisualizer:
                         print(f"加载失败 {filepath}: {e}")
             
             if plotted:
-                ax.set_xlabel('Episode', fontsize=14)
-                ax.set_ylabel(metric, fontsize=14)
+                ax.set_xlabel('Episode', fontsize=27)
+                ax.set_ylabel(metric, fontsize=27)
+                ax.tick_params(axis='both', labelsize=21)
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
 
                 handles, labels = ax.get_legend_handles_labels()
-                fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), ncol=3, fontsize=9, frameon=False)
+                fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), ncol=3, fontsize=20, frameon=False)
 
                 output_path = os.path.join(output_dir, f"{metric} on {dataset_name}.png")
-                plt.tight_layout(rect=[0, 0, 1, 0.95])
+                plt.tight_layout(rect=[0, 0, 1, 0.90])
                 plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
                 plt.close()
                 print(f"保存: {output_path}")
         
         for metric, title in system_metrics:
-            fig, ax = plt.subplots(figsize=(8, 6))
+            fig, ax = plt.subplots(figsize=(12, 6))
             
             plotted = False
             for idx, prefix in enumerate(prefixes):
@@ -563,16 +564,17 @@ class ResultVisualizer:
                         print(f"加载失败 {filepath}: {e}")
             
             if plotted:
-                ax.set_xlabel('Episode', fontsize=14)
-                ax.set_ylabel(title, fontsize=14)
+                ax.set_xlabel('Episode', fontsize=27)
+                ax.set_ylabel(title, fontsize=27)
+                ax.tick_params(axis='both', labelsize=21)
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
 
                 handles, labels = ax.get_legend_handles_labels()
-                fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), ncol=3, fontsize=9, frameon=False)
+                fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.98), ncol=3, fontsize=20, frameon=False)
 
                 output_path = os.path.join(output_dir, f"{title} on {dataset_name}.png")
-                plt.tight_layout(rect=[0, 0, 1, 0.95])
+                plt.tight_layout(rect=[0, 0, 1, 0.90])
                 plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
                 plt.close()
                 print(f"保存: {output_path}")
