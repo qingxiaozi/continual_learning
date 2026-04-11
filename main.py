@@ -45,12 +45,12 @@ EXPERIMENT_CONFIGS = {
             "TRAIN": "FIXED_RATIO",
             "env_group": "group_drl",
         },
-        "Abl_TR_MAB": {
-            "BW": "EQUAL",
-            "UPLOAD": "FIXED_RATIO",
-            "TRAIN": "MAB",
-            "env_group": "group_mab",
-        },
+        # "Abl_TR_MAB": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "FIXED_RATIO",
+        #     "TRAIN": "MAB",
+        #     "env_group": "group_mab",
+        # },
         "Abl_NoReplay": {
             "BW": "EQUAL",
             "UPLOAD": "FIXED_RATIO",
@@ -63,18 +63,18 @@ EXPERIMENT_CONFIGS = {
             "TRAIN": "FIXED_RATIO",
             "env_group": "group_drl",
         },
-        "Combo_Learn": {
-            "BW": "EQUAL",
-            "UPLOAD": "DRL",
-            "TRAIN": "MAB",
-            "env_group": "group_combo",
-        },
-        "Ours_Full": {
-            "BW": "MINMAX_DELAY",
-            "UPLOAD": "DRL",
-            "TRAIN": "MAB",
-            "env_group": "group_combo",
-        }
+        # "Combo_Learn": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "DRL",
+        #     "TRAIN": "MAB",
+        #     "env_group": "group_combo",
+        # },
+        # "Ours_Full": {
+        #     "BW": "MINMAX_DELAY",
+        #     "UPLOAD": "DRL",
+        #     "TRAIN": "MAB",
+        #     "env_group": "group_combo",
+        # }
     }
 
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）
