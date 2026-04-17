@@ -186,26 +186,87 @@ class VehicleEnvironment:
         self._initialize_environment()
         # self.plot_all_trajectories_and_bs(Paths.ALL_TRAJECTORIES_PNG)
 
-    def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png'):
-        """绘制所有轨迹"""
+    def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png', zoom_region=None):
+        """
+        绘制路网图，包含所有轨迹和基站，并可选地添加局部放大区域
+
+        Args:
+            save_path: 图片保存路径
+            zoom_region: 元组 (lon_min, lon_max, lat_min, lat_max)，指定放大区域经纬度范围
+        """
+        fig, ax = plt.subplots(figsize=(14, 10))
+
+        all_lons, all_lats = [], []
         for poly in self.trajectory_data['POLYLINE']:
             try:
                 pts = ast.literal_eval(poly)
                 if pts:
-                    plt.plot(*zip(*pts), 'b-', linewidth=0.3)
+                    lons, lats = zip(*pts)
+                    all_lons.extend(lons)
+                    all_lats.extend(lats)
+                    ax.plot(lons, lats, 'b-', linewidth=0.3, alpha=0.6)
             except:
                 continue
 
         if self.base_stations:
-            plt.scatter([bs['lonlat_position'][0] for bs in self.base_stations],
-                   [bs['lonlat_position'][1] for bs in self.base_stations],
-                   c='red', s=2, marker='.', alpha=0.7, label=f'{len(self.base_stations)} BS')
-        plt.plot([], [], 'b-', linewidth=0.3, label=f'Trajectories ({len(self.trajectory_data)})')
-        plt.title(f"{len(self.trajectory_data)} Trajectories with {len(self.base_stations)} BS")
-        plt.xlabel("Longitude")
-        plt.ylabel("Latitude")
-        plt.legend(loc='best')
-        plt.grid(True, alpha=0.3)
+            bs_lons = [bs['lonlat_position'][0] for bs in self.base_stations]
+            bs_lats = [bs['lonlat_position'][1] for bs in self.base_stations]
+            ax.scatter(bs_lons, bs_lats, c='red', s=15, marker='^', alpha=0.7,
+                      label=f'Base Stations ({len(self.base_stations)})', zorder=5)
+
+        ax.plot([], [], 'b-', linewidth=0.3, label=f'Trajectories ({len(self.trajectory_data)})')
+        ax.set_xlabel("Longitude(°)", fontsize=12)
+        ax.set_ylabel("Latitude(°)", fontsize=12)
+        ax.set_title(f"Road Network: {len(self.trajectory_data)} Trajectories with {len(self.base_stations)} Base Stations", fontsize=14)
+        ax.legend(loc='upper right', fontsize=10)
+
+        if zoom_region is None and all_lons and all_lats:
+            lon_margin = (max(all_lons) - min(all_lons)) * 0.05
+            lat_margin = (max(all_lats) - min(all_lats)) * 0.05
+            zoom_region = (
+                min(all_lons) + lon_margin,
+                min(all_lons) + (max(all_lons) - min(all_lons)) * 0.15,
+                min(all_lats) + lat_margin,
+                min(all_lats) + (max(all_lats) - min(all_lats)) * 0.15
+            )
+
+        if zoom_region:
+            lon_min, lon_max, lat_min, lat_max = zoom_region
+
+            ax_inset = fig.add_axes([0.55, 0.55, 0.35, 0.35])
+
+            for poly in self.trajectory_data['POLYLINE']:
+                try:
+                    pts = ast.literal_eval(poly)
+                    if pts:
+                        ax_inset.plot(*zip(*pts), 'b-', linewidth=0.5, alpha=0.8)
+                except:
+                    continue
+
+            bs_in_region = [
+                (bs['lonlat_position'][0], bs['lonlat_position'][1])
+                for bs in self.base_stations
+                if lon_min <= bs['lonlat_position'][0] <= lon_max
+                and lat_min <= bs['lonlat_position'][1] <= lat_max
+            ]
+
+            if bs_in_region:
+                inset_bs_lons, inset_bs_lats = zip(*bs_in_region)
+                ax_inset.scatter(inset_bs_lons, inset_bs_lats, c='red', s=50, marker='^',
+                                alpha=0.9, label=f'{len(bs_in_region)} BS', zorder=5)
+
+            ax_inset.set_xlim(lon_min, lon_max)
+            ax_inset.set_ylim(lat_min, lat_max)
+            ax_inset.set_title("Zoomed Region", fontsize=10)
+            ax_inset.tick_params(axis='both', labelsize=8)
+
+            rect = plt.Rectangle((lon_min, lat_min), lon_max - lon_min, lat_max - lat_min,
+                                 fill=False, edgecolor='green', linewidth=2, linestyle='--')
+            ax.add_patch(rect)
+
+            if bs_in_region:
+                ax_inset.legend(loc='upper right', fontsize=8)
+
         plt.tight_layout()
 
         if save_path:
@@ -412,25 +473,51 @@ class VehicleEnvironment:
         self._update_vehicle_connections()
 
     def _generate_ppp_vehicles(self, center_position):
-        """泊松点过程生成车辆"""
+        """泊松点过程生成车辆（沿轨迹方向矩形区域）"""
         ppp_count = Config.NUM_VEHICLES - 1
-        angles = np.random.uniform(0, 2 * np.pi, size=ppp_count)
-        radii = np.random.uniform(0, self.ppp_radius, size=ppp_count)
+        if ppp_count <= 0:
+            return
 
-        # 转换为笛卡尔偏移
-        offsets = np.stack([
-            radii * np.cos(angles),
-            radii * np.sin(angles)
-        ], axis=1)  # shape: (ppp_count, 2)
+        if self.trajectory_points is not None and self.trajectory_index < len(self.trajectory_points) - 1:
+            direction = self.trajectory_points[self.trajectory_index + 1] - self.trajectory_points[self.trajectory_index]
+        elif self.trajectory_points is not None and len(self.trajectory_points) > 1:
+            direction = self.trajectory_points[-1] - self.trajectory_points[0]
+        else:
+            angle = np.random.uniform(0, 2 * np.pi)
+            direction = np.array([np.cos(angle), np.sin(angle)])
 
-        # 所有位置 = 中心 + 偏移
+        direction = direction / (np.linalg.norm(direction) + 1e-8)
+        perpendicular = np.array([-direction[1], direction[0]])
+
+        rect_length = 200.0
+        rect_width = 24.0
+
+        area = rect_length * rect_width
+        lambda_ppp = ppp_count / area
+
+        num_vehicles = np.random.poisson(lambda_ppp * area)
+        num_vehicles = min(num_vehicles, ppp_count)
+
+        if num_vehicles == 0:
+            return
+
+        half_length = rect_length / 2
+        half_width = rect_width / 2
+
+        offsets_along = np.random.uniform(-half_length, half_length, num_vehicles)
+        offsets_perp = np.random.uniform(-half_width, half_width, num_vehicles)
+
+        offsets = np.column_stack([
+            direction[0] * offsets_along + perpendicular[0] * offsets_perp,
+            direction[1] * offsets_along + perpendicular[1] * offsets_perp
+        ])
+
         positions = center_position + offsets
 
-        # 批量创建车辆
-        for i in range(ppp_count):
+        for pos in positions:
             vehicle = Vehicle(
-                vehicle_id=i + 1,
-                position=positions[i]
+                vehicle_id=len(self.vehicles),
+                position=pos
             )
             self.vehicles.append(vehicle)
 
@@ -565,11 +652,168 @@ class VehicleEnvironment:
         logger.debug("环境重置完成")
 
 if __name__ == "__main__":
-    """测试车辆位置更新"""
-    env = VehicleEnvironment(None, None, None, None)
-    print("\n=== 连续位置更新 ===")
-    for step in range(3):
-        env.update_vehicle_positions(250)
-        print(f"Step {step+1}: 位置={env.vehicles[0].position}, 索引={env.trajectory_index}")
+    class MinimalEnv:
+        def __init__(self):
+            import pandas as pd
+            import os
+            from config.paths import Paths
+            from config.parameters import Config
+            from scipy.spatial import cKDTree
+            from pyproj import Transformer, CRS
+            import ast
 
-    print("\n测试完成")
+            self.base_point = [-9.374787, 37.088271]
+
+            train_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, "train_trajectory.csv"))
+            test_data = pd.read_csv(os.path.join(Paths.TRAJECTORY_DIR, "test_trajectory.csv"))
+            self.trajectory_data = pd.concat([train_data, test_data], ignore_index=True)
+
+            points = []
+            for poly in self.trajectory_data['POLYLINE']:
+                try:
+                    pts = ast.literal_eval(poly) if isinstance(poly, str) else poly
+                    points.extend(pts)
+                except:
+                    continue
+
+            if points:
+                lons, lats = zip(*points)
+                BASE_LON, BASE_LAT = -9.374787, 37.088271
+                wgs84 = CRS("EPSG:4326")
+                utm_crs = CRS(proj="utm", zone=int((BASE_LON + 180) // 6) + 1, south=BASE_LAT < 0, ellps="WGS84")
+                self.converter = Transformer.from_crs(wgs84, utm_crs, always_xy=True)
+                traj_utm_x, traj_utm_y = self.converter.transform(lons, lats)
+                traj_utm = np.column_stack([traj_utm_x, traj_utm_y])
+
+                local_area = np.pi * Config.BASE_STATION_COVERAGE ** 2
+                LAMBDA_MACRO = Config.PPP_LAMBDA_BS / 1e6
+
+                bs_candidates = []
+                for p in traj_utm:
+                    n_bs = np.random.poisson(local_area * LAMBDA_MACRO)
+                    if n_bs == 0:
+                        continue
+                    angles = np.random.uniform(0, 2 * np.pi, n_bs)
+                    radii = np.random.uniform(0, Config.BASE_STATION_COVERAGE, n_bs)
+                    offsets = np.column_stack([radii * np.cos(angles), radii * np.sin(angles)])
+                    bs_candidates.append(p + offsets)
+
+                bs_candidates = np.vstack(bs_candidates) if bs_candidates else np.array([]).reshape(0, 2)
+                np.random.shuffle(bs_candidates)
+
+                filtered_bs = []
+                kdtree = None
+                for p in bs_candidates:
+                    if not filtered_bs:
+                        filtered_bs.append(p)
+                        kdtree = cKDTree(np.array(filtered_bs))
+                        continue
+                    idxs = kdtree.query_ball_point(p, r=Config.MIN_BS_DISTANCE)
+                    if len(idxs) == 0:
+                        filtered_bs.append(p)
+                        kdtree = cKDTree(np.array(filtered_bs))
+
+                filtered_bs = np.array(filtered_bs)
+
+                utm_zone = int((self.base_point[0] + 180) // 6) + 1
+                utm_crs = CRS(proj="utm", zone=utm_zone, south=self.base_point[1] < 0, ellps="WGS84")
+                transformer = Transformer.from_crs(utm_crs, CRS("EPSG:4326"), always_xy=True)
+                bs_lons, bs_lats = transformer.transform(filtered_bs[:, 0], filtered_bs[:, 1])
+
+                self.base_stations = []
+                for i, (lon, lat, utm) in enumerate(zip(bs_lons, bs_lats, filtered_bs)):
+                    self.base_stations.append({
+                        "id": i,
+                        "lonlat_position": np.array([lon, lat]),
+                        "utm_position": utm,
+                        "coverage": Config.BASE_STATION_COVERAGE,
+                        "capacity": 80,
+                        "connected_vehicles": []
+                    })
+
+                print(f"初始化 {len(self.base_stations)} 个基站")
+
+        def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png', zoom_region=None):
+            import matplotlib.pyplot as plt
+            import ast
+
+            fig, ax = plt.subplots(figsize=(16, 10))
+
+            all_lons, all_lats = [], []
+            for poly in self.trajectory_data['POLYLINE']:
+                try:
+                    pts = ast.literal_eval(poly) if isinstance(poly, str) else poly
+                    if pts:
+                        lons, lats = zip(*pts)
+                        all_lons.extend(lons)
+                        all_lats.extend(lats)
+                        ax.plot(lons, lats, 'b-', linewidth=1, alpha=1)
+                except:
+                    continue
+
+            ax.plot([], [], 'b-', linewidth=1, label='Trajectories')
+
+            if all_lons and all_lats:
+                lon_range = max(all_lons) - min(all_lons)
+                ax.set_xlim(min(all_lons) - lon_range * 0.15, max(all_lons) + lon_range * 0.05)
+
+            ax.set_xlabel("Longitude", fontsize=32)
+            ax.set_ylabel("Latitude", fontsize=32)
+            ax.legend(loc='lower left', fontsize=32, frameon=False)
+            ax.tick_params(axis='both', labelsize=32)
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+            if zoom_region is None and all_lons and all_lats:
+                zoom_region = (-8.62, -8.58, 39.98, 40.02)
+
+            if zoom_region:
+                lon_min, lon_max, lat_min, lat_max = zoom_region
+
+                ax_inset = fig.add_axes([0.70, 0.35, 0.25, 0.25])
+
+                for poly in self.trajectory_data['POLYLINE']:
+                    try:
+                        pts = ast.literal_eval(poly) if isinstance(poly, str) else poly
+                        if pts:
+                            ax_inset.plot(*zip(*pts), 'b-', linewidth=0.8, alpha=0.8)
+                    except:
+                        continue
+
+                bs_in_region = [
+                    (bs['lonlat_position'][0], bs['lonlat_position'][1])
+                    for bs in self.base_stations
+                    if lon_min <= bs['lonlat_position'][0] <= lon_max
+                    and lat_min <= bs['lonlat_position'][1] <= lat_max
+                ]
+
+                if bs_in_region:
+                    inset_bs_lons, inset_bs_lats = zip(*bs_in_region)
+                    ax_inset.scatter(inset_bs_lons, inset_bs_lats, c='red', s=50, marker='^',
+                                    alpha=0.9, zorder=5)
+                    from matplotlib.lines import Line2D
+                    legend_handle = Line2D([0], [0], marker='^', color='w', markerfacecolor='red',
+                                          markersize=15, linestyle='None')
+                    ax_inset.legend([legend_handle], ['BS'], loc='lower right', fontsize=32, frameon=False, handletextpad=0.2)
+
+                ax_inset.set_xlim(lon_min, lon_max)
+                ax_inset.set_ylim(lat_min, lat_max)
+                # ax_inset.set_title("Zoomed Region", fontsize=32)
+                ax_inset.tick_params(axis='both', labelsize=32, pad=5)
+                ax_inset.spines['top'].set_visible(False)
+                ax_inset.spines['right'].set_visible(False)
+
+                rect = plt.Rectangle((lon_min, lat_min), lon_max - lon_min, lat_max - lat_min,
+                                     fill=False, edgecolor='green', linewidth=2, linestyle='--')
+                ax.add_patch(rect)
+
+            plt.tight_layout()
+
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+            plt.close()
+            print(f"Saved: {save_path}")
+
+    env = MinimalEnv()
+    env.plot_all_trajectories_and_bs(save_path='road_network.png')
