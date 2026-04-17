@@ -148,9 +148,9 @@ class DomainIncrementalDataSimulator:
     def _init_dirichlet(self):
         distributions = {}
         num_classes = self.NUM_CLASSES[self.current_dataset]
-        for class_idx in range(num_classes):
-            alpha = np.full(self.num_vehicles, Config.DIRICHLET_ALPHA)
-            distributions[class_idx] = np.random.dirichlet(alpha)
+        for vehicle_id in range(self.num_vehicles):
+            alpha = np.full(num_classes, Config.DIRICHLET_ALPHA)
+            distributions[vehicle_id] = np.random.dirichlet(alpha)
         return distributions
 
     def get_current_domain(self):
@@ -285,39 +285,40 @@ class DomainIncrementalDataSimulator:
         for idx, label in enumerate(train_labels):
             class_indices[label].append(idx)
 
-        vehicle_assignments = {i: [] for i in range(self.num_vehicles)}
-
-        for class_idx, indices in class_indices.items():
-            num_samples = len(indices)
+        for indices in class_indices.values():
             np.random.shuffle(indices)
 
-            if num_samples >= self.num_vehicles:
-                for v in range(self.num_vehicles):
-                    vehicle_assignments[v].append(indices[v])
-                remaining = indices[self.num_vehicles:]
-            else:
-                for i in range(num_samples):
-                    vehicle_assignments[i].append(indices[i])
-                remaining = []
+        class_pointers = {c: 0 for c in class_indices.keys()}
+        class_available = {c: len(indices) for c, indices in class_indices.items()}
 
-            if len(remaining) > 0:
-                if class_idx not in self.class_distributions:
-                    self.class_distributions[class_idx] = np.random.dirichlet(np.full(self.num_vehicles, Config.DIRICHLET_ALPHA))
+        total_train_samples = len(train_labels)
+        samples_per_vehicle = total_train_samples // self.num_vehicles
+        all_classes = sorted(class_indices.keys())
+        num_classes = len(all_classes)
 
-                distribution = self.class_distributions[class_idx]
-                sample_counts = (distribution * len(remaining)).astype(int)
-                total_assigned = sum(sample_counts)
+        vehicle_assignments = {i: [] for i in range(self.num_vehicles)}
 
-                if total_assigned < len(remaining):
-                    extra = np.random.choice(self.num_vehicles, len(remaining) - total_assigned)
-                    for v in extra:
-                        sample_counts[v] += 1
+        for vehicle_id in range(self.num_vehicles):
+            if vehicle_id not in self.class_distributions:
+                self.class_distributions[vehicle_id] = np.random.dirichlet(
+                    np.full(num_classes, Config.DIRICHLET_ALPHA))
 
-                np.random.shuffle(remaining)
-                start_idx = 0
-                for v, count in enumerate(sample_counts):
-                    vehicle_assignments[v].extend(remaining[start_idx:start_idx + count])
-                    start_idx += count
+            distribution = self.class_distributions[vehicle_id].copy()
+            assigned_count = 0
+
+            while assigned_count < samples_per_vehicle:
+                available_classes = [c for c in all_classes if class_available.get(c, 0) > 0]
+                if not available_classes:
+                    break
+
+                probs = np.array([distribution[all_classes.index(c)] for c in available_classes])
+                probs = probs / probs.sum()
+
+                selected_class = np.random.choice(available_classes, p=probs)
+                vehicle_assignments[vehicle_id].append(class_indices[selected_class][class_pointers[selected_class]])
+                class_pointers[selected_class] += 1
+                class_available[selected_class] -= 1
+                assigned_count += 1
 
         self.vehicle_data_assignments[sub_key] = vehicle_assignments
 
