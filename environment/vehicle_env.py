@@ -757,8 +757,8 @@ if __name__ == "__main__":
                 lon_range = max(all_lons) - min(all_lons)
                 ax.set_xlim(min(all_lons) - lon_range * 0.15, max(all_lons) + lon_range * 0.05)
 
-            ax.set_xlabel("Longitude", fontsize=32)
-            ax.set_ylabel("Latitude", fontsize=32)
+            ax.set_xlabel("Longitude(°)", fontsize=32)
+            ax.set_ylabel("Latitude(°)", fontsize=32)
             ax.legend(loc='lower left', fontsize=32, frameon=False)
             ax.tick_params(axis='both', labelsize=32)
             ax.spines['top'].set_visible(False)
