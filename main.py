@@ -24,49 +24,49 @@ EXPERIMENT_CONFIGS = {
         "Base_Uniform": {
             "BW": "EQUAL",
             "UPLOAD": "RATIO",
-            "TRAIN": "RATIO",
+            "CACHE": "FIFO",
             "env_group": "group_uniform",
         },
         "Abl_BW_Opt": {
             "BW": "MINMAX",
             "UPLOAD": "RATIO",
-            "TRAIN": "RATIO",
+            "CACHE": "FIFO",
             "env_group": "group_uniform",
         },
         "Abl_UP_Greedy": {
             "BW": "GREEDY",
             "UPLOAD": "DRL",
-            "TRAIN": "RATIO",
+            "CACHE": "FIFO",
             "env_group": "group_greedy",
         },
         "Abl_UP_DRL": {
             "BW": "EQUAL",
             "UPLOAD": "DRL",
-            "TRAIN": "RATIO",
+            "CACHE": "FIFO",
             "env_group": "group_drl",
         },
         "Abl_NoReplay": {
             "BW": "EQUAL",
             "UPLOAD": "RATIO",
-            "TRAIN": "NEW_ONLY",
+            "CACHE": "NEW_ONLY",
             "env_group": "group_noreplay",
         },
         "Combo_Comm": {
             "BW": "MINMAX",
             "UPLOAD": "DRL",
-            "TRAIN": "RATIO",
+            "TRAIN": "FIFO",
             "env_group": "group_drl",
         },
         "Combo_Learn": {
             "BW": "EQUAL",
             "UPLOAD": "DRL",
-            "TRAIN": "MAB",
+            "CACHE": "MAB",
             "env_group": "group_combo",
         },
         "Ours_Full": {
             "BW": "MINMAX",
             "UPLOAD": "DRL",
-            "TRAIN": "MAB",
+            "CACHE": "MAB", 
             "env_group": "group_combo",
         },
     }
@@ -93,7 +93,7 @@ def run_and_save(exp_name, config, output_dir):
 
     Config.BANDWIDTH_STRATEGY = config["BW"]
     Config.UPLOAD_STRATEGY = config["UPLOAD"]
-    Config.TRAINING_STRATEGY = config["TRAIN"]
+    Config.CACHE_STRATEGY = config["CACHE"]
     Config.set_seed(seed)
 
     tester = RLTester()

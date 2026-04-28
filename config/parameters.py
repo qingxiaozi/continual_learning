@@ -8,7 +8,7 @@ class Config:
     
     BANDWIDTH_STRATEGY = "MINMAX"  # ["EQUAL", "GREEDY", "MINMAX"]
     UPLOAD_STRATEGY = "DRL"              # ["RATIO", "DRL"]
-    TRAINING_STRATEGY = "RATIO"            # ["NEW_ONLY", "RATIO", "MAB"]
+    CACHE_STRATEGY = "FIFO"            # ["FIFO", "MAB"]
     RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
     NUM_EPISODES = 600  # episode数，office31:600; digit10:1120; domainnet:1680
