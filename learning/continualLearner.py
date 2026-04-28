@@ -28,13 +28,13 @@ class ContinualLearner:
             for vid in range(Config.NUM_VEHICLES):
                 cache = cache_manager.get_vehicle_cache(vid)
                 batches.extend(cache["new_data"])
-            batch_mapping = None          # 不需要映射和分数
-        elif strategy == "RATIO":
+            batch_mapping = None
+        elif strategy == "FIFO":
             batches, batch_mapping = self._collect_batches(cache_manager)
         elif strategy == "MAB":
             batches, batch_mapping = self._collect_batches(cache_manager)
         else:
-            raise ValueError(f"未知的训练策略: {strategy}")
+            raise ValueError(f"未知的缓存策略: {strategy}")
 
         # batches, batch_mapping = self._collect_batches(cache_manager)
         if len(batches) == 0:

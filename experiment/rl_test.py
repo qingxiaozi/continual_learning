@@ -193,7 +193,7 @@ class RLTester:
             "config": {
                 "BW": Config.BANDWIDTH_STRATEGY,
                 "UPLOAD": Config.UPLOAD_STRATEGY,
-                "TRAIN": Config.TRAINING_STRATEGY
+                "CACHE": Config.CACHE_STRATEGY
             },
             "metrics": {}
         }
@@ -201,7 +201,7 @@ class RLTester:
         logger.info("\n[System configure]")
         logger.info(f"BW: {Config.BANDWIDTH_STRATEGY}")
         logger.info(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
-        logger.info(f"TRAIN: {Config.TRAINING_STRATEGY}")
+        logger.info(f"CACHE: {Config.CACHE_STRATEGY}")
 
         def report(name, values, category="metrics"):
             mean_val = float(np.mean(values))
@@ -222,9 +222,9 @@ class RLTester:
         return results
 
 
-    def save_results(self):
+        def save_results(self):
         # os.makedirs(Paths.RESULTS_NPY_DIR, exist_ok=True)
-        prefix = f"{Config.UPLOAD_STRATEGY}_{Config.BANDWIDTH_STRATEGY}_{Config.TRAINING_STRATEGY}"
+        prefix = f"{Config.UPLOAD_STRATEGY}_{Config.BANDWIDTH_STRATEGY}_{Config.CACHE_STRATEGY}"
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_AA_steps.npy", np.array(self.AA_steps))
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_FM_steps.npy", np.array(self.FM_steps))
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_BWT_steps.npy", np.array(self.BWT_steps))
