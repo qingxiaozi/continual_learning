@@ -59,11 +59,11 @@ class ResultVisualizer:
         if epoch_elastic_losses and len(epoch_elastic_losses) > 0:
             labels.append("Elastic")
         title = " vs ".join(labels) + " Loss"
-        plt.title(title, fontsize=14, fontweight="bold")
+        plt.title(title, fontsize=38, fontweight="bold")
 
-        plt.xlabel("Epoch", fontsize=12)
-        plt.ylabel("Loss", fontsize=12)
-        plt.legend(fontsize=10)
+        plt.xlabel("Epoch", fontsize=38)
+        plt.ylabel("Loss", fontsize=38)
+        plt.legend(fontsize=38)
         plt.xticks(epochs)
 
         all_losses = list(epoch_losses)
@@ -95,11 +95,10 @@ class ResultVisualizer:
 
         epochs = range(1, len(val_accuracies) + 1)
         plt.plot(epochs, val_accuracies, "b-", linewidth=2, label="Validation Accuracy", marker='o', markersize=4)
-
-        plt.title("Validation Accuracy", fontsize=14, fontweight="bold")
-        plt.xlabel("Epoch", fontsize=12)
-        plt.ylabel("Accuracy (%)", fontsize=12)
-        plt.legend(fontsize=10)
+        plt.title("Validation Accuracy", fontsize=38, fontweight="bold")
+        plt.xlabel("Epoch", fontsize=38)
+        plt.ylabel("Accuracy (%)", fontsize=38)
+        plt.legend(fontsize=38)
         plt.xticks(epochs)
 
         if len(val_accuracies) > 1:
@@ -162,16 +161,15 @@ class ResultVisualizer:
             linewidth=0.5,
         )
 
-        ax.set_title(f"Data Distribution - Session {session}", fontsize=11, pad=8)
-        ax.set_xlabel("Vehicle ID", fontsize=9)
-        ax.set_ylabel("Class", fontsize=9)
+        ax.set_title(f"Data Distribution - Session {session}", fontsize=38, pad=12)
+        ax.set_xlabel("Vehicle ID", fontsize=38)
+        ax.set_ylabel("Class", fontsize=38)
         ax.set_xticks(range(data_simulator.num_vehicles))
         ax.set_yticks(range(num_classes))
         ax.set_yticklabels([f"C{i}" for i in range(num_classes)])
-        ax.tick_params(axis='y', labelsize=8)
-
+        ax.tick_params(axis='y', labelsize=38)
         cbar = fig.colorbar(scatter, ax=ax)
-        cbar.set_label("Samples", fontsize=8)
+        cbar.set_label("Samples", fontsize=38)
         plt.tight_layout()
 
         if save_plot:
@@ -199,9 +197,9 @@ class ResultVisualizer:
                      edgecolor='black',
                      linewidth=1)
 
-        ax.set_title('Sample Count Per Session', fontsize=14, fontweight='bold')
-        ax.set_xlabel('Session', fontsize=12)
-        ax.set_ylabel('Number of Samples', fontsize=12)
+        ax.set_title('Sample Count Per Session', fontsize=38, fontweight='bold')
+        ax.set_xlabel('Session', fontsize=38)
+        ax.set_ylabel('Number of Samples', fontsize=38)
 
         for bar in bars:
             height = bar.get_height()
@@ -209,7 +207,7 @@ class ResultVisualizer:
                 ax.text(bar.get_x() + bar.get_width()/2., height,
                        f'{int(height):,}',
                        ha='center', va='bottom',
-                       fontsize=9, fontweight='bold')
+                       fontsize=24, fontweight='bold')
 
         if len(total_samples) > 1:
             ax2 = ax.twinx()
@@ -220,7 +218,7 @@ class ResultVisualizer:
                     linewidth=self.style_config['linewidth'],
                     markersize=self.style_config['markersize'],
                     label='Cumulative Samples')
-            ax2.set_ylabel('Cumulative Samples', fontsize=12, color='red')
+            ax2.set_ylabel('Cumulative Samples', fontsize=38, color='red')
             ax2.tick_params(axis='y', labelcolor='red')
 
             lines, labels = ax.get_legend_handles_labels()
@@ -353,9 +351,9 @@ class ResultVisualizer:
                title=f"Vehicle Data Heterogeneity (Dirichlet Non-IID) - Domain: {domain}, Session {session}")
         ax.set_xticks(range(data_simulator.num_vehicles))
         ax.set_yticks(range(num_classes))
-        ax.set_yticklabels([f"C{i}" for i in range(num_classes)], fontsize=9)
+        ax.set_yticklabels([f"C{i}" for i in range(num_classes)], fontsize=38)
         ax.grid(True, alpha=0.3, linestyle="--")
-        fig.colorbar(scatter, ax=ax, label='Sample Count')
+        fig.colorbar(scatter, ax=ax, label='Sample Count', fontsize=38)
         plt.tight_layout()
 
         if save_plot:
@@ -432,7 +430,7 @@ class ResultVisualizer:
         ax.set(xlabel="t-SNE Dimension 1", ylabel="t-SNE Dimension 2",
                title=f"Domain Shift Visualization (t-SNE) - Session {session}\n"
                      f"({len(seen)} domains, {len(all_feats)} samples total)")
-        ax.legend(title="Domain", fontsize=10, title_fontsize=11, loc='best', framealpha=0.9)
+        ax.legend(title="Domain", fontsize=38, title_fontsize=38, loc='best', framealpha=0.9)
         ax.grid(True, alpha=0.3, linestyle='--')
 
         plt.tight_layout()
@@ -444,6 +442,9 @@ class ResultVisualizer:
 
     def visualize_all(self):
         """加载 results/npy/{dataset}/npy_1/*.npy 并生成所有可视化图表"""
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Nimbus Roman']
+        
         dataset_name = Config.CURRENT_DATASET
         base_npy_dir = Paths.get_dataset_dir("npy")
         base_npy_dir = os.path.join(base_npy_dir, "npy_7")
@@ -534,13 +535,13 @@ class ResultVisualizer:
                         print(f"加载失败 {filepath}: {e}")
             
             if plotted:
-                ax.set_xlabel('Episode', fontsize=32)
-                ax.set_ylabel(metric, fontsize=32)
-                ax.tick_params(axis='both', labelsize=32)
+                ax.set_xlabel('Episode', fontsize=38)
+                ax.set_ylabel(metric, fontsize=38)
+                ax.tick_params(axis='both', labelsize=38)
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
 
-                ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.4), fontsize=32, frameon=False, ncol=2)
+                ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.4), fontsize=38, frameon=False, ncol=2)
                 output_path = os.path.join(output_dir, f"{metric} on {dataset_name}.png")
                 plt.tight_layout()
                 plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
@@ -569,13 +570,13 @@ class ResultVisualizer:
                         print(f"加载失败 {filepath}: {e}")
             
             if plotted:
-                ax.set_xlabel('Episode', fontsize=32)
-                ax.set_ylabel(title, fontsize=32)
-                ax.tick_params(axis='both', labelsize=32)
+                ax.set_xlabel('Episode', fontsize=38)
+                ax.set_ylabel(title, fontsize=38)
+                ax.tick_params(axis='both', labelsize=38)
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
 
-                ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.4), fontsize=32, frameon=False, ncol=len(prefixes))
+                ax.legend(loc='upper center', bbox_to_anchor=(0.5, 1.4), fontsize=38, frameon=False, ncol=len(prefixes))
                 output_path = os.path.join(output_dir, f"{title} on {dataset_name}.png")
                 plt.tight_layout()
                 plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')

@@ -8,12 +8,15 @@ logger = logging.getLogger(__name__)
 from collections import defaultdict
 from pyproj import Transformer, CRS
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 from matplotlib.ticker import FuncFormatter
 from scipy.spatial import cKDTree
 import pandas as pd
 import random
 import os
 import ast
+
+fm._load_fontmanager(try_read_cache=False)
 
 
 class Vehicle:
@@ -194,6 +197,10 @@ class VehicleEnvironment:
             save_path: 图片保存路径
             zoom_region: 元组 (lon_min, lon_max, lat_min, lat_max)，指定放大区域经纬度范围
         """
+        import ast
+        import matplotlib.pyplot as plt
+        plt.rcParams['font.family'] = 'serif'
+        plt.rcParams['font.serif'] = ['Nimbus Roman']
         fig, ax = plt.subplots(figsize=(14, 10))
 
         all_lons, all_lats = [], []
@@ -215,10 +222,10 @@ class VehicleEnvironment:
                       label=f'Base Stations ({len(self.base_stations)})', zorder=5)
 
         ax.plot([], [], 'b-', linewidth=0.3, label=f'Trajectories ({len(self.trajectory_data)})')
-        ax.set_xlabel("Longitude(°)", fontsize=12)
-        ax.set_ylabel("Latitude(°)", fontsize=12)
-        ax.set_title(f"Road Network: {len(self.trajectory_data)} Trajectories with {len(self.base_stations)} Base Stations", fontsize=14)
-        ax.legend(loc='upper right', fontsize=10)
+        ax.set_xlabel("Longitude(°)", fontsize=38, fontname='Nimbus Roman')
+        ax.set_ylabel("Latitude(°)", fontsize=38, fontname='Nimbus Roman')
+        ax.set_title(f"Road Network: {len(self.trajectory_data)} Trajectories with {len(self.base_stations)} Base Stations", fontsize=38, fontname='Nimbus Roman')
+        ax.legend(loc='upper right', prop={'family': 'Nimbus Roman', 'size': 38})
 
         if zoom_region is None and all_lons and all_lats:
             lon_margin = (max(all_lons) - min(all_lons)) * 0.05
@@ -257,21 +264,20 @@ class VehicleEnvironment:
 
             ax_inset.set_xlim(lon_min, lon_max)
             ax_inset.set_ylim(lat_min, lat_max)
-            ax_inset.set_title("Zoomed Region", fontsize=10)
-            ax_inset.tick_params(axis='both', labelsize=8)
+            ax_inset.set_title("Zoomed Region", fontsize=38, fontname='Nimbus Roman')
+            ax_inset.tick_params(axis='both', labelsize=38)
 
             rect = plt.Rectangle((lon_min, lat_min), lon_max - lon_min, lat_max - lat_min,
                                  fill=False, edgecolor='green', linewidth=2, linestyle='--')
             ax.add_patch(rect)
 
             if bs_in_region:
-                ax_inset.legend(loc='upper right', fontsize=8)
+                ax_inset.legend(loc='upper right', prop={'family': 'Nimbus Roman', 'size': 38})
 
         plt.tight_layout()
 
         if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-
+            plt.savefig(save_path, dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
         print(f"Saved: {save_path}")
 
@@ -734,9 +740,10 @@ if __name__ == "__main__":
                 print(f"初始化 {len(self.base_stations)} 个基站")
 
         def plot_all_trajectories_and_bs(self, save_path='all_trajectories.png', zoom_region=None):
-            import matplotlib.pyplot as plt
             import ast
-
+            import matplotlib.pyplot as plt
+            plt.rcParams['font.family'] = 'serif'
+            plt.rcParams['font.serif'] = ['Nimbus Roman']
             fig, ax = plt.subplots(figsize=(16, 10))
 
             all_lons, all_lats = [], []
@@ -757,10 +764,10 @@ if __name__ == "__main__":
                 lon_range = max(all_lons) - min(all_lons)
                 ax.set_xlim(min(all_lons) - lon_range * 0.15, max(all_lons) + lon_range * 0.05)
 
-            ax.set_xlabel("Longitude(°)", fontsize=32)
-            ax.set_ylabel("Latitude(°)", fontsize=32)
-            ax.legend(loc='lower left', fontsize=32, frameon=False)
-            ax.tick_params(axis='both', labelsize=32)
+            ax.set_xlabel("Longitude(°)", fontsize=38, fontname='Nimbus Roman')
+            ax.set_ylabel("Latitude(°)", fontsize=38, fontname='Nimbus Roman')
+            ax.legend(loc='lower left', prop={'family': 'Nimbus Roman', 'size': 38}, frameon=False)
+            ax.tick_params(axis='both', labelsize=38)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
 
@@ -794,12 +801,12 @@ if __name__ == "__main__":
                     from matplotlib.lines import Line2D
                     legend_handle = Line2D([0], [0], marker='^', color='w', markerfacecolor='red',
                                           markersize=15, linestyle='None')
-                    ax_inset.legend([legend_handle], ['BS'], loc='lower right', fontsize=32, frameon=False, handletextpad=0.2)
+                    ax_inset.legend([legend_handle], ['BS'], loc='lower right', prop={'family': 'Nimbus Roman', 'size': 38}, frameon=False, handletextpad=0.2)
 
                 ax_inset.set_xlim(lon_min, lon_max)
                 ax_inset.set_ylim(lat_min, lat_max)
                 # ax_inset.set_title("Zoomed Region", fontsize=32)
-                ax_inset.tick_params(axis='both', labelsize=32, pad=5)
+                ax_inset.tick_params(axis='both', labelsize=38, pad=5)
                 ax_inset.spines['top'].set_visible(False)
                 ax_inset.spines['right'].set_visible(False)
 
