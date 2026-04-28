@@ -23,58 +23,52 @@ from torch.utils.data import DataLoader
 EXPERIMENT_CONFIGS = {
         "Base_Uniform": {
             "BW": "EQUAL",
-            "UPLOAD": "FIXED_RATIO",
-            "TRAIN": "FIXED_RATIO",
+            "UPLOAD": "RATIO",
+            "TRAIN": "RATIO",
             "env_group": "group_uniform",
         },
         "Abl_BW_Opt": {
-            "BW": "MINMAX_DELAY",
-            "UPLOAD": "FIXED_RATIO",
-            "TRAIN": "FIXED_RATIO",
+            "BW": "MINMAX",
+            "UPLOAD": "RATIO",
+            "TRAIN": "RATIO",
             "env_group": "group_uniform",
         },
         "Abl_UP_Greedy": {
-            "BW": "EQUAL",
-            "UPLOAD": "LOSS_GREEDY",
-            "TRAIN": "FIXED_RATIO",
+            "BW": "GREEDY",
+            "UPLOAD": "DRL",
+            "TRAIN": "RATIO",
             "env_group": "group_greedy",
         },
         "Abl_UP_DRL": {
             "BW": "EQUAL",
             "UPLOAD": "DRL",
-            "TRAIN": "FIXED_RATIO",
+            "TRAIN": "RATIO",
             "env_group": "group_drl",
         },
-        # "Abl_TR_MAB": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "FIXED_RATIO",
-        #     "TRAIN": "MAB",
-        #     "env_group": "group_mab",
-        # },
         "Abl_NoReplay": {
             "BW": "EQUAL",
-            "UPLOAD": "FIXED_RATIO",
+            "UPLOAD": "RATIO",
             "TRAIN": "NEW_ONLY",
             "env_group": "group_noreplay",
         },
         "Combo_Comm": {
-            "BW": "MINMAX_DELAY",
+            "BW": "MINMAX",
             "UPLOAD": "DRL",
-            "TRAIN": "FIXED_RATIO",
+            "TRAIN": "RATIO",
             "env_group": "group_drl",
         },
-        # "Combo_Learn": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "DRL",
-        #     "TRAIN": "MAB",
-        #     "env_group": "group_combo",
-        # },
-        # "Ours_Full": {
-        #     "BW": "MINMAX_DELAY",
-        #     "UPLOAD": "DRL",
-        #     "TRAIN": "MAB",
-        #     "env_group": "group_combo",
-        # }
+        "Combo_Learn": {
+            "BW": "EQUAL",
+            "UPLOAD": "DRL",
+            "TRAIN": "MAB",
+            "env_group": "group_combo",
+        },
+        "Ours_Full": {
+            "BW": "MINMAX",
+            "UPLOAD": "DRL",
+            "TRAIN": "MAB",
+            "env_group": "group_combo",
+        },
     }
 
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）

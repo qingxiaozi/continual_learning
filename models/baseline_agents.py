@@ -7,14 +7,8 @@ import copy
 from models.global_model import GlobalModel
 
 
-class StaticAgent(BaseAgent):
-    """5.1 静态学习"""
-    def select_action(self, state, available_batches):
-        # 返回空动作，环境看到 UPLOAD_POLICY="STATIC" 会直接跳过
-        return [0] * len(available_batches)
-
-class FixedRatioAgent(BaseAgent):
-    """5.2 固定比例"""
+class RatioAgent(BaseAgent):
+    """5.1 固定比例"""
     def __init__(self, ratio: float = 0.5):
         self.ratio = ratio
 

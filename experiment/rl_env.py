@@ -115,13 +115,11 @@ class VehicleEdgeEnv:
         )
         policy = Config.BANDWIDTH_STRATEGY
         if policy == "EQUAL":
-            ratios = allocator.allocate_average_bandwidth()
-        elif policy == "PROPORTIONAL":
-            ratios = allocator.allocate_proportional_bandwidth()
-        elif policy == "GREEDY_CHANNEL":
-            ratios = allocator.allocate_greedy_channel_bandwidth()
-        elif policy == "MINMAX_DELAY":
-            ratios, _ = allocator.allocate_minmaxdelay_bandwidth(self.session)
+            ratios = allocator.allocate_EQUAL_bandwidth()
+        elif policy == "GREEDY":
+            ratios = allocator.allocate_GREEDY_bandwidth()
+        elif policy == "MINMAX":
+            ratios, _ = allocator.allocate_MINMAX_bandwidth(self.session)
         else:
             raise ValueError(f"Unknown BANDWIDTH_STRATEGY: {policy}")
         return ratios

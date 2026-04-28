@@ -21,22 +21,14 @@ from experiment.rl_env import VehicleEdgeEnv
 from models.drl_agent import DRLAgent
 from utils.metrics import IncrementalMetricsCalculator
 from utils.visualizer import ResultVisualizer
-from models.baseline_agents import (
-    StaticAgent, FixedRatioAgent, RandomAgent, LossGreedyAgent
-)
+from models.baseline_agents import RatioAgent
 
 
 class AgentFactory:
     @staticmethod
     def create_agent(upload_strategy,state_dim):
-        if upload_strategy == "STATIC":
-            return StaticAgent()
-        elif upload_strategy == "FIXED_RATIO":
-            return FixedRatioAgent(ratio=0.5)
-        elif upload_strategy == "RANDOM":
-            return RandomAgent()
-        elif upload_strategy == "LOSS_GREEDY":
-            return LossGreedyAgent()
+        if upload_strategy == "RATIO":
+            return RatioAgent(ratio=0.5)
         elif upload_strategy == "DRL":
             agent = DRLAgent(state_dim)
             agent.load_model(Paths.get_drl_model_path())
@@ -110,16 +102,7 @@ class RLTester:
 
             for t in range(self.max_timesteps):
                 available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
-
-                if Config.UPLOAD_STRATEGY == "LOSS_GREEDY":
-                    action = self.agent.select_action(
-                        state,
-                        available_batches=available_batches,
-                        global_model=self.env.global_model,
-                        vehicles=self.env.vehicle_env.vehicles
-                    )
-                else:
-                    action = self.agent.select_action(state, available_batches=available_batches)
+                action = self.agent.select_action(state, available_batches=available_batches)
 
                 next_state, reward, done, info = self.env.step(action)
                 state = next_state

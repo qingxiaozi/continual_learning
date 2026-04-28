@@ -88,18 +88,38 @@ for episode in TEST_EPISODES:
 持续学习相关的指标，需要在task/domain级别进行计算，即在domain结束时计算。<br>
 
 ## 三、评价指标
-1. 持续学习的质量
-AA、AIA、FM、BWT
-2. 系统与通信指标
-每个episode下的reward，平均reward
-每个episode下的通信时延，平均时延
+
+### 1. 持续学习的质量
+- **AA (Average Accuracy)**：所有任务/域上的平均准确率
+- **AIA (Average Incremental Accuracy)**：AA + BWT，反映整体持续学习性能
+- **FM (Forward Transfer)**：正向迁移能力，衡量新任务对旧任务的帮助
+- **BWT (Backward Transfer)**：反向迁移能力（灾难性遗忘），衡量旧任务对新任务的影响
+
+### 2. 系统与通信指标
+- **Reward**：每个episode下的奖励，反映模型性能提升与通信成本的权衡
+- **Delay**：每个episode下的通信时延
+
+### 3. MDP状态定义（论文）
+根据论文MDP定义，状态s包含各车辆v的本地状态xs_v = [Cs_v, Ls_v, ds_v]：
+- **Cs_v**：车辆v对新收集数据的平均推理置信度
+- **Ls_v**：学习反馈分数，Ls_v = 1 / (1 + L(ωs-1g, Nsv))，L为损失函数
+- **ds_v**：车辆到最近基站的归一化距离
+
+### 4. 奖励函数设计
+奖励函数公式：
+```
+reward = delta_acc - 2.0 * forgetting - 0.1 * delay
+```
+- **delta_acc**：准确率变化，当前测试集准确率与上一轮的差值
+- **forgetting**：灾难性遗忘，衡量之前任务准确率的下降程度
+- **delay**：通信时延
 
 ## 四、数据集
 |数据集|域|类别数|类别|样本数|图像大小|通道数|说明|
 |------|------|------|------|------|------|------|------|
-|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795|图像大小|通道数|说明|
-|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST：70000；EMNIST：280000；USPS：7291；SVHN：99289|图像大小|通道数|数字识别|
-|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|类别数|类别|Real: 约 172,000 张；Clipart: 约 48,000 张；Painting: 约 72,000 张；Quickdraw: 约 172,000 张；Sketch: 约 72,000 张；Infograph: 约 48,000 张|图像大小|通道数|说明|
+|office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795 (总计:4,110)|224×224|3|域适应基准数据集|
+|digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST:70,000；EMNIST:280,000；USPS:7,291；SVHN:99,289 (总计:456,580)|224×224|3|数字识别数据集|
+|DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|345|clipart、infograph、painting、quickdraw、real、sketch|Real:175,327；Quickdraw:172,500；Painting:75,759；Sketch:70,386；Infograph:53,201；Clipart:48,833 (总计:596,006)|224×224|3|大规模域适应数据集|
 <br>
 
 ## 五、结果
@@ -112,24 +132,21 @@ AA、AIA、FM、BWT
 ## 六、对比实验
 1. 带宽分配策略 
 EQUAL (均匀分配)：所有上传车辆平分总带宽。<br>
-GREEDY_CHANNEL (贪婪信道分配)：将更多带宽分配给信道条件（SNR）更好的车辆。<br>
-MINMAX_DELAY (最小化最大传输时延)<br>
+GREEDY (贪婪信道分配)：将更多带宽分配给信道条件（SNR）更好的车辆。<br>
+MINMAX (最小化最大传输时延)<br>
 
-1. 上传决策策略
-FIXED_RATIO (固定比例)：每辆车上传其可用数据的固定比例<br>
-RANDOM (随机)：每辆车随机决定上传0到MAX_UPLOAD_BATCHES之间的批次数。<br>
-LOSS_GREEDY (损失贪心)：优先上传本地模型在其上损失最大的批次。<br>
+2. 上传决策策略
+RATIO (固定比例)：每辆车上传其缓存容量的固定比例。<br>
 DRL (深度强化学习)：通过DRL智能体，基于全局状态做出联合优化决策。<br>
 
-1. 训练数据选择策略
-NEW_ONLY (仅用新数据)：只使用本次会话上传的新数据进行训练。<br>
-FIXED_RATIO (固定新旧比例)：按固定比例（如1:1）混合新旧数据。<br>
-MAB (多臂老虎机)：动态评估每个数据源（或批次）的价值，自适应地选择最有信息量的数据。<br>
+3. 数据保留策略
+FIFO (先进先出)：将新数据与旧数据按顺序混合，如果新旧数据超出缓存容量，则按照FIFO原则删除数据，使其满足缓存容量限制。训练时使用缓存中的所有数据。<br>
+MAB (多臂老虎机)：在训练过程中动态评估每个数据批次的价值，下一阶段中，上传新数据，根据数据批次的价值去除超出缓存容量的旧数据。训练时使用缓存中的所有数据。<br>
 
 1. 对比实验设计
 Naive_Baseline：带宽平均分配，数据按照固定比例上传，训练方式采用固定比例训练。<br>
 Proportional_BW：带宽按照比例分配，数据按照固定比例上传，训练方式采用固定比例训练。<br>
-Greedy_Channel_BW：带宽按照贪婪策略分配，数据按照固定比例上传，训练方式采用固定比例训练。<br>
+GREEDY_BW：带宽按照贪婪策略分配，数据按照固定比例上传，训练方式采用固定比例训练。<br>
 
 ### environment
 #### 车辆环境（vehicle_env）
@@ -149,10 +166,17 @@ Greedy_Channel_BW：带宽按照贪婪策略分配，数据按照固定比例上
 #### 数据模拟（dataSimu_env）
 功能：<br>
 分别处理office-31、digit10、DomainNet三个数据集，将其按照Non-IID（狄利克雷分布）的方式划分给多个智能车辆，并支持增量学习。<br>
+数据分配逻辑：<br>
+1. 每个域的数据划分为两部分：50%初始数据 + 5×10%子数据集<br>
+2. 50%初始数据用于初始模型训练和奖励计算<br>
+3. 5×10%子数据集用于持续学习训练，每个session使用一个子集<br>
+4. 使用狄利克雷分布(Dirichlet)将每个域的数据非独立同分布的划分给多个车辆<br>
+5. 每辆车获得相同数量的样本，但类别分布按狄利克雷概率随机分配<br>
+6. 域按顺序依次切换，每个域有5个子集循环使用<br>
 步骤：<br>
-1. 支持三个数据集的读取，并进行数据预处理，使得样本的大小与通道数统一。大小：224x224；通道数：3。
-2. 按照域顺序依次加载，第一个域作为初始数据，后续域作为增量数据。
-3. 使用狄利克雷分布将每个域的数据非独立同分布的划分给多个车辆。
+1. 支持三个数据集的读取，并进行数据预处理，使得样本的大小与通道数统一。大小：224x224；通道数：3。<br>
+2. 按照域顺序依次加载，第一个域作为初始数据，后续域作为增量数据。<br>
+3. 使用狄利克雷分布将每个域的数据非独立同分布的划分给多个车辆。<br>
 4. 每个车辆维护自己的数据缓存，并能够按照批次提供数据。
 
 ### models
@@ -167,10 +191,12 @@ Greedy_Channel_BW：带宽按照贪婪策略分配，数据按照固定比例上
 
 
 #### 强化学习智能体（drl_agent）
-1. 选择动作。以一定概率生成随机动作，否则利用策略网络选择动作。
-2. 将数据标注量动作通过线性变换映射到[0, MAX_UPLOAD_BATCHES]的整数，将带宽分配进行归一化，使得总和为1。
-3. 模型优化。从回放缓冲区随机采样一个批次的经验，使用策略网络计算当前状态-动作对的Q值，使用目标网络计算下一个状态最大的Q值，根据贝尔曼方程计算目标Q值。使用均方误差损失函数计算当前Q值和目标Q值之间的差值，并通过优化器更新策略网络。
-4. 保存和加载模型，包括策略网络、目标网络和优化器的状态字典。
+采用DQN算法，包含以下功能：
+1. **动作选择**：采用ε-greedy策略，以概率ε生成随机动作进行探索，否则利用策略网络（Q网络）选择动作
+2. **动作空间**：动作维度为[NUM_VEHICLES + NUM_VEHICLES]，前NUM_VEHICLES维表示每辆车的上传批次数（0~MAX_UPLOAD_BATCHES），后NUM_VEHICLES维表示带宽分配权重（归一化后和为1）
+3. **模型优化**：从回放缓冲区随机采样一个批次的经验，使用策略网络计算当前状态-动作对的Q值，使用目标网络计算下一个状态最大的Q值，根据贝尔曼方程计算目标Q值。使用均方误差损失函数计算当前Q值和目标Q值之间的差值，并通过优化器更新策略网络
+4. **目标网络**：每隔一定步数将策略网络参数复制到目标网络，用于稳定训练
+5. 保存和加载模型，包括策略网络、目标网络和优化器的状态字典
 
 ## 七、实验结果
 ### 损失变化/时间

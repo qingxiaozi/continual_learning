@@ -6,10 +6,10 @@ import numpy as np
 class Config:
     RANDOM_SEED = 42  # 随机种子，用于可复现实验
     
-    BANDWIDTH_STRATEGY = "MINMAX_DELAY"  # ["EQUAL", "GREEDY_CHANNEL", "MINMAX_DELAY"]
-    UPLOAD_STRATEGY = "DRL"              # ["STATIC", "FIXED_RATIO", "LOSS_GREEDY", "DRL"]
-    TRAINING_STRATEGY = "FIXED_RATIO"            # ["NEW_ONLY", "FIXED_RATIO", "MAB"]
-    FIXED_RATIO = 0.5  # 固定比例策略中使用的新数据比例
+    BANDWIDTH_STRATEGY = "MINMAX"  # ["EQUAL", "GREEDY", "MINMAX"]
+    UPLOAD_STRATEGY = "DRL"              # ["RATIO", "DRL"]
+    TRAINING_STRATEGY = "RATIO"            # ["NEW_ONLY", "RATIO", "MAB"]
+    RATIO = 0.5  # 固定比例策略中使用的新数据比例
     # 实验参数
     NUM_EPISODES = 600  # episode数，office31:600; digit10:1120; domainnet:1680
     NUM_TRAINING_SESSIONS = 15  # train session，office31:15; digit10:28; domainnet:42
