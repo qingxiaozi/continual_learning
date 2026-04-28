@@ -103,7 +103,6 @@ class RLTester:
             for t in range(self.max_timesteps):
                 available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
                 action = self.agent.select_action(state, available_batches=available_batches)
-
                 next_state, reward, done, info = self.env.step(action)
                 state = next_state
 

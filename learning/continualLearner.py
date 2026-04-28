@@ -29,7 +29,7 @@ class ContinualLearner:
                 cache = cache_manager.get_vehicle_cache(vid)
                 batches.extend(cache["new_data"])
             batch_mapping = None          # 不需要映射和分数
-        elif strategy == "FIXED_RATIO":
+        elif strategy == "RATIO":
             batches, batch_mapping = self._collect_batches(cache_manager)
         elif strategy == "MAB":
             batches, batch_mapping = self._collect_batches(cache_manager)
