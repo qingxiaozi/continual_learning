@@ -18,28 +18,16 @@ class BandwidthAllocator:
         # print("带宽分配")
 
     # 平均带宽分配
-    def allocate_average_bandwidth(self) -> np.ndarray:
+    def allocate_EQUAL_bandwidth(self) -> np.ndarray:
         """
         Returns:
             bandwidth_ratios: 每辆车的带宽比例列表
         """
         # 简单平均分配：每辆车分配 1/车辆数 的带宽
         return np.ones(self.num_vehicles) / self.num_vehicles
-
-    # 按照批次比例进行带宽分配
-    def allocate_proportional_bandwidth(self) -> np.ndarray:
-        """
-        按批次比例分配带宽
-        根据每辆车的上传批次数量按比例分配
-        """
-        total_batches = sum(self.batch_choices)
-        if total_batches == 0:
-            return self.allocate_average_bandwidth()
-
-        return np.array(self.batch_choices) / total_batches
-
+        
     # 按照最小化最大传输时延分配带宽
-    def allocate_minmaxdelay_bandwidth(self, session_id: int = 0) -> Tuple[np.ndarray, float]:
+    def allocate_MINMAX_bandwidth(self, session_id: int = 0) -> Tuple[np.ndarray, float]:
         """
         优化带宽分配（基于最小化最大传输时延）
         根据理论公式：min max (m_v * |b_v| * b_0) / (β_v * R_uplink)
@@ -53,7 +41,7 @@ class BandwidthAllocator:
         """
         # 如果没有数据传输需求，返回平均分配
         if sum(self.batch_choices) == 0:
-            return self.allocate_average_bandwidth(), 0.0
+            return self.allocate_EQUAL_bandwidth(), 0.0
 
         # 计算每辆车的K_v值（基本传输需求）
         K_values = self._calculate_K_values(session_id)
@@ -62,6 +50,46 @@ class BandwidthAllocator:
         bandwidth_ratios, min_max_delay = self._solve_optimization_problem(K_values)
 
         return bandwidth_ratios, min_max_delay
+
+    def allocate_GREEDY_bandwidth(self) -> np.ndarray:
+        """
+        贪婪信道带宽分配,将更多带宽分配给信道条件(SNR)更好的车辆。
+        """
+        if sum(self.batch_choices) == 0:
+            return self.allocate_EQUAL_bandwidth()
+
+        snr_values = np.zeros(self.num_vehicles)
+        for v in range(self.num_vehicles):
+            if self.batch_choices[v] == 0:
+                continue
+
+            vehicle = self.vehicle_env._get_vehicle_by_id(v)
+            if not vehicle or vehicle.bs_connection is None:
+                continue
+
+            base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
+            if not base_station:
+                continue
+
+            if hasattr(self.comm_system, 'calculate_channel_gain'):
+                channel_gain = self.comm_system.calculate_channel_gain(vehicle, base_station)
+                signal_power = self.comm_system.vehicle_transmit_power * channel_gain
+                noise_interference = self.comm_system.noise_power + self.comm_system.interference_power
+                snr = signal_power / max(noise_interference, 1e-20)
+                snr_values[v] = snr
+            else:
+                distance = np.linalg.norm(vehicle.position - base_station.position)
+                snr_values[v] = 1.0 / max(distance, 1e-6)
+
+        total_snr = np.sum(snr_values)
+        if total_snr > 0:
+            bandwidth_ratios = snr_values / total_snr
+        else:
+            bandwidth_ratios = self.allocate_EQUAL_bandwidth()
+
+        # 应用约束
+        bandwidth_ratios = self._apply_constraints(bandwidth_ratios)
+        return bandwidth_ratios
 
     def _calculate_K_values(self, session_id: int) -> np.ndarray:
         """
@@ -130,7 +158,7 @@ class BandwidthAllocator:
 
         # 如果没有有效的K值，使用简单分配
         if np.sum(K_values) == 0:
-            return self.allocate_average_bandwidth(), 0.0
+            return self.allocate_EQUAL_bandwidth(), 0.0
 
         try:
             # 方法1：使用闭式解（无约束时）
@@ -156,7 +184,7 @@ class BandwidthAllocator:
                 min_max_delay = max(K_values[i]/bandwidth_ratios[i]
                                    for i in range(num_vehicles) if bandwidth_ratios[i] > 0)
             else:
-                bandwidth_ratios = self.allocate_average_bandwidth()
+                bandwidth_ratios = self.allocate_EQUAL_bandwidth()
                 min_max_delay = 0.0
 
             return bandwidth_ratios, min_max_delay
@@ -241,7 +269,7 @@ class BandwidthAllocator:
         if total > 0:
             bandwidth_ratios = bandwidth_ratios / total
         else:
-            bandwidth_ratios = self.allocate_average_bandwidth()
+            bandwidth_ratios = self.allocate_EQUAL_bandwidth()
 
         return bandwidth_ratios
 
@@ -269,44 +297,3 @@ class BandwidthAllocator:
         return self.comm_system.calculate_transmission_delay(
             upload_decisions, bandwidth_allocations, session_id
         )
-
-    def allocate_greedy_channel_bandwidth(self) -> np.ndarray:
-        """
-        贪婪信道带宽分配 (用于 Baseline: MAB-Greedy-BW)
-        将更多带宽分配给信道条件（SNR）更好的车辆。
-        """
-        if sum(self.batch_choices) == 0:
-            return self.allocate_average_bandwidth()
-
-        snr_values = np.zeros(self.num_vehicles)
-        for v in range(self.num_vehicles):
-            if self.batch_choices[v] == 0:
-                continue
-
-            vehicle = self.vehicle_env._get_vehicle_by_id(v)
-            if not vehicle or vehicle.bs_connection is None:
-                continue
-
-            base_station = self.vehicle_env._get_base_station_by_id(vehicle.bs_connection)
-            if not base_station:
-                continue
-
-            if hasattr(self.comm_system, 'calculate_channel_gain'):
-                channel_gain = self.comm_system.calculate_channel_gain(vehicle, base_station)
-                signal_power = self.comm_system.vehicle_transmit_power * channel_gain
-                noise_interference = self.comm_system.noise_power + self.comm_system.interference_power
-                snr = signal_power / max(noise_interference, 1e-20)
-                snr_values[v] = snr
-            else:
-                distance = np.linalg.norm(vehicle.position - base_station.position)
-                snr_values[v] = 1.0 / max(distance, 1e-6)
-
-        total_snr = np.sum(snr_values)
-        if total_snr > 0:
-            bandwidth_ratios = snr_values / total_snr
-        else:
-            bandwidth_ratios = self.allocate_average_bandwidth()
-
-        # 应用约束
-        bandwidth_ratios = self._apply_constraints(bandwidth_ratios)
-        return bandwidth_ratios

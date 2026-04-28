@@ -450,13 +450,13 @@ class ResultVisualizer:
         base_npy_dir = os.path.join(base_npy_dir, "npy_7")
         
         legend_mapping = {
-            # 'DRL_EQUAL_LOSS_GREEDY_FIXED_RATIO': 'Abl_UP_Greedy',
-            'FIXED_RATIO_EQUAL_FIXED_RATIO': 'Base',
-            # 'FIXED_RATIO_EQUAL_NEW_ONLY': 'NoReplay',
-            'FIXED_RATIO_MINMAX_DELAY_FIXED_RATIO': 'Abl_BW_Opt',
-            'DRL_EQUAL_FIXED_RATIO': 'Abl_UP_DRL',
-            'DRL_MINMAX_DELAY_FIXED_RATIO': 'Ours',
-            # 'LOSS_GREEDY_EQUAL_FIXED_RATIO': 'AbI_UP_Greedy',
+            # 'DRL_EQUAL_LOSS_GREEDY_RATIO': 'Abl_UP_Greedy',
+            'RATIO_EQUAL_RATIO': 'Base',
+            # 'RATIO_EQUAL_NEW_ONLY': 'NoReplay',
+            'RATIO_MINMAX_RATIO': 'Abl_BW_Opt',
+            'DRL_EQUAL_RATIO': 'Abl_UP_DRL',
+            'DRL_MINMAX_RATIO': 'Ours',
+            # 'LOSS_GREEDY_EQUAL_RATIO': 'AbI_UP_Greedy',
         }
         
         if not os.path.exists(base_npy_dir):
@@ -494,8 +494,8 @@ class ResultVisualizer:
                 file_map[key] = os.path.join(root, f)
                 prefixes.add(prefix)
         
-        order = ['FIXED_RATIO_EQUAL_FIXED_RATIO', 'FIXED_RATIO_MINMAX_DELAY_FIXED_RATIO',
-                 'DRL_EQUAL_FIXED_RATIO', 'DRL_MINMAX_DELAY_FIXED_RATIO']
+        order = ['RATIO_EQUAL_RATIO', 'RATIO_MINMAX_RATIO',
+                 'DRL_EQUAL_RATIO', 'DRL_MINMAX_RATIO']
         prefixes = [p for p in order if p in prefixes]
         print(f"找到 {len(prefixes)} 个实验: {prefixes}")
         
@@ -513,8 +513,8 @@ class ResultVisualizer:
             
             plotted = False
             line_configs = [
-                ('FIXED_RATIO_EQUAL_FIXED_RATIO', 'Base/Abl_BW_Opt', colors[1]),
-                ('DRL_MINMAX_DELAY_FIXED_RATIO', 'Abl_UP_DRL/Ours', colors[3])
+                ('RATIO_EQUAL_RATIO', 'Base/Abl_BW_Opt', colors[1]),
+                ('DRL_MINMAX_RATIO', 'Abl_UP_DRL/Ours', colors[3])
             ]
             
             for prefix, label, color in line_configs:
