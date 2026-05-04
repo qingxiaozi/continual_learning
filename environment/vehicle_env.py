@@ -429,40 +429,6 @@ class VehicleEnvironment:
 
         print(f"初始化 {len(self.base_stations)} 个基站")
 
-    # def _initialize_base_stations(self):
-    #     """PPP生成基站"""
-    #     points = self._get_all_trajectory_points()
-    #     if not points: return
-
-    #     lons, lats = zip(*points)
-    #     # 计算经纬度范围
-    #     min_lon, max_lon = min(lons), max(lons)
-    #     min_lat, max_lat = min(lats), max(lats)
-
-    #     R, center_lat = 6371000, np.mean(lats)
-    #     m_lon = R * np.cos(np.radians(center_lat)) * np.pi / 180
-    #     m_lat = R * np.pi / 180
-
-    #     # 一行式计算面积和基站数
-    #     area_km2 = ((max(lons)-min(lons))*m_lon * (max(lats)-min(lats))*m_lat) / 1e6
-    #     num_bs = max(10, int(area_km2 * self.ppp_lambda_bs))
-
-    #     # 批量生成经纬度并转换为UTM
-    #     bs_lons = np.random.uniform(min_lon, max_lon, num_bs)
-    #     bs_lats = np.random.uniform(min_lat, max_lat, num_bs)
-    #     bs_utm = self._convert_to_cartesian(bs_lons, bs_lats)
-
-    #     # 创建基站
-    #     self.base_stations = [{
-    #         "id": i,
-    #         "lonlat_position": np.array([bs_lons[i], bs_lats[i]]),
-    #         "utm_position": bs_utm[i],
-    #         "coverage": Config.BASE_STATION_COVERAGE,
-    #         "capacity": 50,
-    #         "connected_vehicles": [],
-    #     } for i in range(num_bs)]
-
-    #     print(f"初始化 {num_bs} 个基站")
 
     def _initialize_vehicles_with_ppp(self):
         """初始化车辆：主车辆 + PPP生成的其他车辆"""
@@ -479,13 +445,15 @@ class VehicleEnvironment:
         self._update_vehicle_connections()
 
     def _generate_ppp_vehicles(self, center_position):
-        """泊松点过程生成车辆（沿轨迹方向矩形区域）"""
-        ppp_count = Config.NUM_VEHICLES - 1
-        if ppp_count <= 0:
+        """在主车轨迹附近生成固定数量的从车"""
+        num_vehicles = Config.NUM_VEHICLES - 1
+        if num_vehicles <= 0:
             return
 
         if self.trajectory_points is not None and self.trajectory_index < len(self.trajectory_points) - 1:
             direction = self.trajectory_points[self.trajectory_index + 1] - self.trajectory_points[self.trajectory_index]
+        elif self.trajectory_points is not None and self.trajectory_index > 0:
+            direction = self.trajectory_points[self.trajectory_index] - self.trajectory_points[self.trajectory_index - 1]
         elif self.trajectory_points is not None and len(self.trajectory_points) > 1:
             direction = self.trajectory_points[-1] - self.trajectory_points[0]
         else:
@@ -495,20 +463,8 @@ class VehicleEnvironment:
         direction = direction / (np.linalg.norm(direction) + 1e-8)
         perpendicular = np.array([-direction[1], direction[0]])
 
-        rect_length = 200.0
-        rect_width = 24.0
-
-        area = rect_length * rect_width
-        lambda_ppp = ppp_count / area
-
-        num_vehicles = np.random.poisson(lambda_ppp * area)
-        num_vehicles = min(num_vehicles, ppp_count)
-
-        if num_vehicles == 0:
-            return
-
-        half_length = rect_length / 2
-        half_width = rect_width / 2
+        half_length = 100.0
+        half_width = 10.0
 
         offsets_along = np.random.uniform(-half_length, half_length, num_vehicles)
         offsets_perp = np.random.uniform(-half_width, half_width, num_vehicles)
@@ -553,18 +509,16 @@ class VehicleEnvironment:
             return
 
         distance = Config.VEHICLE_SPEED_FACTOR * time_delta
-        idx, accumulated = self.trajectory_index, 0.0
+        idx = self.trajectory_index
+        accumulated = 0.0
 
-        # 累加距离找到目标点
-        while idx < len(self.trajectory_points) - 1 and accumulated < distance:
-            segment = np.linalg.norm(self.trajectory_points[idx+1] - self.trajectory_points[idx])
+        while idx < len(self.trajectory_points) - 1 and accumulated + np.linalg.norm(self.trajectory_points[idx+1] - self.trajectory_points[idx]) <= distance:
+            accumulated += np.linalg.norm(self.trajectory_points[idx+1] - self.trajectory_points[idx])
             idx += 1
-            accumulated += segment
 
-        # 如果移动了且不超过终点
-        if idx <= len(self.trajectory_points) - 1 and idx > self.trajectory_index:
+        if idx > self.trajectory_index:
             self.trajectory_index = idx
-            self.vehicles[0].position = self.trajectory_points[self.trajectory_index]
+            self.vehicles[0].position = self.trajectory_points[idx]
             self.vehicles = [self.vehicles[0]]
             self._generate_ppp_vehicles(self.vehicles[0].position)
         self._update_vehicle_connections()
@@ -608,44 +562,40 @@ class VehicleEnvironment:
         state = []
 
         for vehicle in self.vehicles:
+            if vehicle is None:
+                state.extend([0.5, 1.0, 0.0, 1.0])
+                continue
+                
             try:
-                # 获取当前置信度，从全局模型推理中得到
-                if vehicle.data_batches:
+                confidence = 0.5
+                if hasattr(vehicle, 'data_batches') and vehicle.data_batches:
                     confidence = vehicle.get_inference_confidence(self.global_model)
-                else:
-                    confidence = 0.5
-                vehicle.confidence_history.append(confidence)
+                if hasattr(vehicle, 'confidence_history'):
+                    vehicle.confidence_history.append(confidence)
 
-                # 2. 获取测试损失 - 从实际模型评估中获取
-                if vehicle.uploaded_data:
-                    raw_loss = vehicle.calculate_test_loss(
-                        self.global_model, self.gold_model
-                    )
+                test_loss = 1.0
+                if hasattr(vehicle, 'uploaded_data') and vehicle.uploaded_data:
+                    raw_loss = vehicle.calculate_test_loss(self.global_model, self.gold_model)
                     test_loss = 1.0 / (1.0 + raw_loss)
-                else:
-                    test_loss = 1.0
-                vehicle.test_loss_history.append(test_loss)
+                if hasattr(vehicle, 'test_loss_history'):
+                    vehicle.test_loss_history.append(test_loss)
 
-                # 3. 获取质量评分 - 从缓存管理器中获取
-                quality_score = vehicle.update_quality_scores(self.cache_manager)
+                quality_score = 0.0
+                if hasattr(vehicle, 'update_quality_scores'):
+                    quality_score = vehicle.update_quality_scores(self.cache_manager)
 
-                # 4. 计算到基站的归一化距离
+                normalized_distance = 1.0
                 if vehicle.bs_connection is not None:
                     bs = self._get_base_station_by_id(vehicle.bs_connection)
                     if bs:
                         distance = np.linalg.norm(vehicle.position - bs["utm_position"])
                         normalized_distance = min(distance / Config.BASE_STATION_COVERAGE, 1.0)
-                    else:
-                        normalized_distance = 1.0
-                else:
-                    normalized_distance = 1.0
 
-                # 添加到状态向量
                 state.extend([confidence, test_loss, quality_score, normalized_distance])
 
             except Exception as e:
-                logger.debug(f"Error getting state for vehicle {vehicle.id}: {e}")
-                state.extend([0.5, 1.0, 0, 1.0])
+                logger.debug(f"Error getting state for vehicle {getattr(vehicle, 'id', 'unknown')}: {e}")
+                state.extend([0.5, 1.0, 0.0, 1.0])
 
         return np.array(state, dtype=np.float32)
 

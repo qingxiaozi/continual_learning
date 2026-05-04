@@ -57,8 +57,7 @@ class RLTrainer:
             total_delay = 0.0
 
             for t in range(self.max_timesteps):
-                available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
-                # 选择动作
+                available_batches = [len(v.data_batches) for v in self.env.vehicle_env.vehicles]
                 action = self.agent.select_action(state, available_batches)
                 
                 # 执行环境中的动作

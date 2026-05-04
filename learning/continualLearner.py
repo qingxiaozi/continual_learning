@@ -20,16 +20,10 @@ class ContinualLearner:
         current_domain,
         num_epochs,
     ):
-        # 根据 Config.TRAINING_STRATEGY 从缓存中挑选要训练的批次
-        strategy = Config.TRAINING_STRATEGY
+        # 根据 Config.CACHE_STRATEGY 从缓存中挑选要训练的批次
+        strategy = Config.CACHE_STRATEGY
         # 根据策略挑选要训练的批次
-        if strategy == "NEW_ONLY":
-            batches = []
-            for vid in range(Config.NUM_VEHICLES):
-                cache = cache_manager.get_vehicle_cache(vid)
-                batches.extend(cache["new_data"])
-            batch_mapping = None
-        elif strategy == "FIFO":
+        if strategy == "FIFO":
             batches, batch_mapping = self._collect_batches(cache_manager)
         elif strategy == "MAB":
             batches, batch_mapping = self._collect_batches(cache_manager)

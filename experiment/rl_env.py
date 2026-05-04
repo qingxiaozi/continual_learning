@@ -34,8 +34,8 @@ class VehicleEdgeEnv:
         self.evaluator = ModelEvaluator()
         self.current_domain = self.data_simulator.get_current_domain()
         self.session = 0
-        dummy_state = self._get_state()
-        self.state_dim = dummy_state.shape[0]
+        self.data_simulator.update_session_dataset(0)
+        self.state_dim = Config.NUM_VEHICLES * 4
         self.last_comm_metrics = {
             "transmission_delay": 0.0,
             "labeling_delay": 0.0,
@@ -59,7 +59,7 @@ class VehicleEdgeEnv:
         self.data_simulator.update_session_dataset(0)
 
         return self._get_state()
-
+    
     def step(self, action):
         """
         执行一个 RL step
@@ -127,6 +127,8 @@ class VehicleEdgeEnv:
     def _upload_datas(self, batch_choices):
         for vehicle_id, n in enumerate(batch_choices):
             vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
+            if vehicle is None:
+                continue
             actual_n = min(n, len(vehicle.data_batches)) if n > 0 else 0
             selected = random.sample(vehicle.data_batches, actual_n) if actual_n > 0 else []
             vehicle.set_uploaded_data(selected)
@@ -253,16 +255,5 @@ class VehicleEdgeEnv:
 
     def _get_state(self):
         """获取当前环境状态表示"""
-        state = self.vehicle_env.get_environment_state()
-        available_batches = []
-        cache_old_ratios = []
-        for vehicle in self.vehicle_env.vehicles:
-            available_batches.append(len(vehicle.data_batches))
-            cache = self.cache_manager.get_vehicle_cache(vehicle.id)
-            n_old = len(cache.get("old_data", []))
-            n_new = len(cache.get("new_data", []))
-            total = n_old + n_new
-            cache_old_ratios.append(n_old / total if total > 0 else 0.0)
-        state = np.concatenate([state, available_batches, cache_old_ratios], dtype=np.float32)
-        return state
+        return self.vehicle_env.get_environment_state()
     
