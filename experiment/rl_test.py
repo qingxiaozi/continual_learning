@@ -73,14 +73,14 @@ class RLTester:
         """测试循环"""
         logger.info("testing...")
 
-        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.TRAINING_STRATEGY}_reward_7"
+        run_name = f"mp_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.CACHE_STRATEGY}_reward_7"
         self.wandb_run = wandb.init(
             project=f"Vehicle-Edge-CL-Testing_{Config.CURRENT_DATASET}",
             name=run_name,
             config={
                 "upload_strategy": Config.UPLOAD_STRATEGY,
                 "bandwidth_strategy": Config.BANDWIDTH_STRATEGY,
-                "training_strategy": Config.TRAINING_STRATEGY,
+                "training_strategy": Config.CACHE_STRATEGY,
                 "num_episodes": self.num_episodes,
                 "max_timesteps": self.max_timesteps
             },
@@ -221,10 +221,10 @@ class RLTester:
 
         return results
 
-
-        def save_results(self):
-        # os.makedirs(Paths.RESULTS_NPY_DIR, exist_ok=True)
+    def save_results(self):
         prefix = f"{Config.UPLOAD_STRATEGY}_{Config.BANDWIDTH_STRATEGY}_{Config.CACHE_STRATEGY}"
+        if Config.UPLOAD_STRATEGY == "RATIO":
+            prefix = f"{prefix}_R{Config.RATIO}"
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_AA_steps.npy", np.array(self.AA_steps))
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_FM_steps.npy", np.array(self.FM_steps))
         np.save(f"{Paths.get_dataset_dir('npy')}/{prefix}_BWT_steps.npy", np.array(self.BWT_steps))
