@@ -20,17 +20,7 @@ class ContinualLearner:
         current_domain,
         num_epochs,
     ):
-        # 根据 Config.CACHE_STRATEGY 从缓存中挑选要训练的批次
-        strategy = Config.CACHE_STRATEGY
-        # 根据策略挑选要训练的批次
-        if strategy == "FIFO":
-            batches, batch_mapping = self._collect_batches(cache_manager)
-        elif strategy == "MAB":
-            batches, batch_mapping = self._collect_batches(cache_manager)
-        else:
-            raise ValueError(f"未知的缓存策略: {strategy}")
-
-        # batches, batch_mapping = self._collect_batches(cache_manager)
+        batches, batch_mapping = self._collect_batches(cache_manager)
         if len(batches) == 0:
             return {
                 "loss_before": 1.0,
@@ -43,7 +33,7 @@ class ContinualLearner:
 
         # 如果不是 MAB 策略，把 init_epochs 设为 num_epochs,
         # trainer 内部就不会进入 selector 采样阶段
-        init_ep = Config.INIT_EPOCHS if strategy == "MAB" else num_epochs
+        init_ep = Config.INIT_EPOCHS if Config.CACHE_STRATEGY == "MAB" else num_epochs
         result = self.trainer.train(
             batches=batches,
             num_epochs=num_epochs,
@@ -53,7 +43,7 @@ class ContinualLearner:
 
         loss_after = self._compute_loss_on_batches(batches)
 
-        if strategy == "MAB":
+        if Config.CACHE_STRATEGY == "MAB":
             # 只有 MAB 才更新缓存里对应的质量分数
             self._update_cache_quality(
                 cache_manager,
