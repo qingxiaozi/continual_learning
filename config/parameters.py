@@ -9,7 +9,7 @@ class Config:
     BANDWIDTH_STRATEGY = "MINMAX"  # ["EQUAL", "GREEDY", "MINMAX"]
     UPLOAD_STRATEGY = "DRL"              # ["RATIO", "DRL"]
     CACHE_STRATEGY = "FIFO"            # ["FIFO", "MAB"]
-    RATIO = 0.5  # office31:0, 0.5, 1; digit10:0, 0.2, 0.4, 0.6, 0.8, 1; domainnet:0, 0.2, 0.4, 0.6, 0.8, 1
+    RATIO = 0.4  # office31:0, 0.5, 1; digit10:0, 0.2, 0.4, 0.6, 0.8, 1; domainnet:0, 0.2, 0.4, 0.6, 0.8, 1
     # 实验参数
     NUM_EPISODES = 600  # episode数，office31:600; digit10:1120; domainnet:1680
     NUM_TRAINING_SESSIONS = 15  # train session，office31:15; digit10:20; domainnet:30
@@ -60,7 +60,7 @@ class Config:
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
-    CURRENT_DATASET = "office31"
+    CURRENT_DATASET = "digit10"
     # 域增量学习参数
     DOMAIN_SEQUENCES = {
         "office31": ["amazon", "webcam", "dslr"],
@@ -78,7 +78,7 @@ class Config:
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
     # 数据路径
     DATA_BASE_PATH = "./data"
-    USE_SAMPLED_DATA = True  # 是否使用采样数据集
+    USE_SAMPLED_DATA = False  # 是否使用采样数据集
     SAMPLED_DATA_PATH = "./data/domainnet_sample"  # 采样数据集路径
     # 数据集特定参数
     OFFICE31_CLASSES = 31
