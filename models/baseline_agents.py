@@ -14,10 +14,9 @@ class RatioAgent(BaseAgent):
 
     def select_action(self, state, available_batches):
         action = []
-        for avail in available_batches:
-            upload = int(avail * self.ratio)
-            # 确保不超过单次最大上传限制
-            upload = min(upload, Config.MAX_UPLOAD_BATCHES)
+        for _ in available_batches:
+            upload = int(Config.MAX_LOCAL_BATCHES * self.ratio)
+            # upload = min(upload, Config.MAX_UPLOAD_BATCHES)
             action.append(upload)
         return action
 
@@ -25,8 +24,8 @@ class RandomAgent(BaseAgent):
     """随机策略（可选，用于调试）"""
     def select_action(self, state, available_batches):
         action = []
-        for avail in available_batches:
-            upload = random.randint(0, min(avail, Config.MAX_UPLOAD_BATCHES))
+        for _ in available_batches:
+            upload = random.randint(0, Config.MAX_LOCAL_BATCHES)
             action.append(upload)
         return action
 
