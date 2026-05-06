@@ -25,19 +25,19 @@ EXPERIMENT_CONFIGS = {
             "BW": "EQUAL",
             "UPLOAD": "RATIO",
             "CACHE": "FIFO",
-            "env_group": "group_uniform",
+            "env_group": "group_base",
         },
         "Abl_BW_Opt": {
             "BW": "MINMAX",
             "UPLOAD": "RATIO",
             "CACHE": "FIFO",
-            "env_group": "group_uniform",
+            "env_group": "group_base",
         },
-        "Abl_UP_Greedy": {
-            "BW": "GREEDY",
-            "UPLOAD": "DRL",
-            "CACHE": "FIFO",
-            "env_group": "group_greedy",
+        "Abl_Cache_MAB": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "MAB",
+            "env_group": "group_base",
         },
         "Abl_UP_DRL": {
             "BW": "EQUAL",
@@ -45,40 +45,68 @@ EXPERIMENT_CONFIGS = {
             "CACHE": "FIFO",
             "env_group": "group_drl",
         },
-        "Abl_NoReplay": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "NEW_ONLY",
-            "env_group": "group_noreplay",
-        },
-        "Combo_Comm": {
-            "BW": "MINMAX",
-            "UPLOAD": "DRL",
-            "TRAIN": "FIFO",
-            "env_group": "group_drl",
-        },
-        "Combo_Learn": {
-            "BW": "EQUAL",
-            "UPLOAD": "DRL",
-            "CACHE": "MAB",
-            "env_group": "group_combo",
-        },
         "Ours_Full": {
             "BW": "MINMAX",
             "UPLOAD": "DRL",
-            "CACHE": "MAB", 
-            "env_group": "group_combo",
+            "CACHE": "MAB",
+            "env_group": "group_drl",
+        },
+        # "RATIO_0": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 0.0,
+        #     "env_group": "group_ratio",
+        # },
+        "RATIO_0.2": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.2,
+            "env_group": "group_ratio",
+        },
+        "RATIO_0.4": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.4,
+            "env_group": "group_ratio",
+        },
+        "RATIO_0.5": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.5,
+            "env_group": "group_ratio",
+        },
+        "RATIO_0.6": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.6,
+            "env_group": "group_ratio",
+        },
+        "RATIO_0.8": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.8,
+            "env_group": "group_ratio",
+        },
+        "RATIO_1": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 1.0,
+            "env_group": "group_ratio",
         },
     }
 
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）
 ENV_GROUP_SEEDS = {
-    "group_uniform": 42,
-    "group_greedy": 43,
+    "group_base": 42,
     "group_drl": 44,
-    "group_mab": 45,
-    "group_noreplay": 46,
-    "group_combo": 47,
+    "group_ratio": 45,
 }
 
 import multiprocessing as mp
@@ -94,6 +122,8 @@ def run_and_save(exp_name, config, output_dir):
     Config.BANDWIDTH_STRATEGY = config["BW"]
     Config.UPLOAD_STRATEGY = config["UPLOAD"]
     Config.CACHE_STRATEGY = config["CACHE"]
+    if "RATIO" in config:
+        Config.RATIO = config["RATIO"]
     Config.set_seed(seed)
 
     tester = RLTester()
