@@ -12,10 +12,10 @@ class Config:
     RATIO = 0.5  # UPLOAD_STRATEGY为RATIO时，使用的新数据比例
     # 实验参数
     NUM_EPISODES = 600  # episode数，office31:600; digit10:1120; domainnet:1680
-    NUM_TRAINING_SESSIONS = 15  # train session，office31:15; digit10:28; domainnet:42
+    NUM_TRAINING_SESSIONS = 15  # train session，office31:15; digit10:20; domainnet:30
     TARGET_UPDATE_INTERVAL = 5  # 每5个episode硬更新目标网络
     NUM_TEST_EPISODES = 100  # 100
-    NUM_TESTING_SESSIONS = 15  # office31:15; digit10:28; domainnet:42
+    NUM_TESTING_SESSIONS = 15  # office31:15; digit10:20; domainnet:30
 
     NUM_VEHICLES = 20  # 车辆数
     # 模型参数
@@ -54,9 +54,9 @@ class Config:
     DRL_TAU = 0.005  # 软更新参数
 
     # 缓存参数
-    MAX_CACHE_SIZE = 1000  # 边缘服务器的最大缓存批次
-    MAX_UPLOAD_BATCHES = 5  # 单阶段最大上传批次
-    MAX_LOCAL_BATCHES = 5  # 单个智能车最大缓存批次
+    MAX_CACHE_SIZE = 2000  # 边缘服务器的最大缓存批次，# office:40, digit10:2000, domainnet:2600
+    MAX_UPLOAD_BATCHES = 100  # 单阶段最大上传批次, # office21:2, digit10:100, domainnet:130
+    MAX_LOCAL_BATCHES = 100  # 单个智能车最大缓存批次, # office21:2, digit10:100, domainnet:130
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
