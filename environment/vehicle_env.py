@@ -321,22 +321,42 @@ class VehicleEnvironment:
 
         return np.column_stack([x, y])
 
-    def _get_all_trajectory_points(self):
-        """获取所有轨迹点"""
-        return [
-            point
-            for poly in self.trajectory_data['POLYLINE']
-            for point in (ast.literal_eval(poly) if isinstance(poly, str) else poly)
-            if isinstance(poly, str)  # 确保是字符串
-        ]
-
     def _initialize_base_stations(self):
         """
         城市级宏基站部署（沿轨迹缓冲区的 PPP）
-        - 仅在车辆真实活动区域附近生成基站
+        - 使用所有轨迹（train + test）生成基站，只生成一次并缓存
         - KDTree 去重，复杂度 O(N log N)
         """
-        points = self._get_all_trajectory_points()
+        # 尝试加载已缓存的基站位置
+        bs_cache_path = Paths.get_base_stations_cache_path()
+        if os.path.exists(bs_cache_path):
+            self.base_stations = np.load(bs_cache_path, allow_pickle=True).tolist()
+            print(f"从缓存加载 {len(self.base_stations)} 个基站")
+            return
+
+        # 获取所有轨迹点（train + test）
+        all_trajectory_data = []
+        for traj_file in ["train_trajectory.csv", "test_trajectory.csv"]:
+            traj_path = os.path.join(Paths.TRAJECTORY_DIR, traj_file)
+            if os.path.exists(traj_path):
+                df = pd.read_csv(traj_path)
+                all_trajectory_data.append(df)
+
+        if not all_trajectory_data:
+            self.base_stations = []
+            return
+
+        # 合并所有轨迹
+        combined_trajectory = pd.concat(all_trajectory_data, ignore_index=True)
+
+        points = []
+        for poly in combined_trajectory['POLYLINE']:
+            try:
+                pts = ast.literal_eval(poly) if isinstance(poly, str) else poly
+                points.extend(pts)
+            except Exception:
+                continue
+
         if not points:
             self.base_stations = []
             return
@@ -428,6 +448,11 @@ class VehicleEnvironment:
             })
 
         print(f"初始化 {len(self.base_stations)} 个基站")
+
+        # 保存基站位置到缓存文件
+        bs_cache_path = Paths.get_base_stations_cache_path()
+        np.save(bs_cache_path, self.base_stations)
+        print(f"基站位置已缓存到: {bs_cache_path}")
 
 
     def _initialize_vehicles_with_ppp(self):
