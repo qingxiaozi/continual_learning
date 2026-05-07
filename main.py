@@ -49,7 +49,7 @@ EXPERIMENT_CONFIGS = {
             "BW": "MINMAX",
             "UPLOAD": "DRL",
             "CACHE": "MAB",
-            "env_group": "group_drl",
+            "env_group": "group_ours",
         },
         # "RATIO_0": {
         #     "BW": "EQUAL",
@@ -105,8 +105,9 @@ EXPERIMENT_CONFIGS = {
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）
 ENV_GROUP_SEEDS = {
     "group_base": 42,
-    "group_drl": 44,
-    "group_ratio": 45,
+    "group_drl": 42,
+    "group_ratio": 42,
+    "group_ours": 42,
 }
 
 import multiprocessing as mp
