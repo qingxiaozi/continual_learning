@@ -78,7 +78,7 @@ class DomainIncrementalDataSimulator:
     - init_domain_cache:    {domain_key: {train/val/test}}     50%初始数据
     - sub_domain_cache:     {(domain_key, sub_idx): {train/val/test}}  5×10%子集
     - vehicle_data_assignments: {(domain_key, sub_idx): {vid: [indices]}}  车辆分配
-    - class_distributions:  {class_idx: [ratio_per_vehicle]}    狄利克雷分布
+    - class_distributions:  {vehicle_id: [ratio_per_class]}    各类别样本分配比例（等分）
 
     =========================================================
     核心流程
@@ -287,36 +287,45 @@ class DomainIncrementalDataSimulator:
         for idx, label in enumerate(train_labels):
             class_indices[label].append(idx)
 
-        for indices in class_indices.values():
-            np.random.shuffle(indices)
-
-        class_pointers = {c: 0 for c in class_indices.keys()}
-        class_available = {c: len(indices) for c, indices in class_indices.items()}
-
         total_train_samples = len(train_labels)
         samples_per_vehicle = total_train_samples // self.num_vehicles
         all_classes = sorted(class_indices.keys())
         num_classes = len(all_classes)
-
-        vehicle_assignments = {i: [] for i in range(self.num_vehicles)}
 
         for vehicle_id in range(self.num_vehicles):
             if vehicle_id not in self.class_distributions:
                 self.class_distributions[vehicle_id] = np.random.dirichlet(
                     np.full(num_classes, Config.DIRICHLET_ALPHA))
 
+        vehicle_assignments = {i: [] for i in range(self.num_vehicles)}
+        used_indices = set()
+
+        for vehicle_id in range(self.num_vehicles):
             distribution = self.class_distributions[vehicle_id].copy()
+            target_per_class = {}
 
             for c_idx, c in enumerate(all_classes):
-                num_samples = int(distribution[c_idx] * samples_per_vehicle)
-                num_samples = min(num_samples, class_available.get(c, 0))
-                if num_samples <= 0:
-                    continue
-                start_idx = class_pointers[c]
-                end_idx = start_idx + num_samples
-                vehicle_assignments[vehicle_id].extend(class_indices[c][start_idx:end_idx])
-                class_pointers[c] = end_idx
-                class_available[c] -= num_samples
+                target_per_class[c] = int(distribution[c_idx] * samples_per_vehicle)
+
+            total_target = sum(target_per_class.values())
+            diff = samples_per_vehicle - total_target
+
+            if diff > 0:
+                additional_classes = np.random.choice(all_classes, size=diff, replace=False)
+                for c in additional_classes:
+                    target_per_class[c] += 1
+            elif diff < 0:
+                excess_classes = np.random.choice(all_classes, size=-diff, replace=False)
+                for c in excess_classes:
+                    target_per_class[c] -= 1
+
+            for c in all_classes:
+                count = target_per_class[c]
+                available = [idx for idx in class_indices[c] if idx not in used_indices]
+                np.random.shuffle(available)
+                selected = available[:count]
+                vehicle_assignments[vehicle_id].extend(selected)
+                used_indices.update(selected)
 
         self.vehicle_data_assignments[sub_key] = vehicle_assignments
 
