@@ -52,6 +52,7 @@ class Config:
     DRL_EPSILON_DECAY = 2000  # epsilon衰减速率
     DRL_TARGET_UPDATE_EVERY = 100  # 目标网络更新频率
     DRL_TAU = 0.005  # 软更新参数
+    DRL_UPDATE_INTERVAL = 4  # DRL优化间隔（每4步优化一次）
 
     # 缓存参数
     MAX_CACHE_SIZE = 2000  # 边缘服务器的最大缓存批次，# office:40, digit10:2000, domainnet:2600

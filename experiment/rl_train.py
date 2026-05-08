@@ -66,14 +66,15 @@ class RLTrainer:
                 # 存储经验
                 self.agent.store_experience(state, action, reward, next_state, done)
 
-                # 优化模型
-                loss = self.agent.optimize_model()
+                # 每隔 DRL_UPDATE_INTERVAL 步优化一次模型
+                if global_step % Config.DRL_UPDATE_INTERVAL == 0:
+                    loss = self.agent.optimize_model()
 
-                if loss is not None:
-                    wandb.log({
-                        "DRL train loss": loss,
-                        "global step": global_step
-                    })
+                    if loss is not None:
+                        wandb.log({
+                            "DRL train loss": loss,
+                            "global step": global_step
+                        })
 
                 total_reward += reward
                 if 'comm' in info:
