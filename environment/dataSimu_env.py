@@ -311,11 +311,11 @@ class DomainIncrementalDataSimulator:
             diff = samples_per_vehicle - total_target
 
             if diff > 0:
-                additional_classes = np.random.choice(all_classes, size=diff, replace=False)
+                additional_classes = np.random.choice(all_classes, size=diff, replace=True)
                 for c in additional_classes:
                     target_per_class[c] += 1
             elif diff < 0:
-                excess_classes = np.random.choice(all_classes, size=-diff, replace=False)
+                excess_classes = np.random.choice(all_classes, size=-diff, replace=True)
                 for c in excess_classes:
                     target_per_class[c] -= 1
 
