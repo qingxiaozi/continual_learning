@@ -170,7 +170,7 @@ class VehicleEdgeEnv:
         cur_acc = {}
         if cumulative_test_datasets:
             for (domain, sub_idx), test_dataset in cumulative_test_datasets.items():
-                loader = DataLoader(test_dataset, batch_size=Config.BATCH_SIZE)
+                loader = DataLoader(test_dataset, batch_size=Config.EVAL_BATCH_SIZE)
                 acc, _ = self.evaluator.evaluate_model(self.global_model.model, loader)
                 cur_acc[(domain, sub_idx)] = acc
 

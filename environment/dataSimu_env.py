@@ -279,7 +279,9 @@ class DomainIncrementalDataSimulator:
             return
 
         train_dataset = self.sub_domain_cache[sub_key]["train"]
-        train_labels = [train_dataset[i][1] for i in range(len(train_dataset))]
+        if not hasattr(train_dataset, 'cached_labels'):
+            train_dataset.cached_labels = [train_dataset[i][1] for i in range(len(train_dataset))]
+        train_labels = train_dataset.cached_labels
 
         class_indices = defaultdict(list)
         for idx, label in enumerate(train_labels):
@@ -304,21 +306,17 @@ class DomainIncrementalDataSimulator:
                     np.full(num_classes, Config.DIRICHLET_ALPHA))
 
             distribution = self.class_distributions[vehicle_id].copy()
-            assigned_count = 0
 
-            while assigned_count < samples_per_vehicle:
-                available_classes = [c for c in all_classes if class_available.get(c, 0) > 0]
-                if not available_classes:
-                    break
-
-                probs = np.array([distribution[all_classes.index(c)] for c in available_classes])
-                probs = probs / probs.sum()
-
-                selected_class = np.random.choice(available_classes, p=probs)
-                vehicle_assignments[vehicle_id].append(class_indices[selected_class][class_pointers[selected_class]])
-                class_pointers[selected_class] += 1
-                class_available[selected_class] -= 1
-                assigned_count += 1
+            for c_idx, c in enumerate(all_classes):
+                num_samples = int(distribution[c_idx] * samples_per_vehicle)
+                num_samples = min(num_samples, class_available.get(c, 0))
+                if num_samples <= 0:
+                    continue
+                start_idx = class_pointers[c]
+                end_idx = start_idx + num_samples
+                vehicle_assignments[vehicle_id].extend(class_indices[c][start_idx:end_idx])
+                class_pointers[c] = end_idx
+                class_available[c] -= num_samples
 
         self.vehicle_data_assignments[sub_key] = vehicle_assignments
 

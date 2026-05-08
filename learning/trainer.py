@@ -28,7 +28,7 @@ class EpochTrainer:
             l1_lambda=1e-6,
         )
 
-    def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=5):
+    def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=3):
         """训练模型
 
         Args:

@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from collections import defaultdict
 from pyproj import Transformer, CRS
 import matplotlib.pyplot as plt
+from scipy.spatial import cKDTree
 import matplotlib.font_manager as fm
 from matplotlib.ticker import FuncFormatter
 from scipy.spatial import cKDTree
@@ -163,6 +164,8 @@ class VehicleEnvironment:
         # 实体集合
         self.vehicles = []  # 车辆对象列表
         self.base_stations = []  # 基站对象列表，字典
+        self.bs_kdtree = None  # 基站 KDTree 索引
+        self.bs_by_id = {}  # 基站ID→对象映射
         self.current_session = 0  # 当前训练会话编号
         self.environment_time = 0.0  # 环境运行时间(s)
 
@@ -332,6 +335,7 @@ class VehicleEnvironment:
         if os.path.exists(bs_cache_path):
             self.base_stations = np.load(bs_cache_path, allow_pickle=True).tolist()
             print(f"从缓存加载 {len(self.base_stations)} 个基站")
+            self._build_bs_kdtree()
             return
 
         # 获取所有轨迹点（train + test）
@@ -454,6 +458,18 @@ class VehicleEnvironment:
         np.save(bs_cache_path, self.base_stations)
         print(f"基站位置已缓存到: {bs_cache_path}")
 
+        # 构建 KDTree 加速最近基站查询
+        self._build_bs_kdtree()
+
+    def _build_bs_kdtree(self):
+        """构建基站 KDTree 索引和ID映射，加速最近邻查询"""
+        if not self.base_stations:
+            self.bs_kdtree = None
+            self.bs_by_id = {}
+            return
+        bs_positions = np.array([bs["utm_position"] for bs in self.base_stations])
+        self.bs_kdtree = cKDTree(bs_positions)
+        self.bs_by_id = {bs["id"]: bs for bs in self.base_stations}
 
     def _initialize_vehicles_with_ppp(self):
         """初始化车辆：主车辆 + PPP生成的其他车辆"""
@@ -516,16 +532,22 @@ class VehicleEnvironment:
         return:
             dict: 最近的基站信息，如果没有可用基站则返回None
         """
-        available_bs = [
-            bs for bs in self.base_stations
-            if np.linalg.norm(position - bs["utm_position"]) <= bs["coverage"]
-            and len(bs["connected_vehicles"]) < bs["capacity"]
-        ]
-        if not available_bs:
-            print(f"No available base station for position {position}")
+        if self.bs_kdtree is None:
             return None
 
-        return min(available_bs, key=lambda bs: np.linalg.norm(position - bs["utm_position"]))
+        k = min(len(self.base_stations), 10)
+        distances, indices = self.bs_kdtree.query(position, k=k)
+
+        if k == 1:
+            distances, indices = [distances], [indices]
+
+        for dist, idx in zip(distances, indices):
+            bs = self.base_stations[idx]
+            if dist <= bs["coverage"] and len(bs["connected_vehicles"]) < bs["capacity"]:
+                return bs
+
+        print(f"No available base station for position {position}")
+        return None
 
     def update_vehicle_positions(self, time_delta=20):
         """更新车辆位置"""
@@ -568,10 +590,7 @@ class VehicleEnvironment:
         """
         根据ID获取基站对象
         """
-        for bs in self.base_stations:
-            if bs["id"] == bs_id:
-                return bs
-        return None
+        return self.bs_by_id.get(bs_id)
 
     def _get_vehicle_by_id(self, vehicle_id):
         """
