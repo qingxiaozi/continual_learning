@@ -30,7 +30,7 @@ class RLTrainer:
 
         wandb.init(
             project=f"Vehicle-Edge-DRL_{Config.CURRENT_DATASET}", 
-            name=f"Run_Episodes_{Config.NUM_EPISODES}",
+            name=f"Run_Episodes_{Config.NUM_EPISODES}_{Config.BANDWIDTH_STRATEGY}_{Config.UPLOAD_STRATEGY}_{Config.CACHE_STRATEGY}_ratio_{Config.RATIO}",
             config={
                 "num_episodes": self.num_episodes,
                 "max_timesteps": self.max_timesteps,
