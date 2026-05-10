@@ -7,7 +7,9 @@
 ├── data
 │   ├── PortoTaxi
 │   ├── digit10
+│   ├── digit10_sample
 │   ├── domainnet
+│   ├── domainnet_sample
 │   └── office-31
 ├── environment
 │   ├── communication_env.py
@@ -120,6 +122,30 @@ reward = delta_acc - 2.0 * forgetting - 0.1 * delay
 |office-31|Amazon、Webcam、DSLR|31|back_pack、bottle、desktop_computer、laptop_computer、mouse、phone、ring_binder、stapler、bike、calculator、file_cabinet、letter_tray、mug、printer、ruler、tape_dispenser、bike_helmet、desk_chair、headphones、mobile_phone、paper_notebook、projector、scissors、trash_can、bookcase、desk_lamp、keyboard、monitor、pen、punchers、speaker|Amazon:2817；dslr:498；webcam:795 (总计:4,110)|224×224|3|域适应基准数据集|
 |digit10|MNIST、EMNIST、USPS、SVHN|10|0、1、2、3、4、5、6、7、8、9|MNIST:70,000；EMNIST:280,000；USPS:7,291；SVHN:99,289 (总计:456,580)|224×224|3|数字识别数据集|
 |DomainNet|Clipart、Infograph、Painting、Quickdraw、Real、Sketch|345|clipart、infograph、painting、quickdraw、real、sketch|Real:175,327；Quickdraw:172,500；Painting:75,759；Sketch:70,386；Infograph:53,201；Clipart:48,833 (总计:596,006)|224×224|3|大规模域适应数据集|
+
+### 采样数据集
+使用 `data_sample.py` 脚本对原始数据集进行1/10采样：
+
+#### digit10_sample 数据集
+| 域 | 图片数量 |
+|----|----------|
+| mnist | 7,000 |
+| emnist | 28,000 |
+| usps | 729 |
+| svhn | 9,928 |
+| **总计** | **45,657** |
+
+#### domainnet_sample 数据集
+| 域 | 图片数量 |
+|----|----------|
+| clipart | 4,878 |
+| infograph | 5,309 |
+| painting | 7,361 |
+| quickdraw | 17,250 |
+| real | 17,492 |
+| sketch | 7,019 |
+| **总计** | **59,309** |
+
 <br>
 
 ## 五、结果

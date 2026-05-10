@@ -20,7 +20,7 @@ class Config:
     NUM_VEHICLES = 10  # 车辆数
     # 模型参数
     NUM_EPOCH = 7  # 训练epoch数
-    BATCH_SIZE = 8  # batch size
+    BATCH_SIZE = 16  # batch size，digit10:16
     EVAL_BATCH_SIZE = 64  # 评估时的 batch_size
     LEARNING_RATE = 0.001  # 学习率
 
@@ -56,8 +56,8 @@ class Config:
     DRL_UPDATE_INTERVAL = 4  # DRL优化间隔（每4步优化一次）
 
     # 缓存参数
-    MAX_LOCAL_BATCHES = 100  # 单个智能车最大缓存批次, # office21:2, digit10:100, domainnet:130
-    MAX_UPLOAD_BATCHES = 100  # 单阶段最大上传批次, # office21:2, digit10:100, domainnet:130
+    MAX_LOCAL_BATCHES = 15  # 单个智能车最大缓存批次, # office21:2, digit10:15, domainnet:15
+    MAX_UPLOAD_BATCHES = 15  # 单阶段最大上传批次, # office21:2, digit10:15, domainnet:15
     MAX_CACHE_SIZE = MAX_LOCAL_BATCHES * NUM_VEHICLES  # 边缘服务器的最大缓存批次，# office:40, digit10:2000, domainnet:2600
 
     # 数据分布参数
@@ -80,8 +80,8 @@ class Config:
     DIRICHLET_ALPHA = 0.5  # α越小，数据分布越异构
     # 数据路径
     DATA_BASE_PATH = "./data"
-    USE_SAMPLED_DATA = False  # 是否使用采样数据集
-    SAMPLED_DATA_PATH = "./data/domainnet_sample"  # 采样数据集路径
+    USE_SAMPLED_DATA = True  # 是否使用采样数据集
+    SAMPLED_DATA_PATH = "./data/digit10_sample"  # 采样数据集路径
     # 数据集特定参数
     OFFICE31_CLASSES = 31
     DIGIT10_CLASSES = 10
