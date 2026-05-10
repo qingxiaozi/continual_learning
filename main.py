@@ -21,36 +21,36 @@ from torch.utils.data import DataLoader
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-        "Base_Uniform": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "env_group": "group_base",
-        },
-        "Abl_BW_Opt": {
-            "BW": "MINMAX",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "env_group": "group_base",
-        },
-        "Abl_Cache_MAB": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "MAB",
-            "env_group": "group_base",
-        },
-        "Abl_UP_DRL": {
-            "BW": "EQUAL",
-            "UPLOAD": "DRL",
-            "CACHE": "FIFO",
-            "env_group": "group_drl",
-        },
-        "Ours_Full": {
-            "BW": "MINMAX",
-            "UPLOAD": "DRL",
-            "CACHE": "MAB",
-            "env_group": "group_ours",
-        },
+        # "Base_Uniform": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "env_group": "group_base",
+        # },
+        # "Abl_BW_Opt": {
+        #     "BW": "MINMAX",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "env_group": "group_base",
+        # },
+        # "Abl_Cache_MAB": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "MAB",
+        #     "env_group": "group_base",
+        # },
+        # "Abl_UP_DRL": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "DRL",
+        #     "CACHE": "FIFO",
+        #     "env_group": "group_drl",
+        # },
+        # "Ours_Full": {
+        #     "BW": "MINMAX",
+        #     "UPLOAD": "DRL",
+        #     "CACHE": "MAB",
+        #     "env_group": "group_ours",
+        # },
         # "RATIO_0": {
         #     "BW": "EQUAL",
         #     "UPLOAD": "RATIO",
