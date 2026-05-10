@@ -16,7 +16,6 @@ class RatioAgent(BaseAgent):
         action = []
         for _ in available_batches:
             upload = int(Config.MAX_LOCAL_BATCHES * self.ratio)
-            # upload = min(upload, Config.MAX_UPLOAD_BATCHES)
             action.append(upload)
         return action
 

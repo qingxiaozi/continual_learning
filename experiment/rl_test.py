@@ -28,7 +28,7 @@ class AgentFactory:
     @staticmethod
     def create_agent(upload_strategy,state_dim):
         if upload_strategy == "RATIO":
-            return RatioAgent(ratio=0.5)
+            return RatioAgent(ratio=Config.RATIO)
         elif upload_strategy == "DRL":
             agent = DRLAgent(state_dim)
             agent.load_model(Paths.get_drl_model_path())
@@ -193,7 +193,8 @@ class RLTester:
             "config": {
                 "BW": Config.BANDWIDTH_STRATEGY,
                 "UPLOAD": Config.UPLOAD_STRATEGY,
-                "CACHE": Config.CACHE_STRATEGY
+                "CACHE": Config.CACHE_STRATEGY,
+                "RATIO": Config.RATIO if Config.UPLOAD_STRATEGY == "RATIO" else None,
             },
             "metrics": {}
         }
@@ -202,6 +203,8 @@ class RLTester:
         logger.info(f"BW: {Config.BANDWIDTH_STRATEGY}")
         logger.info(f"UPLOAD: {Config.UPLOAD_STRATEGY}")
         logger.info(f"CACHE: {Config.CACHE_STRATEGY}")
+        if Config.UPLOAD_STRATEGY == "RATIO":
+            logger.info(f"RATIO: {Config.RATIO}")
 
         def report(name, values, category="metrics"):
             mean_val = float(np.mean(values))
