@@ -8,14 +8,14 @@ class Config:
     
     BANDWIDTH_STRATEGY = "MINMAX"  # ["EQUAL", "GREEDY", "MINMAX"]
     UPLOAD_STRATEGY = "DRL"              # ["RATIO", "DRL"]
-    CACHE_STRATEGY = "MAB"            # ["FIFO", "MAB"]
+    CACHE_STRATEGY = "MAB"          # ["FIFO", "MAB"]
     RATIO = 0.4  # office31:0, 0.5, 1; digit10:0, 0.2, 0.4, 0.6, 0.8, 1; domainnet:0, 0.2, 0.4, 0.6, 0.8, 1
     # 实验参数
     NUM_EPISODES = 550  # episode数，office31:600; digit10:550; domainnet:1680
-    NUM_TRAINING_SESSIONS = 15  # train session，office31:15; digit10:20; domainnet:30
+    NUM_TRAINING_SESSIONS = 20 # train session，office31:15; digit10:20; domainnet:30
     TARGET_UPDATE_INTERVAL = 5  # 每5个episode硬更新目标网络
     NUM_TEST_EPISODES = 80  # 80
-    NUM_TESTING_SESSIONS = 15  # office31:15; digit10:20; domainnet:30
+    NUM_TESTING_SESSIONS = 20  # office31:15; digit10:20; domainnet:30
 
     NUM_VEHICLES = 10  # 车辆数
     # 模型参数
@@ -58,7 +58,7 @@ class Config:
     # 缓存参数
     MAX_LOCAL_BATCHES = 15  # 单个智能车最大缓存批次, # office21:2, digit10:15, domainnet:15
     MAX_UPLOAD_BATCHES = 15  # 单阶段最大上传批次, # office21:2, digit10:15, domainnet:15
-    MAX_CACHE_SIZE = MAX_LOCAL_BATCHES * NUM_VEHICLES  # 边缘服务器的最大缓存批次，# office:40, digit10:2000, domainnet:2600
+    MAX_CACHE_SIZE = MAX_LOCAL_BATCHES * NUM_VEHICLES  # 边缘服务器的最大缓存批次，# office:40, digit10:150, domainnet:2600
 
     # 数据分布参数
     DATASET_NAMES = ["digit10", "office31", "domainnet"]
@@ -89,7 +89,7 @@ class Config:
     # 域切换参数
     DOMAIN_CHANGE_INTERVAL = 5  # 每x个session切换一个域
     # 数据加载参数
-    IMAGE_SIZE = 16  # 统一调整到相同尺寸，digit10:16，office31:32, domainnet:32
+    IMAGE_SIZE = 16  # 统一调整到相同尺寸，digit10:16，office31:32, domainnet:224x224
     # 测试策略参数
     TEST_STRATEGY = "cumulative"  # 'current' 或 'cumulative'
     TEST_RATIO = 0.2  # 测试集比例
