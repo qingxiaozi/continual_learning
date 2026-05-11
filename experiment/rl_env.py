@@ -196,7 +196,7 @@ class VehicleEdgeEnv:
             forget_sum = sum(max(self._prev_per_task_acc[t] - cur_acc[t], 0) for t in common_tasks)
             forgetting = forget_sum / len(common_tasks)
 
-        reward = delta_acc - 2.0 * forgetting - 0.1 * delay
+        reward = delta_acc - 2.5 * forgetting - 0.05 * delay
 
         self._prev_per_task_acc = cur_acc.copy()
 
