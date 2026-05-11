@@ -21,12 +21,6 @@ from torch.utils.data import DataLoader
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-        # "Base_Uniform": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "env_group": "group_base",
-        # },
         # "Abl_BW_Opt": {
         #     "BW": "MINMAX",
         #     "UPLOAD": "RATIO",
@@ -45,6 +39,12 @@ EXPERIMENT_CONFIGS = {
         #     "CACHE": "FIFO",
         #     "env_group": "group_drl",
         # },
+        "Abl_UP_DRL_MAB": {
+            "BW": "EQUAL",
+            "UPLOAD": "DRL", 
+            "CACHE": "MAB",
+            "env_group": "group_ours",
+        },
         # "Ours_Full": {
         #     "BW": "MINMAX",
         #     "UPLOAD": "DRL",
@@ -55,51 +55,44 @@ EXPERIMENT_CONFIGS = {
         #     "BW": "EQUAL",
         #     "UPLOAD": "RATIO",
         #     "CACHE": "FIFO",
-        #     "RATIO": 0.0,
+        #     "RATIO": 0,
         #     "env_group": "group_ratio",
         # },
-        "RATIO_0.2": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 0.2,
-            "env_group": "group_ratio",
-        },
-        "RATIO_0.4": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 0.4,
-            "env_group": "group_ratio",
-        },
-        "RATIO_0.5": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 0.5,
-            "env_group": "group_ratio",
-        },
-        "RATIO_0.6": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 0.6,
-            "env_group": "group_ratio",
-        },
-        "RATIO_0.8": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 0.8,
-            "env_group": "group_ratio",
-        },
-        "RATIO_1": {
-            "BW": "EQUAL",
-            "UPLOAD": "RATIO",
-            "CACHE": "FIFO",
-            "RATIO": 1.0,
-            "env_group": "group_ratio",
-        },
+        # "RATIO_0.2": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 0.2,
+        #     "env_group": "group_ratio",
+        # },
+        # "RATIO_0.4": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 0.4,
+        #     "env_group": "group_ratio",
+        # },
+        # "RATIO_0.6": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 0.6,
+        #     "env_group": "group_ratio",
+        # },
+        # "RATIO_0.8": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 0.8,
+        #     "env_group": "group_ratio",
+        # },
+        # "RATIO_1": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "RATIO",
+        #     "CACHE": "FIFO",
+        #     "RATIO": 1.0,
+        #     "env_group": "group_ratio",
+        # },
     }
 
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）
