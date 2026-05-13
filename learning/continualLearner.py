@@ -128,4 +128,4 @@ class ContinualLearner:
             cache["quality_scores"] = (
                 [s for _, s in scores["old"]] +
                 [s for _, s in scores["new"]]
-            )  
+            )
