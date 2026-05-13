@@ -81,11 +81,9 @@ class CacheManager:
                         cache["quality_scores"].pop(idx)
                         if has_mapping and idx < len(cache["batch_mapping"]):
                             cache["batch_mapping"].pop(idx)
-            else:
+            elif len(cache["old_data"]) > 0:
                 remove_count = min(excess, len(cache["old_data"]))
                 cache["old_data"] = cache["old_data"][remove_count:]
-                if cache["quality_scores"]:
-                    cache["quality_scores"] = cache["quality_scores"][remove_count:]
                 if has_mapping:
                     cache["batch_mapping"] = cache["batch_mapping"][remove_count:]
 
@@ -110,10 +108,10 @@ class CacheManager:
         num_new = len(cache["new_data"])
         if num_new == 0:
             return
-        
+
         cache["old_data"].extend(cache["new_data"])
         cache["new_data"] = []
-        cache["quality_scores"].extend([0.0] * num_new)
+
         if isinstance(cache["batch_mapping"], list):
             cache["batch_mapping"].extend([None] * num_new)
 
