@@ -206,13 +206,9 @@ class VehicleEdgeEnv:
         """更新会话和环境状态"""
         domain_changed, previous_domain, current_domain = self.data_simulator.update_session_dataset(self.session)
 
-        # 域发生变化，提升所有车辆的缓存
-        if domain_changed:
-            for vehicle_id in range(Config.NUM_VEHICLES):
-                self.cache_manager.promote_new_to_old(vehicle_id)
-            print(
-                f"已提升缓存中的数据。"
-            )
+        # 将所有车辆的新数据提升为旧数据
+        for vehicle_id in range(Config.NUM_VEHICLES):
+            self.cache_manager.promote_new_to_old(vehicle_id)
 
         # 更新车辆位置
         self.vehicle_env.update_vehicle_positions(time_delta=250)
