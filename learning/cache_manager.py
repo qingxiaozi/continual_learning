@@ -73,17 +73,30 @@ class CacheManager:
             excess = total_size - self.max_size
             has_mapping = isinstance(cache["batch_mapping"], list) and len(cache["batch_mapping"]) > 0
 
-            if cache["quality_scores"] and len(cache["old_data"]) > 0:
-                quality_indices = np.argsort(cache["quality_scores"])[:excess]
+            old_quality_scores = cache["quality_scores"][:len(cache["old_data"])]
+            
+            if old_quality_scores and len(cache["old_data"]) > 0:
+                quality_indices = np.argsort(old_quality_scores)[:excess]
+                logger.info(
+                    f"[MAB] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
+                    f"quality_scores={old_quality_scores}, 移除索引={list(quality_indices)}"
+                )
                 for idx in sorted(quality_indices, reverse=True):
                     if idx < len(cache["old_data"]):
                         cache["old_data"].pop(idx)
-                        cache["quality_scores"].pop(idx)
+                        if idx < len(cache["quality_scores"]):
+                            cache["quality_scores"].pop(idx)
                         if has_mapping and idx < len(cache["batch_mapping"]):
                             cache["batch_mapping"].pop(idx)
             elif len(cache["old_data"]) > 0:
                 remove_count = min(excess, len(cache["old_data"]))
+                logger.info(
+                    f"[FIFO] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
+                    f"移除前 {remove_count} 个"
+                )
                 cache["old_data"] = cache["old_data"][remove_count:]
+                if len(cache["quality_scores"]) >= remove_count:
+                    cache["quality_scores"] = cache["quality_scores"][remove_count:]
                 if has_mapping:
                     cache["batch_mapping"] = cache["batch_mapping"][remove_count:]
 
