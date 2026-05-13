@@ -14,7 +14,7 @@ class Config:
     NUM_EPISODES = 550  # episode数，office31:600; digit10:550; domainnet:1680
     NUM_TRAINING_SESSIONS = 20 # train session，office31:15; digit10:20; domainnet:30
     TARGET_UPDATE_INTERVAL = 5  # 每5个episode硬更新目标网络
-    NUM_TEST_EPISODES = 80  # 80
+    NUM_TEST_EPISODES = 20  # 80
     NUM_TESTING_SESSIONS = 20  # office31:15; digit10:20; domainnet:30
 
     NUM_VEHICLES = 10  # 车辆数

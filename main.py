@@ -21,42 +21,35 @@ from torch.utils.data import DataLoader
 
 # ========== 定义所有对比实验 ==========
 EXPERIMENT_CONFIGS = {
-        # "Abl_BW_Opt": {
-        #     "BW": "MINMAX",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "env_group": "group_base",
-        # },
-        # "Abl_Cache_MAB": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "MAB",
-        #     "env_group": "group_base",
-        # },
+        "Abl_BW_Opt": {
+            "BW": "MINMAX",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "env_group": "group_base",
+        },
+        "Abl_Cache_MAB": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "MAB",
+            "env_group": "group_base",
+        },
         # "Abl_UP_DRL": {
         #     "BW": "EQUAL",
         #     "UPLOAD": "DRL",
         #     "CACHE": "FIFO",
         #     "env_group": "group_drl",
         # },
-        "Abl_UP_DRL_MAB": {
-            "BW": "EQUAL",
-            "UPLOAD": "DRL", 
-            "CACHE": "MAB",
-            "env_group": "group_ours",
-        },
+        # "Abl_UP_DRL_MAB": {
+        #     "BW": "EQUAL",
+        #     "UPLOAD": "DRL", 
+        #     "CACHE": "MAB",
+        #     "env_group": "group_ours",
+        # },
         # "Ours_Full": {
         #     "BW": "MINMAX",
         #     "UPLOAD": "DRL",
         #     "CACHE": "MAB",
         #     "env_group": "group_ours",
-        # },
-        # "RATIO_0": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 0,
-        #     "env_group": "group_ratio",
         # },
         # "RATIO_0.2": {
         #     "BW": "EQUAL",
@@ -65,13 +58,13 @@ EXPERIMENT_CONFIGS = {
         #     "RATIO": 0.2,
         #     "env_group": "group_ratio",
         # },
-        # "RATIO_0.4": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 0.4,
-        #     "env_group": "group_ratio",
-        # },
+        "RATIO_0.4": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.4,
+            "env_group": "group_ratio",
+        },
         # "RATIO_0.6": {
         #     "BW": "EQUAL",
         #     "UPLOAD": "RATIO",
