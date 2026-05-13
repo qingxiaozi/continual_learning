@@ -1,5 +1,6 @@
 import torch
 import torch.optim as optim
+import numpy as np
 from config.parameters import Config
 from learning.trainer import EpochTrainer
 
@@ -125,7 +126,13 @@ class ContinualLearner:
             scores["old"].sort()
             scores["new"].sort()
 
-            cache["quality_scores"] = (
-                [s for _, s in scores["old"]] +
-                [s for _, s in scores["new"]]
-            )
+            old_scores = [s for _, s in scores["old"]]
+            new_scores = [s for _, s in scores["new"]]
+            
+            if old_scores:
+                logger.info(
+                    f"[MAB质量分数] 车辆 {vid}: old_scores均值={np.mean(old_scores):.4f}, "
+                    f"标准差={np.std(old_scores):.4f}, min={min(old_scores):.4f}, max={max(old_scores):.4f}"
+                )
+            
+            cache["quality_scores"] = old_scores + new_scores
