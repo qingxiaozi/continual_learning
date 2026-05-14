@@ -14,7 +14,7 @@ class Config:
     NUM_EPISODES = 550  # episode数，office31:600; digit10:550; domainnet:1680
     NUM_TRAINING_SESSIONS = 20 # train session，office31:15; digit10:20; domainnet:30
     TARGET_UPDATE_INTERVAL = 5  # 每5个episode硬更新目标网络
-    NUM_TEST_EPISODES = 20  # 80
+    NUM_TEST_EPISODES = 80  # 80
     NUM_TESTING_SESSIONS = 20  # office31:15; digit10:20; domainnet:30
 
     NUM_VEHICLES = 10  # 车辆数
@@ -25,7 +25,7 @@ class Config:
     LEARNING_RATE = 0.001  # 学习率
 
     # MAB参数
-    INIT_EPOCHS = 1  # MAB初始探索轮次
+    INIT_EPOCHS = 3  # MAB初始探索轮次
     MAB_EXPLORATION_FACTOR = 2.0  # UCB探索因子
     
     # 通信参数

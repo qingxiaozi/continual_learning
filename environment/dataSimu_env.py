@@ -228,12 +228,16 @@ class DomainIncrementalDataSimulator:
         val_size = int(Config.VAL_RATIO * len(indices))
         train_size = len(indices) - test_size - val_size
 
-        train_idx, val_idx, test_idx = random_split(indices, [train_size, val_size, test_size], generator=generator)
+        train_idx, val_idx, test_idx = random_split(range(len(indices)), [train_size, val_size, test_size], generator=generator)
+
+        train_indices = [indices[i] for i in train_idx.indices]
+        val_indices = [indices[i] for i in val_idx.indices]
+        test_indices = [indices[i] for i in test_idx.indices]
 
         return {
-            "train": TransformSubset(original_dataset, train_idx.indices, self.TRAIN_TRANSFORM),
-            "val": TransformSubset(original_dataset, val_idx.indices, self.TEST_TRANSFORM),
-            "test": TransformSubset(original_dataset, test_idx.indices, self.TEST_TRANSFORM),
+            "train": TransformSubset(original_dataset, train_indices, self.TRAIN_TRANSFORM),
+            "val": TransformSubset(original_dataset, val_indices, self.TEST_TRANSFORM),
+            "test": TransformSubset(original_dataset, test_indices, self.TEST_TRANSFORM),
         }
 
     def _get_current_sub_domain_idx(self):

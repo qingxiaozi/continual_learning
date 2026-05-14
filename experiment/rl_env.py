@@ -57,6 +57,8 @@ class VehicleEdgeEnv:
         self._prev_per_task_acc = {}
         # 预加载第一个子数据集，使 step 0 可以训练
         self.data_simulator.update_session_dataset(0)
+        # 为车辆生成初始数据批次
+        self._refresh_vehicle_data()
 
         return self._get_state()
     
