@@ -32,21 +32,25 @@ class GlobalModel(nn.Module):
             Paths.RESULTS_DIR, f"global_model_{dataset_name}.pth"
         )
 
+        self._build_model()
         self.reset_parameters()
 
     def reset_parameters(self):
         """"
         Episode-level reset only.
         Should NOT be called within an episode.
+        根据 init_mode 决定是加载预训练模型还是随机初始化。
         """
-        self._build_model()
-
         if self.init_mode == "pretrained" and os.path.exists(self.model_path):
             self._load_pretrained()
-        elif self.init_mode == "random":
-            pass  # 已是随机初始化
+            logger.info(f"加载预训练全局模型: {self.model_path}")
         else:
-            logger.info("未找到预训练全局模型，使用随机初始化")
+            for param in self.model.parameters():
+                if param.dim() > 1:
+                    nn.init.kaiming_normal_(param)
+                else:
+                    nn.init.zeros_(param)
+            logger.info("随机初始化全局模型")
     
     def _build_model(self):
         self.model = models.resnet18(pretrained=False)
