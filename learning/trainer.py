@@ -92,6 +92,8 @@ class EpochTrainer:
 
         total_loss = 0.0
         num_steps = 0
+        
+        # logger.info(f"[训练] batches数量={len(batches)}, use_mab={use_mab}")
 
         for step in range(len(batches)):
             if use_mab:

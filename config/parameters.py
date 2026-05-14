@@ -25,7 +25,7 @@ class Config:
     LEARNING_RATE = 0.001  # 学习率
 
     # MAB参数
-    INIT_EPOCHS = 3  # MAB初始探索轮次
+    INIT_EPOCHS = 1  # MAB初始探索轮次
     MAB_EXPLORATION_FACTOR = 2.0  # UCB探索因子
     
     # 通信参数

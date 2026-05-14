@@ -1,8 +1,11 @@
+import logging
 import torch
 import torch.optim as optim
 import numpy as np
 from config.parameters import Config
 from learning.trainer import EpochTrainer
+
+# logger = logging.getLogger(__name__)
 
 
 class ContinualLearner:
@@ -22,6 +25,7 @@ class ContinualLearner:
         num_epochs,
     ):
         batches, batch_mapping = self._collect_batches(cache_manager)
+        # logger.info(f"[收集批次] 总批次数量={len(batches)}")
         if len(batches) == 0:
             return {
                 "loss_before": 1.0,
@@ -35,6 +39,7 @@ class ContinualLearner:
         # 如果不是 MAB 策略，把 init_epochs 设为 num_epochs,
         # trainer 内部就不会进入 selector 采样阶段
         init_ep = Config.INIT_EPOCHS if Config.CACHE_STRATEGY == "MAB" else num_epochs
+        # logger.info(f"[策略检查] CACHE_STRATEGY={Config.CACHE_STRATEGY}, INIT_EPOCHS={Config.INIT_EPOCHS}, num_epochs={num_epochs}, init_ep={init_ep}")
         result = self.trainer.train(
             batches=batches,
             num_epochs=num_epochs,
@@ -129,10 +134,10 @@ class ContinualLearner:
             old_scores = [s for _, s in scores["old"]]
             new_scores = [s for _, s in scores["new"]]
             
-            if old_scores:
-                logger.info(
-                    f"[MAB质量分数] 车辆 {vid}: old_scores均值={np.mean(old_scores):.4f}, "
-                    f"标准差={np.std(old_scores):.4f}, min={min(old_scores):.4f}, max={max(old_scores):.4f}"
-                )
+            # if old_scores:
+            #     logger.info(
+            #         f"[MAB质量分数] 车辆 {vid}: old_scores均值={np.mean(old_scores):.4f}, "
+            #         f"标准差={np.std(old_scores):.4f}, min={min(old_scores):.4f}, max={max(old_scores):.4f}"
+            #     )
             
             cache["quality_scores"] = old_scores + new_scores

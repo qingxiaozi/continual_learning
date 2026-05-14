@@ -77,10 +77,10 @@ class CacheManager:
             
             if old_quality_scores and len(cache["old_data"]) > 0:
                 quality_indices = np.argsort(old_quality_scores)[:excess]
-                logger.info(
-                    f"[MAB] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
-                    f"quality_scores={old_quality_scores}, 移除索引={list(quality_indices)}"
-                )
+                # logger.info(
+                #     f"[MAB] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
+                #     f"quality_scores={old_quality_scores}, 移除索引={list(quality_indices)}"
+                # )
                 for idx in sorted(quality_indices, reverse=True):
                     if idx < len(cache["old_data"]):
                         cache["old_data"].pop(idx)
@@ -90,20 +90,20 @@ class CacheManager:
                             cache["batch_mapping"].pop(idx)
             elif len(cache["old_data"]) > 0:
                 remove_count = min(excess, len(cache["old_data"]))
-                logger.info(
-                    f"[FIFO] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
-                    f"移除前 {remove_count} 个"
-                )
+                # logger.info(
+                #     f"[FIFO] 车辆 {vehicle_id}: old_data={len(cache['old_data'])}, "
+                #     f"移除前 {remove_count} 个"
+                # )
                 cache["old_data"] = cache["old_data"][remove_count:]
                 if len(cache["quality_scores"]) >= remove_count:
                     cache["quality_scores"] = cache["quality_scores"][remove_count:]
                 if has_mapping:
                     cache["batch_mapping"] = cache["batch_mapping"][remove_count:]
 
-            logger.debug(
-                f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
-                f"剩余 {len(cache['old_data'])} 个旧批次, {len(cache['quality_scores'])} 个质量评分"
-            )
+            # logger.debug(
+            #     f"车辆 {vehicle_id} 缓存维护: 移除了 {excess} 个批次, "
+            #     f"剩余 {len(cache['old_data'])} 个旧批次, {len(cache['quality_scores'])} 个质量评分"
+            # )
 
     def get_vehicle_cache(self, vehicle_id):
         """获取车辆缓存"""
