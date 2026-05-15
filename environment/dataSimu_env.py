@@ -71,33 +71,25 @@ class DomainIncrementalDataSimulator:
     =========================================================
     每个域的数据划分：
     - 50% 初始数据 (init_domain_cache): 用于初始模型训练和奖励计算
-    - 5×10% 子数据集 (sub_domain_cache): 用于持续学习训练
+    - 5 x 10% 子数据集 (sub_domain_cache): 用于持续学习训练
 
     缓存结构：
     - full_domain_cache:     {domain_key: original_dataset}     原始域数据
     - init_domain_cache:    {domain_key: {train/val/test}}     50%初始数据
-    - sub_domain_cache:     {(domain_key, sub_idx): {train/val/test}}  5×10%子集
+    - sub_domain_cache:     {(domain_key, sub_idx): {train/val/test}}  5 x 10%子集
     - vehicle_data_assignments: {(domain_key, sub_idx): {vid: [indices]}}  车辆分配
-    - class_distributions:  {vehicle_id: [ratio_per_class]}    各类别样本分配比例（等分）
 
     =========================================================
     核心流程
-    =========================================================
     reset() → 清空所有缓存，重置session=0
-         ↓
     update_session_dataset(session_id) → 域/子集切换
-         ↓
     _preload_all_sub_domain_datasets() → 加载50%+5×10%数据
-         ↓
     generate_vehicle_data(vid) → 分配车辆数据，生成batches
-         ↓
     evaluate_model() → 用50%初始数据评估，计算奖励
-         ↓
     get_cumulative_val/test_datasets() → 累积验证/测试集用于训练
 
     =========================================================
     域切换规则
-    =========================================================
     - DOMAIN_CHANGE_INTERVAL: 域切换间隔
     - 每个域有5个子集，sub_idx在域内循环 [0, 1, 2, 3, 4]
     """

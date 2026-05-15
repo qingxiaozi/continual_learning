@@ -51,41 +51,41 @@ EXPERIMENT_CONFIGS = {
         #     "CACHE": "MAB",
         #     "env_group": "group_ours",
         # },
-        # "RATIO_0.2": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 0.2,
-        #     "env_group": "group_ratio",
-        # },
-        "RATIO_0.4": {
+        "RATIO_0.2": {
             "BW": "EQUAL",
             "UPLOAD": "RATIO",
             "CACHE": "FIFO",
-            "RATIO": 0.4,
+            "RATIO": 0.2,
             "env_group": "group_ratio",
         },
-        # "RATIO_0.6": {
+        # "RATIO_0.4": {
         #     "BW": "EQUAL",
         #     "UPLOAD": "RATIO",
         #     "CACHE": "FIFO",
-        #     "RATIO": 0.6,
+        #     "RATIO": 0.4,
         #     "env_group": "group_ratio",
         # },
-        # "RATIO_0.8": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 0.8,
-        #     "env_group": "group_ratio",
-        # },
-        # "RATIO_1": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 1.0,
-        #     "env_group": "group_ratio",
-        # },
+        "RATIO_0.6": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.6,
+            "env_group": "group_ratio",
+        },
+        "RATIO_0.8": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.8,
+            "env_group": "group_ratio",
+        },
+        "RATIO_1": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 1.0,
+            "env_group": "group_ratio",
+        },
     }
 
 # 环境分组 → 相同随机种子（同一组内物理环境完全相同）

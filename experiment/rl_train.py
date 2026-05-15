@@ -95,8 +95,8 @@ class RLTrainer:
             })
 
             # 下面两行可以不要，先放着吧
-            self.episode_rewards.append(total_reward)
-            self.visualizer.plot_training_loss(self.episode_rewards)
+            # self.episode_rewards.append(total_reward)
+            # self.visualizer.plot_training_loss(self.episode_rewards)
 
             # 定期更新目标网络
             if episode % Config.TARGET_UPDATE_INTERVAL == 0:
