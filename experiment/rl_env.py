@@ -83,14 +83,14 @@ class VehicleEdgeEnv:
 
         # 1. 执行动作，分配带宽，上传数据，更新缓存
         bandwidth_ratios = self._allocate_bandwidth(batch_choices)
-        self._upload_datas(batch_choices)
+        actual_uploads = self._upload_datas(batch_choices)
         self._update_cache()
         # 2. 训练
         training_results = self._train_global_model()
 
         total_samples = self._get_total_samples()
         # 3. 通信开销
-        comm_results = self._calculate_delay(batch_choices, bandwidth_ratios, training_results, total_samples)
+        comm_results = self._calculate_delay(actual_uploads, bandwidth_ratios, training_results, total_samples)
         self.last_comm_metrics = comm_results
 
         # 4. 计算奖励
@@ -127,14 +127,17 @@ class VehicleEdgeEnv:
         return ratios
 
     def _upload_datas(self, batch_choices):
+        actual_uploads = []
         for vehicle_id, n in enumerate(batch_choices):
             vehicle = self.vehicle_env._get_vehicle_by_id(vehicle_id)
             if vehicle is None:
+                actual_uploads.append(0)
                 continue
             actual_n = min(n, len(vehicle.data_batches)) if n > 0 else 0
             selected = random.sample(vehicle.data_batches, actual_n) if actual_n > 0 else []
             vehicle.set_uploaded_data(selected)
-        return
+            actual_uploads.append(actual_n)
+        return actual_uploads
 
     def _update_cache(self):
         """更新缓存"""

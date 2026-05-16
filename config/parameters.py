@@ -20,7 +20,7 @@ class Config:
     NUM_VEHICLES = 10  # 车辆数
     # 模型参数
     NUM_EPOCH = 7  # 训练epoch数
-    BATCH_SIZE = 16  # batch size，digit10:16
+    BATCH_SIZE = 8  # batch size，digit10:16
     EVAL_BATCH_SIZE = 64  # 评估时的 batch_size
     LEARNING_RATE = 0.001  # 学习率
 
@@ -56,8 +56,8 @@ class Config:
     DRL_UPDATE_INTERVAL = 4  # DRL优化间隔（每4步优化一次）
 
     # 缓存参数
-    MAX_LOCAL_BATCHES = 15  # 单个智能车最大缓存批次, # office21:2, digit10:15, domainnet:15
-    MAX_UPLOAD_BATCHES = 15  # 单阶段最大上传批次, # office21:2, digit10:15, domainnet:15
+    MAX_LOCAL_BATCHES = 10  # 单个智能车最大缓存批次, # office21:2, digit10:15, domainnet:15
+    MAX_UPLOAD_BATCHES = 10  # 单阶段最大上传批次, # office21:2, digit10:15, domainnet:15
     MAX_CACHE_SIZE = MAX_LOCAL_BATCHES * NUM_VEHICLES  # 边缘服务器的最大缓存批次，# office:40, digit10:150, domainnet:2600
 
     # 数据分布参数
