@@ -97,11 +97,11 @@ class VehicleEdgeEnv:
         reward = self._calculate_reward(comm_results, training_results, total_samples)
         self.communication_system.clear_channel_cache()
         # 5. 更新环境
+        self.session += 1
         self._update_session_environment()
         next_state = self._get_state()
         done = self._is_done()
         info = self._get_info()
-        self.session += 1
 
         return next_state, reward, done, info
 
