@@ -187,24 +187,15 @@ class DomainIncrementalDataSimulator:
             np.random.shuffle(all_indices)
             init_size = int(0.5 * len(original_dataset))
             init_indices = all_indices[:init_size]
+            remaining_indices = all_indices[init_size:]
             self.init_domain_cache[domain_key] = self._split_indices(original_dataset, init_indices, Config.RANDOM_SEED, "50%初始数据")
 
         if (domain_key, 0) not in self.sub_domain_cache:
-            self._create_non_overlapping_subsets(original_dataset, domain_key)
+            self._create_non_overlapping_subsets(original_dataset, domain_key, remaining_indices)
 
         logger.info(f"已预加载域 {domain} 的数据")
 
-    def _create_non_overlapping_subsets(self, original_dataset, domain_key):
-        total_size = len(original_dataset)
-        init_size = int(0.5 * total_size)
-
-        all_indices = list(range(total_size))
-        np.random.seed(Config.RANDOM_SEED + 100)
-        np.random.shuffle(all_indices)
-
-        init_indices = set(all_indices[:init_size])
-        remaining_indices = [i for i in all_indices if i not in init_indices]
-
+    def _create_non_overlapping_subsets(self, original_dataset, domain_key, remaining_indices):
         subset_size = len(remaining_indices) // 5
 
         for sub_idx in range(5):
