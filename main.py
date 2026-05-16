@@ -58,13 +58,13 @@ EXPERIMENT_CONFIGS = {
             "RATIO": 0.2,
             "env_group": "group_ratio",
         },
-        # "RATIO_0.4": {
-        #     "BW": "EQUAL",
-        #     "UPLOAD": "RATIO",
-        #     "CACHE": "FIFO",
-        #     "RATIO": 0.4,
-        #     "env_group": "group_ratio",
-        # },
+        "RATIO_0.4": {
+            "BW": "EQUAL",
+            "UPLOAD": "RATIO",
+            "CACHE": "FIFO",
+            "RATIO": 0.4,
+            "env_group": "group_ratio",
+        },
         "RATIO_0.6": {
             "BW": "EQUAL",
             "UPLOAD": "RATIO",
