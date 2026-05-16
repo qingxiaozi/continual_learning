@@ -49,6 +49,7 @@ class VehicleEdgeEnv:
         """重置环境，开始新的episode"""
         # self.gold_model.reset_parameters()
         self.global_model.reset_parameters()
+        self.continual_learner.trainer.reset_optimizer()
         self.vehicle_env.reset()
         self.data_simulator.reset()
         self.cache_manager.reset()
