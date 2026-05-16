@@ -292,7 +292,7 @@ class DomainIncrementalDataSimulator:
             target_per_class = {}
 
             for c_idx, c in enumerate(all_classes):
-                target_per_class[c] = int(distribution[c_idx] * samples_per_vehicle)
+                target_per_class[c] = int(distribution[c] * samples_per_vehicle)
 
             total_target = sum(target_per_class.values())
             diff = samples_per_vehicle - total_target
