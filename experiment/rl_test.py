@@ -101,7 +101,7 @@ class RLTester:
             cached_loaders = {}
 
             for t in range(self.max_timesteps):
-                available_batches = state[-2*Config.NUM_VEHICLES:-Config.NUM_VEHICLES].astype(int).tolist()
+                available_batches = [len(v.data_batches) for v in self.env.vehicle_env.vehicles]
                 action = self.agent.select_action(state, available_batches=available_batches)
                 next_state, reward, done, info = self.env.step(action)
                 state = next_state
