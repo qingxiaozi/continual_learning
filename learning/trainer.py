@@ -28,6 +28,13 @@ class EpochTrainer:
             l1_lambda=1e-6,
         )
 
+    def reset_optimizer(self):
+        self.optimizer = torch.optim.Adam(
+            self.model.parameters(),
+            lr=Config.LEARNING_RATE,
+            weight_decay=1e-3,
+        )
+
     def train(self, batches, num_epochs, init_epochs, val_dataset=None, patience=3):
         """训练模型
 
@@ -36,7 +43,7 @@ class EpochTrainer:
         """
         logger.info(f"training......")
         selector = MABDataSelector(num_arms=len(batches))
-        best_state = self.model.state_dict()
+        best_state = {k: v.detach().clone() for k, v in self.model.state_dict().items()}
         best_val = float("inf")
         patience_cnt = 0
         actual_epochs = 0
@@ -56,7 +63,7 @@ class EpochTrainer:
 
                 if val_loss < best_val:
                     best_val = val_loss
-                    best_state = self.model.state_dict()
+                    best_state = {k: v.detach().clone() for k, v in self.model.state_dict().items()}
                     patience_cnt = 0
                 else:
                     patience_cnt += 1
